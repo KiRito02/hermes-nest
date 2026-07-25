@@ -37,16 +37,16 @@ GitHub Issues are the work queue; pull requests are the review and merge record.
 - Merge into `master` only after validation passes, review feedback is resolved, and the human approves.
 - Keep `master` buildable because it is the protected integration branch.
 
-## Direct Capability Tracking
+## Companion Capability Tracking
 
-- Track the direct Hermes Agent roadmap in the thin, always-current index
+- Track the Companion/Gateway roadmap in the thin, always-current index
   `docs/agents/feature-gap-index.md` (capability → status + priority + safety +
   one-line note).
 - Create GitHub issues from a `roadmap` row in the index only when a specific gap becomes selected or ready for triage.
-- Validate request/response shapes **just-in-time** against the owner's running
-  server, official Hermes Agent API Server docs, and a matching pinned Hermes
-  Agent source/test checkout. Record sanitized evidence and the upstream commit
-  in the issue/PR.
+- Validate App-facing shapes **just-in-time** against the Companion
+  contract/tests and owner's running Companion. For proxied behavior also
+  validate the local Gateway, official Hermes Agent docs, and a matching pinned
+  source/test checkout. Record sanitized evidence and commits in the issue/PR.
 
 ## Skill Semantics
 

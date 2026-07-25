@@ -13,11 +13,12 @@ read the [Code of Conduct](CODE_OF_CONDUCT.md).
   `PROJECT_SPEC.md`; do not add new ones without maintainer approval.
 - Build and run the **`HermesMobile`** scheme on an iPhone simulator
   (`iPhone 17` is the reference device; any recent iPhone simulator works).
-- To actually use the app you need your own
-  [Hermes Agent API Server](https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server)
-  started by `hermes gateway`. See [`DEVELOPMENT.md`](DEVELOPMENT.md) for
-  reachable-server options and the simulator-only `http://127.0.0.1:8642`
-  fallback.
+- To actually use the target architecture you need the self-hosted Hermex
+  Companion on the same NAS as a
+  [Hermes Agent API Server](https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server).
+  The App connects to Companion; Companion connects to `hermes gateway` over
+  loopback. Until the Companion implementation lands, the current branch is
+  documentation/migration work, not a usable deployment.
 
 ## Running tests
 
@@ -75,18 +76,21 @@ independently useful, it deserves its own PR.
 
 ## App bug or server bug?
 
-Hermex Direct is a client of
-[Hermes Agent](https://github.com/NousResearch/hermes-agent), so some apparent
-app bugs are server-contract bugs. Before filing:
+Hermex Direct has three layers: App, self-hosted Companion, and
+[Hermes Agent](https://github.com/NousResearch/hermes-agent). Before filing:
 
 - Capture the HTTP status/content type and a sanitized response from the same
-  endpoint with `curl`; never include the API key.
-- Compare the behavior with `/v1/capabilities`, the official API Server docs,
-  and the matching Hermes Agent source/tests.
-- If the server violates its advertised contract, file it
+  Companion endpoint with `curl`; never include a device or Gateway credential.
+- Compare App behavior with the versioned Companion contract and capability
+  document.
+- For a proxied route, compare Companion behavior with the local Gateway,
+  `/v1/capabilities`, official API Server docs, and matching Hermes Agent
+  source/tests.
+- If Gateway violates its advertised contract, file it
   [upstream](https://github.com/NousResearch/hermes-agent/issues) and link that
-  ticket here when the app also needs a graceful fallback.
-- If the wire contract is correct and only the app fails, file it here.
+  ticket here when Companion/App also need a graceful fallback.
+- If Companion violates its contract, or the wire contract is correct and only
+  the App fails, file it here and identify the failing layer.
 
 ## PR workflow
 
@@ -99,9 +103,10 @@ app bugs are server-contract bugs. Before filing:
    [`AGENTS.md`](AGENTS.md)):
    - **Tolerant decoding:** every `Codable` model uses optionals for fields the
      server might add or rename — never crash on unknown fields.
-   - **Never invent API endpoints or JSON shapes** — verify against your running
-     server, the official Hermes Agent API Server docs, and matching pinned
-     Hermes Agent source/tests, in that order.
+   - **Never invent endpoints or JSON shapes** — verify App-facing behavior
+     against the Companion contract and a running Companion. For proxied
+     behavior also verify the local Gateway, official Hermes Agent API Server
+     docs, and matching pinned source/tests.
    - **No new third-party dependencies** without approval.
 4. **Run the full test suite** (command above) and make sure it passes.
 5. **Open a PR** against `master` using the PR template — link the issue with

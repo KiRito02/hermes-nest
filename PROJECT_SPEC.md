@@ -1,27 +1,34 @@
-# Hermex Direct — iOS App Project Specification
+# Hermex Direct — iOS App + NAS Companion Project Specification
 
-**Status:** source of truth for the `KiRito02/hermex` fork  
-**Target:** native iOS client for the self-hosted Hermes Agent API Server  
+**Status:** source of truth for the `KiRito02/hermex` fork
+**Target:** native iOS client for a self-hosted NAS Companion that uses the
+local Hermes Agent API Server
 **Distribution:** personal sideload first; no App Store or TestFlight requirement
 
 ---
 
 ## 0. How to use this document
 
-This specification replaces the inherited `hermes-webui` product contract for
-this fork. The existing SwiftUI application is the implementation starting
-point, but inherited WebUI behavior is not automatically a product requirement.
+This specification replaces both the inherited `hermes-webui` product contract
+and the superseded direct-App-to-Gateway draft for this fork. The existing
+SwiftUI application is the implementation starting point, but inherited WebUI
+behavior is not automatically a product requirement.
 
-Before implementing an API call:
+Before implementing an App-facing call:
 
-1. Probe the owner's running Hermes Agent API Server when connection details are
-   available. Its wire response is the final arbiter.
-2. Check the current official Hermes Agent API Server documentation.
-3. Check the matching Hermes Agent source and tests at a recorded commit.
-4. Treat `/v1/capabilities` as the runtime compatibility boundary.
+1. Check the versioned Hermex Companion contract and matching tests.
+2. Probe the owner's running Companion when connection details are available.
+   Its App-facing wire response is the final arbiter.
+3. For a proxied Gateway behavior, probe the local Gateway, check the official
+   Hermes Agent API Server documentation, then check matching upstream source
+   and tests at a recorded commit.
+4. Treat the Companion capability document, which includes a sanitized Gateway
+   capability snapshot, as the App's runtime compatibility boundary.
 
-Never infer an endpoint or payload from the old WebUI client. Unknown JSON fields
-and unknown SSE event types must be tolerated.
+Never infer a Companion endpoint or payload from the old WebUI client,
+HermesPilot Link, or an upstream Dashboard route. Exact Companion-native paths
+and payloads are locked in their implementation issues. Unknown JSON fields and
+unknown SSE event types must be tolerated.
 
 ---
 
@@ -29,13 +36,16 @@ and unknown SSE event types must be tolerated.
 
 ### 1.1 What we are building
 
-Hermex Direct is a native SwiftUI iPhone application that remotely controls a
-Hermes Agent running on the owner's NAS. It connects directly to the API Server
-started by `hermes gateway`; `hermes-webui` is not required.
+Hermex Direct is a native SwiftUI iPhone and iPad application plus a small
+self-hosted Companion running on the owner's NAS. The App connects only to the
+Companion. The Companion connects over loopback to the API Server started by
+`hermes gateway`, transparently carries supported Gateway REST/SSE behavior,
+and supplies restricted file, upload, and built-in Memory management that the
+Gateway does not expose.
 
 The phone is the interaction and review surface. The NAS remains the execution
 plane and owns agent processes, tools, memory, skills, sessions, and scheduled
-work.
+work. No vendor account, hosted relay, or third-party control plane is required.
 
 ### 1.2 Why this fork exists
 
@@ -44,9 +54,13 @@ client for agent work, but its networking layer is coupled to `hermes-webui`.
 This fork combines:
 
 - the existing native Hermex layout and agent-oriented message UI;
-- direct bearer-authenticated access to Hermes Agent API Server;
+- a self-hosted, single-endpoint Companion with per-device authentication;
+- loopback-only access from the Companion to Hermes Agent API Server;
 - capability-gated support for the core session/run/approval flow;
+- Jobs, Skills/Toolsets, model selection, inline images, restricted files,
+  upload, and built-in Memory management in the first-release roadmap;
 - a dedicated performance pass for long, Markdown-heavy conversations;
+- adaptive iPhone/iPad presentation;
 - a personal sideload workflow that does not require App Store publication.
 
 ### 1.3 What it is not
@@ -55,8 +69,10 @@ This fork combines:
 - Not a hosted relay or account service.
 - Not a copy of Hermes Agent running on iOS.
 - Not dependent on `hermes-webui`.
-- Not required to preserve WebUI-only Kanban, workspace, upload, profile-cookie,
-  memory-file, or analytics endpoints.
+- Not a general NAS administration API, arbitrary filesystem browser, SSH/SFTP
+  client, terminal, or Git mutation service.
+- Not required to preserve WebUI-only Kanban, projects, profile cookies,
+  personalities, analytics, or private route shapes.
 - Not an App Store or TestFlight deliverable in the initial fork.
 
 ### 1.4 Initial user
@@ -71,26 +87,28 @@ scope until explicitly approved.
 
 | Decision | Value |
 | --- | --- |
-| UI platform | Native SwiftUI, iOS 18+, iPhone first |
-| Server | Hermes Agent API Server started by `hermes gateway` |
-| Default server port | `8642` |
-| Authentication | Required bearer token from `API_SERVER_KEY` |
-| Secret storage | iOS Keychain; never `UserDefaults`, logs, fixtures, or git |
-| Compatibility | Runtime discovery through `GET /v1/capabilities` |
+| UI platform | Native SwiftUI, iOS 18+, adaptive iPhone and iPad |
+| App server | Self-hosted Hermex Companion on the owner's NAS |
+| Agent upstream | Hermes Agent API Server on Companion-local loopback |
+| App authentication | Revocable per-device Companion credential |
+| Gateway authentication | `API_SERVER_KEY`, stored only on the NAS |
+| Secret storage | App device credential in Keychain; NAS secrets outside git/logs |
+| Compatibility | Companion capabilities merged with sanitized Gateway capabilities |
 | Conversation storage | Server-owned sessions; local cache is read-only/offline support |
 | Streaming | SSE over `URLSession`/existing LDSwiftEventSource dependency |
-| Transport | HTTPS reverse proxy/tunnel or private Tailscale access |
+| Transport | HTTPS reverse proxy/tunnel or private Tailscale access to Companion |
 | Dependencies | Keep the exhaustive locked list in §2.1; add none without approval |
 | Distribution | Personal sideload first |
 | App identity | Owner-specific values supplied through local signing configuration |
-| Legacy WebUI backend | Unsupported by the direct-v1 contract |
-| Performance work | Separate track from API migration |
+| Hosted control plane | None |
+| Legacy WebUI backend | Unsupported by the Companion-v1 contract |
+| Performance work | Separate track from protocol migration |
 
 ### 2.1 Locked third-party dependencies
 
-These are the complete direct Swift Package dependencies currently authorized
-for the app. Versions are minimums with the existing up-to-next-major
-requirements in the Xcode project.
+These are the complete Swift Package dependencies currently authorized for the
+App. Versions are minimums with the existing up-to-next-major requirements in
+the Xcode project.
 
 | Package | Minimum version | Purpose |
 | --- | --- | --- |
@@ -103,7 +121,8 @@ requirements in the Xcode project.
 
 Transitive packages do not become independently approved direct dependencies.
 Any addition or replacement requires owner approval and an update to this
-table.
+table. Companion runtime dependencies require their own explicit approval and
+must be recorded before Companion implementation begins.
 
 ---
 
@@ -111,56 +130,97 @@ table.
 
 ```text
 ┌──────────────────────────────┐      HTTPS REST + SSE
-│ Hermex Direct on iPhone      │ ─────────────────────────────┐
-│                              │                              │
-│ SwiftUI views                │                              ▼
-│ feature-level repositories   │                 ┌────────────────────────┐
-│ API client + SSE client      │                 │ Tunnel / reverse proxy │
-│ Keychain bearer credential   │                 │ or Tailscale           │
-│ SwiftData read-only cache    │                 └────────────┬───────────┘
-└──────────────────────────────┘                              │
+│ Hermex Direct on iPhone/iPad │ ─────────────────────────────┐
+│ SwiftUI + feature interfaces │                              │
+│ device credential in Keychain│                              ▼
+│ SwiftData read-only cache    │                 ┌─────────────────────────┐
+└──────────────────────────────┘                 │ Hermex Companion on NAS │
+                                               │ device auth + capability│
+                                               │ Gateway proxy           │
+                                               │ workspace/upload        │
+                                               │ built-in Memory         │
+                                               └────────────┬────────────┘
+                                                            │ loopback
+                                                            │ REST + SSE
                                                             ▼
-                                               ┌──────────────────────────┐
-                                               │ Hermes Agent API Server  │
-                                               │ hermes gateway :8642     │
-                                               │ sessions / runs / jobs   │
-                                               └──────────────────────────┘
+                                               ┌─────────────────────────┐
+                                               │ Hermes Agent API Server │
+                                               │ hermes gateway :8642    │
+                                               │ sessions/runs/jobs/etc. │
+                                               └─────────────────────────┘
 ```
 
-### 3.1 Backend seams
+The Companion is the App's only remote endpoint. Hermes Agent API Server should
+remain on loopback and must not be separately exposed merely for the App.
+
+### 3.1 App seams
 
 Views must not construct paths or decode wire payloads. Networking is split by
 user capability rather than by one giant backend protocol:
 
-- `ServerConnectionService`: health, bearer authentication, capabilities.
+- `CompanionConnectionService`: pairing, device authentication, health,
+  capability discovery, and revocation state.
 - `SessionRepository`: list/create/read/update/delete/fork/messages.
 - `ConversationRunService`: start/stream/status/stop/approval.
 - `ModelCatalogService`: OpenAI-compatible models and rich Hermes options.
-- Optional capability services: jobs, skills, and toolsets.
+- `AutomationCatalogService`: Jobs, Skills, and Toolsets.
+- `WorkspaceRepository`: approved roots, browse, preview, download, and upload.
+- `MemoryRepository`: built-in Memory read and controlled mutations.
 
 The existing UI may continue to use concrete types during migration, but new
-direct-API code must enter through these feature boundaries. This permits
-WebUI-only features to remain disabled without contaminating core chat.
+Companion code must enter through these seams. Views must not know whether a
+result came from Companion-native storage or a proxied Gateway route.
 
-### 3.2 Capability gating
+### 3.2 Companion modules
 
-After a successful health check, the app requests `/v1/capabilities` with the
-bearer token and stores a tolerant capability snapshot for the configured
-server.
+The Companion must remain a small, deep module rather than becoming another
+general WebUI backend. Its external interface hides:
+
+- one-time local pairing and revocable per-device credentials;
+- Gateway key custody and loopback connectivity;
+- sanitized capability merging;
+- transparent REST/SSE proxying without a second run lifecycle;
+- workspace allowlists, sensitive-path filtering, and path canonicalization;
+- bounded streaming upload with temporary files and atomic completion;
+- built-in Memory locking, validation, limits, and atomic writes.
+
+Gateway-compatible paths may be forwarded without semantic rewriting.
+Companion-native operations use an explicitly versioned namespace. Exact paths,
+payloads, error shapes, and pairing protocol are defined and tested in their
+implementation issues; this specification does not invent them.
+
+### 3.3 Capability gating
+
+After authenticated Companion onboarding, the App stores a tolerant Companion
+capability snapshot. That snapshot includes the Companion version/features and
+a sanitized representation of the connected Gateway's `/v1/capabilities`.
 
 - Core UI requires the capabilities needed by the current migration stage.
 - Optional destinations are shown only when their endpoint/feature is
   advertised.
 - A missing optional capability disables only that feature.
 - Unknown capability fields are ignored.
-- A server that is healthy but incompatible gets a distinct error from invalid
-  credentials or network failure.
+- Companion unavailable, device unauthorized/revoked, Gateway unavailable,
+  Gateway unauthorized, and incompatible versions are distinct states.
 - The app must not probe speculative paths to guess support.
 
-### 3.3 UI preservation boundary
+### 3.4 Authority and lifecycle
+
+- Hermes Gateway is authoritative for sessions, messages, runs, approvals,
+  Jobs, Skills/Toolsets, models, and agent-produced output.
+- The Companion is authoritative for devices, allowed workspace roots,
+  uploaded-file metadata, and built-in Memory mutations it performs.
+- The App owns only presentation state and a read-only/offline cache.
+- The Companion must preserve Gateway `run_id`, session identity, terminal
+  status, ordering, SSE comments, and unknown event types.
+- A disconnected App must reconnect or poll through the Companion using the
+  existing Gateway identity; neither App nor Companion may resubmit a prompt
+  automatically.
+
+### 3.5 UI preservation boundary
 
 The backend migration is behavior-preserving for supported surfaces. Except for
-the intentional password-to-API-key onboarding change and hiding unsupported
+the intentional Companion pairing/onboarding change and removal of unsupported
 WebUI-only destinations, retain the inherited:
 
 - Sessions → Chat navigation hierarchy.
@@ -168,7 +228,7 @@ WebUI-only destinations, retain the inherited:
 - User/assistant message presentation.
 - Markdown, code, math, reasoning, and tool-card presentation.
 - Stop, scroll-to-bottom, offline-cache, theme, Dynamic Type, and VoiceOver
-  affordances where the direct protocol can support them.
+  affordances where the Companion/Gateway protocol can support them.
 
 Review each migrated UI slice against `master` with matched fixtures. A visual
 redesign, navigation rewrite, or removal of a supported interaction is separate
@@ -176,45 +236,63 @@ scope requiring owner approval.
 
 ---
 
-## 4. Direct API contract
+## 4. Companion and Gateway contract
 
-The paths in this section are documented candidates from the current official
-Hermes Agent API Server documentation. They are not yet a compatibility claim
-for the owner's installed server. Each implementation issue must confirm the
-installed version/commit, sanitized `/v1/capabilities`, and exact live wire
+The Gateway paths in this section are documented candidates from current
+official Hermes Agent API Server documentation. They are not yet a compatibility
+claim for the owner's installed server. Each implementation issue must confirm
+the installed version/commit, sanitized `/v1/capabilities`, and exact live wire
 shape before relying on a path or payload.
 
-Base URL examples:
+The App sends Gateway-compatible requests to the Companion base URL; it never
+constructs the Gateway loopback URL. The Companion forwards supported
+Gateway-compatible routes and adds separately versioned native operations.
 
-- LAN/private proxy: `https://hermes.example.com`
+Companion URL examples:
+
+- private reverse proxy: `https://hermex.example.com`
 - Tailscale with valid TLS: `https://nas-name.tailnet-name.ts.net`
-- Simulator-only local development: `http://127.0.0.1:8642`
+- simulator-only local development: an implementation-defined localhost port
 
-All authenticated calls send:
+The App authenticates with its device credential. The Companion authenticates
+to Gateway with `API_SERVER_KEY`. The two credentials must never be
+interchangeable, returned to the other side, put in a query string, or logged.
 
-```http
-Authorization: Bearer <API_SERVER_KEY>
-```
+### 4.1 Companion connection and discovery
 
-The bearer value must be redacted from request descriptions, errors, analytics,
-screenshots, and debug logs.
+Companion foundation must provide a versioned, testable interface for:
 
-### 4.1 Connection and discovery
+- unauthenticated bounded liveness without secret or path disclosure;
+- one-time local pairing and device naming;
+- authenticated Companion/Gateway readiness;
+- tolerant capabilities and version discovery;
+- listing and revoking paired devices.
+
+Pairing must require a short-lived, single-use secret created on the NAS. It may
+be transferred by QR code or manual entry. Pairing must not require a Hermex
+account, hosted claim server, or relay. The exact wire contract is owned by
+Issue #1.
+
+### 4.2 Proxied Gateway discovery
+
+The Companion verifies and sanitizes the following upstream Gateway surfaces:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/health` | Cheap liveness check; documented response includes `{"status":"ok"}` |
-| GET | `/health/detailed` | Authenticated bounded readiness details |
-| GET | `/v1/capabilities` | Stable, machine-readable feature and endpoint discovery |
+| GET | `/health` | Gateway liveness |
+| GET | `/health/detailed` | Bounded authenticated Gateway readiness |
+| GET | `/v1/capabilities` | Gateway feature and endpoint discovery |
 | GET | `/v1/models` | OpenAI-compatible model aliases |
-| GET | `/api/model/options` | Rich Hermes provider/model/reasoning metadata |
+| GET | `/api/model/options` | Rich provider/model/reasoning metadata |
 
-`/health` success alone does not authenticate the client. Onboarding completes
-only after an authenticated capability request succeeds.
+Companion onboarding completes only after device authentication succeeds and
+the Companion returns a decodable capability document. A temporarily unavailable
+Gateway may leave Companion administration reachable in a clearly degraded
+state.
 
-### 4.2 Sessions
+### 4.3 Sessions
 
-The direct session-control surface is:
+The upstream session-control surface carried through the Companion is:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -231,9 +309,9 @@ The direct session-control surface is:
 List pagination (`limit`, `offset`, `source`, `include_children`) and response
 shapes must be verified against the owner's server before model code is merged.
 
-### 4.3 Runs and human control
+### 4.4 Runs and human control
 
-The long-running control surface is:
+The upstream long-running control surface carried through the Companion is:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -248,17 +326,19 @@ verified on the owner's installed Hermes Agent version before choosing the
 production turn coordinator. Until then, UI state must not assume that
 `session_id` correlation alone guarantees message persistence.
 
-### 4.4 Streaming rules
+### 4.5 Streaming rules
 
-The direct server can emit event families such as assistant/message deltas,
+The Gateway can emit event families such as assistant/message deltas,
 reasoning, tool started/completed, approval requests, run completed/failed, and
 stream termination.
 
-The client must:
+The Companion transport and App client together must:
 
 - parse the SSE `event:` field and JSON `data:` independently;
 - ignore comment/keepalive lines beginning with `:`;
 - ignore unknown event types without ending the run;
+- preserve upstream ordering and Gateway run/session identity;
+- avoid response buffering that delays visible progress;
 - keep stable tool-call identity when updating a tool card;
 - coalesce presentation updates rather than publishing every token to SwiftUI;
 - finalize from authoritative terminal/status data when available;
@@ -270,32 +350,74 @@ The client must:
 Exact event names and payloads are locked per implementation issue using live
 server evidence, official documentation, and matching upstream tests.
 
-### 4.5 Optional direct surfaces
+### 4.6 First-release Gateway surfaces
 
-These may be added only when advertised by capabilities and verified:
+These are part of the approved first-release roadmap but remain
+capability-gated and require live verification:
 
 | Surface | Documented paths |
 | --- | --- |
 | Jobs | `/api/jobs` and job detail/update/delete/pause/resume/run routes |
 | Skills | `GET /v1/skills` |
 | Toolsets | `GET /v1/toolsets` |
+| Models | `GET /v1/models` and `GET /api/model/options` |
+| Inline images | Verified multimodal session/run input |
 
-### 4.6 Explicitly unsupported in direct v1
+Skills/Toolsets are read-only unless a future advertised Gateway or Companion
+capability explicitly supports mutation.
 
-The following inherited features depend on Hermes Bridge/WebUI endpoints that
-the direct API does not currently advertise:
+### 4.7 Companion workspace and upload
 
-- general workspace tree, raw file browser, git mutations, and file export;
-- general document/file upload; inline images may be supported separately;
-- WebUI projects, pin/archive actions, profile cookies, personalities, memory
-  file browser, usage dashboard, and bridge slash-command metadata;
+The Companion first release supports:
+
+- NAS-configured allowed workspace roots that the App cannot broaden;
+- paged directory browsing under those roots;
+- bounded text/binary metadata preview and authenticated download;
+- streaming upload to a selected allowed destination;
+- upload progress, cancellation, collision handling, and stable metadata;
+- making a completed upload available to a subsequent Hermes turn without
+  pretending the Gateway supports `file`, `input_file`, or `file_id`.
+
+All paths are canonicalized after symlink resolution and checked against an
+allowed root. Sensitive files and directories are denied even if nested under
+an allowed root. The first release does not include arbitrary delete, recursive
+mutation, shell access, or Git mutation.
+
+Uploads stream into a sibling temporary file, enforce a configured byte limit,
+and atomically publish only after success. Exact attachment-reference and
+turn-coordination shapes require a dedicated contract issue and live Gateway
+verification.
+
+### 4.8 Companion built-in Memory management
+
+The Companion first release supports controlled management of Hermes built-in
+`MEMORY.md` and `USER.md`:
+
+- read current content and bounded metadata;
+- add, replace, remove, and reset with explicit confirmation where destructive;
+- preserve Hermes section/character-limit semantics;
+- lock across concurrent App and Agent writes;
+- use atomic writes and reject stale conflicting updates.
+
+Raw filesystem overwrite is not the Memory interface. External Memory providers
+are not implied by built-in Memory support and require separate capability
+adapters.
+
+### 4.9 Explicitly unsupported in Companion v1
+
+The following inherited features are outside the approved first release:
+
+- arbitrary NAS filesystem or secret-file access;
+- file deletion, recursive directory mutation, terminal, and Git mutations;
+- WebUI projects, pin/archive actions, profile cookies, personalities, usage
+  dashboard, and bridge slash-command metadata;
 - Hermes Bridge Kanban/Boards;
 - WebUI approval/clarify side streams;
 - cookie login, logout, CSRF handling, and WebUI version checks.
 
-Existing code for these features may remain during migration, but direct mode
-must hide or clearly mark unavailable features. It must never call an old route
-against the Agent API Server.
+Existing code for these features may remain during migration, but Companion
+mode must hide or clearly mark unavailable features. It must never call an old
+WebUI route against either the Companion or Agent API Server.
 
 ---
 
@@ -303,7 +425,7 @@ against the Agent API Server.
 
 ### 5.1 NAS configuration
 
-Minimum server configuration:
+Hermes Gateway remains configured with a long random key:
 
 ```dotenv
 API_SERVER_ENABLED=true
@@ -316,30 +438,60 @@ Start with:
 hermes gateway
 ```
 
-The default listener is `127.0.0.1:8642`. Prefer keeping it on loopback and
-placing an authenticated TLS tunnel or reverse proxy in front. If binding more
-broadly for a private network, retain the bearer key and firewall the port.
+The documented Gateway default is `127.0.0.1:8642`. Keep it on loopback so only
+the Companion can reach it. The Companion owns its separate configuration,
+device registry, allowed workspace roots, and Gateway credential. Exact
+configuration keys and service commands are defined only when the Companion
+implementation issue locks them.
 
 ### 5.2 Remote transport
 
 Preferred options:
 
-1. HTTPS through a reverse proxy or Cloudflare Tunnel.
-2. Tailscale with HTTPS via a tailnet certificate or Tailscale Serve.
+1. Tailscale with HTTPS via a tailnet certificate or Tailscale Serve.
+2. HTTPS through an owner-controlled reverse proxy or Cloudflare Tunnel.
 
 A blanket iOS App Transport Security exception is not part of the release
 configuration. Simulator-only HTTP may use a narrowly scoped debug setting.
+The Companion should bind loopback by default and be exposed only through the
+selected private/TLS transport.
 
 ### 5.3 Credential handling
 
-- Store server URL and bearer key in Keychain.
-- Do not persist the key in SwiftData.
-- Do not include it in `URL`, query strings, crash text, or logs.
-- Clear credentials when the user reconfigures the server.
+- Store Companion URL, device ID, and device credential in App Keychain.
+- Never place `API_SERVER_KEY` on the iPhone or in a pairing payload.
+- Store Companion device and Gateway secrets with owner-only NAS permissions.
+- Do not persist secrets in SwiftData.
+- Do not include secrets in URLs, query strings, crash text, analytics, or logs.
+- Clear the App credential when the user removes the server or the device is
+  revoked.
 - Treat `401` and `403` as authentication/authorization failures without
   deleting offline cached transcripts automatically.
 - Self-signed TLS trust is a separate transport decision; v1 prefers a
   system-trusted certificate rather than disabling certificate validation.
+
+### 5.4 Device lifecycle
+
+- Pairing secrets are single-use, short-lived, and generated on the NAS.
+- Each installed App receives a distinct revocable credential.
+- Revocation affects only the selected device.
+- Device listing exposes labels and bounded activity metadata, never credential
+  material.
+- Companion logs identify a device by a non-secret stable identifier and redact
+  request bodies that may contain prompts, Memory, or file content.
+
+### 5.5 File and Memory safety
+
+- Resolve and validate a filesystem path server-side; never trust an App path
+  string as authorization.
+- Deny traversal, symlink escapes, special files, and sensitive-path patterns.
+- Bound directory pages, preview bytes, upload bytes, Memory bytes, request
+  time, and concurrent work.
+- Use temporary files, fsync/close as appropriate, and atomic replacement.
+- Never expose `.env`, auth stores, Companion state, Apple material, private
+  keys, or Gateway logs through workspace browsing.
+- Destructive Memory reset requires an explicit App confirmation and a
+  Companion request designed to resist accidental replay.
 
 ---
 
@@ -375,9 +527,9 @@ App Store and TestFlight preparation require a separate explicit decision.
 
 ## 7. Chat performance requirements
 
-Performance remediation is intentionally independent from direct API migration.
-Backend correctness must not be judged from scroll smoothness, and UI
-optimization must not silently change protocol behavior.
+Performance remediation is intentionally independent from Companion/Gateway
+protocol migration. Backend correctness must not be judged from scroll
+smoothness, and UI optimization must not silently change protocol behavior.
 
 ### 7.1 Known risks in the inherited client
 
@@ -392,8 +544,15 @@ optimization must not silently change protocol behavior.
 
 - Use lazy or explicitly windowed transcript rendering.
 - Page older messages; do not lay out the entire server history by default.
-- Batch streaming deltas before publishing to the view.
-- Disable per-token animation and text selection while a message is streaming.
+- Batch transport deltas before publishing to the view.
+- Preserve a progressive word/fade effect through a presentation queue whose
+  cadence is independent of raw SSE event frequency.
+- Bound presentation updates to a measured refresh rate and collapse queued
+  animation when it falls behind.
+- Disable or simplify streaming animation while the user scrolls, when Reduce
+  Motion is enabled, in background/low-power states, or when the queue exceeds
+  its latency budget.
+- Disable text selection only while a message is actively streaming.
 - Preserve stable message/tool identities so existing rows do not rebuild.
 - Cache or precompute expensive finalized-message presentation data where
   practical.
@@ -403,7 +562,8 @@ optimization must not silently change protocol behavior.
 
 ### 7.3 Acceptance scenarios
 
-The performance issue must include reproducible fixtures for:
+The performance issue must include a repeatable benchmark harness and fixtures
+for:
 
 - a short plain-text conversation;
 - at least 200 mixed messages;
@@ -413,7 +573,11 @@ The performance issue must include reproducible fixtures for:
 
 Success means no correctness regression, bounded memory growth, and visibly
 responsive scrolling on the selected iPhone test target. Numeric frame-time
-targets are recorded only after a baseline can be measured on macOS/device.
+and stream-to-presentation latency targets are recorded only after a baseline
+can be measured on macOS/device. The benchmark records fixture version, device,
+OS, build configuration, message count, content mix, streaming cadence, peak
+memory, dropped/hitch frames where available, and time to settle after stream
+completion.
 
 ---
 
@@ -426,65 +590,88 @@ Do not implement all phases at once.
 
 Tracking issue: https://github.com/KiRito02/hermex/issues/2
 
-- [x] Confirm direct Hermes Agent API Server as the product backend.
-- [x] Replace the inherited WebUI product contract with this specification.
-- [x] Align `AGENTS.md` API evidence routing after owner approval.
+- [x] Retire the inherited WebUI product contract.
+- [x] Verify the Gateway capability and file/Memory gaps.
+- [x] Select the self-hosted Companion architecture.
+- [x] Align specification, working agreements, roadmap, and Issue #1.
 - [ ] Record the owner's Hermes Agent version/commit and live capability
   response without storing secrets.
 
-### Phase B — direct connection foundation
+### Phase B — Companion contract and foundation
 
 Tracking issue: https://github.com/KiRito02/hermex/issues/1
 
-- [ ] Introduce tolerant capability/auth models.
-- [ ] Send bearer authentication from the central API client.
-- [ ] Replace password/cookie onboarding with server URL + API key.
-- [ ] Validate `/health` and `/v1/capabilities`.
-- [ ] Store URL/key in Keychain and redact errors/logs.
-- [ ] Hide all migrated-but-unsupported feature entry points.
+- [ ] Approve the Companion runtime language and dependency list.
+- [ ] Define versioned health, pairing, device-auth, capability, error, and
+  revocation contracts with tests.
+- [ ] Start the minimal NAS Companion without a hosted relay.
+- [ ] Connect Companion to Gateway over loopback while keeping
+  `API_SERVER_KEY` NAS-local.
+- [ ] Replace password/cookie/API-key onboarding with Companion URL and
+  one-time local pairing.
+- [ ] Store only the device credential in App Keychain and redact secrets/logs.
+- [ ] Distinguish Companion, device-auth, Gateway, and compatibility failures.
 
 This is the first implementation issue.
 
-### Phase C — direct sessions
+### Phase C — Gateway proxy and capability merge
+
+- [ ] Transparently forward the verified Gateway REST surface.
+- [ ] Transparently carry SSE without buffering or identity rewriting.
+- [ ] Merge sanitized Gateway capabilities into Companion capabilities.
+- [ ] Add bounded readiness and diagnostics without leaking paths or secrets.
+- [ ] Build contract fixtures against a pinned Hermes Agent commit.
+
+### Phase D — sessions
 
 - [ ] List and page `/api/sessions`.
 - [ ] Create, read, update, delete, and fork supported sessions.
 - [ ] Load paginated message history.
-- [ ] Map direct wire models to stable app-domain models.
+- [ ] Map wire models to stable App-domain models.
 - [ ] Preserve read-only offline cache behavior.
 
-### Phase D — direct streaming and control
+### Phase E — streaming, control, and presentation pipeline
 
 - [ ] Select the verified session-chat/run coordination strategy.
 - [ ] Stream assistant, reasoning, and tool lifecycle events.
 - [ ] Stop, status-poll, and reconnect without resending.
 - [ ] Surface approval requests and responses when supported.
 - [ ] Reconcile final messages with server-authoritative state.
+- [ ] Coalesce transport deltas and drive the bounded progressive animation
+  queue without tying SwiftUI updates to raw SSE frequency.
 
-### Phase E — optional post-v1 capabilities
-
-This phase is future scope and requires separate owner approval after direct-v1
-chat is stable.
+### Phase F — first-release Gateway capabilities and adaptive UI
 
 - [ ] Rich model/provider/reasoning picker.
-- [ ] Jobs.
-- [ ] Skills and toolsets.
-- [ ] Inline image input if verified and desired.
+- [ ] Jobs CRUD/control advertised by the installed Gateway.
+- [ ] Read-only Skills and Toolsets.
+- [ ] Inline image input.
+- [ ] Adaptive iPhone/iPad navigation, composer, sheets, and transcript layout.
 
-### Phase F — long-chat performance
+### Phase G — Companion files, upload, and built-in Memory
+
+- [ ] Configure NAS-side allowed roots.
+- [ ] Browse, preview, and download bounded allowed files.
+- [ ] Stream uploads with progress, cancellation, limits, and atomic completion.
+- [ ] Lock the verified upload-to-turn attachment strategy.
+- [ ] Read and safely mutate built-in `MEMORY.md` and `USER.md`.
+- [ ] Add stale-write, concurrent-write, size-limit, and destructive-reset tests.
+
+### Phase H — long-chat performance
 
 - [ ] Establish fixtures/baseline.
 - [ ] Lazy/windowed transcript.
-- [ ] Batched stream rendering.
+- [ ] Batched transport and bounded progressive rendering.
 - [ ] Reduce heavy Markdown and scroll-observer work.
-- [ ] Verify correctness and responsiveness.
+- [ ] Record repeatable post-change benchmark results.
 
-### Phase G — personal sideload
+### Phase I — personal sideload and release acceptance
 
 - [ ] Add personal signing configuration and app-only scheme.
 - [ ] Add macOS CI build/test and sideload artifact workflow.
 - [ ] Document Windows AltStore/SideStore installation.
-- [ ] Verify on the owner's iPhone/iPad-compatible layout as applicable.
+- [ ] Deploy Companion reproducibly on the owner's NAS with restart-safe state.
+- [ ] Verify on the owner's iPhone and iPad-compatible layout.
 
 ---
 
@@ -492,27 +679,48 @@ chat is stable.
 
 ### 9.1 Unit tests
 
-- URL/path and authorization-header construction.
-- Keychain lifecycle without logging secrets.
-- Capability decoding with missing/unknown fields.
+- Companion URL, device-auth, and Gateway-proxy header construction.
+- Keychain device-credential lifecycle without logging secrets.
+- Companion/Gateway capability decoding with missing/unknown fields.
 - Session and message tolerant decoding.
 - SSE framing, unknown events, comments, split frames, and malformed data.
 - Run state transitions, reconnect, stop, and approval handling.
 - Stream batching and transcript identity stability.
+- Pairing expiry/replay, per-device revocation, and error classification.
+- Workspace canonicalization, root confinement, symlink escape, sensitive-path
+  denial, pagination, and size limits.
+- Upload cancellation, partial-file cleanup, collision policy, and atomic
+  completion.
+- Built-in Memory locking, stale writes, limits, mutation, and reset.
 
 ### 9.2 Contract tests
 
-Contract tests target a pinned Hermes Agent commit/version and cover only
-advertised endpoints. They must never require the owner's secret in public CI.
+App contract tests target a pinned Companion contract. Proxy contract tests
+target a pinned Hermes Agent commit/version and cover only advertised
+endpoints. Public CI uses fakes/fixtures and must never require owner secrets.
 
 When live credentials are available locally:
 
 - capture sanitized request/response fixtures;
-- record server version/commit and `/v1/capabilities`;
+- record Companion version, Hermes version/commit, and sanitized capabilities;
 - compare exact method, path, status, content type, and required fields;
-- never commit bearer tokens, private hostnames, filesystem paths, or prompts.
+- verify that `API_SERVER_KEY` is never returned to the App;
+- never commit device credentials, bearer tokens, private hostnames,
+  filesystem paths, Memory content, file content, or prompts.
 
-### 9.3 Xcode validation
+### 9.3 Companion validation
+
+- Run unit and contract suites on Linux/NAS.
+- Verify Gateway proxy streaming with split frames, keepalives, reconnect, and
+  slow subscribers.
+- Verify the service restarts without losing paired-device/revocation state or
+  exposing secret material.
+- Validate allowed-root behavior against real NAS filesystem and container
+  mount layouts.
+- Run a live smoke only with owner-approved local credentials and sanitized
+  output.
+
+### 9.4 Xcode validation
 
 Green full-suite macOS CI is required before review of code-affecting changes.
 Because the primary development machines are Linux/Windows, the handoff may
@@ -523,30 +731,43 @@ check occurs. Physical-device checks are required for sideload signing,
 Keychain entitlements, performance, microphone, and background behavior.
 
 For each migrated supported screen, manual validation compares the same
-fixture/state on `master` and the direct branch. Expected differences are
-limited to direct authentication/capability wording and explicitly unsupported
-destinations.
+fixture/state on `master` and the Companion branch. Expected differences are
+limited to Companion onboarding/capability wording, the approved first-release
+features, and explicitly unsupported destinations.
 
 ---
 
-## 10. Definition of done for direct v1
+## 10. Definition of done for Companion v1
 
-Direct v1 is complete when the owner can sideload the app and:
+Companion v1 is complete when the owner can deploy the NAS Companion, sideload
+the App, and:
 
-- configure a NAS URL and API key;
-- pass liveness, authentication, and capability checks;
+- pair locally without a vendor account or relay;
+- connect using a revocable device credential while `API_SERVER_KEY` remains
+  on the NAS;
+- pass Companion, Gateway, authentication, and capability checks;
 - list/create/open supported Hermes sessions;
 - load conversation history;
 - send a turn and watch assistant/tool/reasoning progress;
 - recover status after transient disconnect without duplicate submission;
 - stop a run and answer an approval when advertised;
 - use the app without any `hermes-webui` process;
+- manage advertised Jobs, browse Skills/Toolsets, choose models, and send
+  inline images;
+- browse allowed NAS files, upload a file with progress, and make the completed
+  upload available to a Hermes turn;
+- view and safely manage built-in `MEMORY.md` and `USER.md`;
 - retain the inherited Sessions/Chat navigation, compact composer, and
   message/Markdown/reasoning/tool-card presentation for supported behavior;
+- use an adaptive layout on the owner's iPhone and iPad;
+- retain a progressive streaming animation without coupling SwiftUI updates to
+  every SSE delta;
 - scroll a long mixed-content conversation responsively;
-- understand which optional legacy features are unavailable;
+- reproduce the long-chat benchmark and compare it with the recorded baseline;
 - rebuild and reinstall through the documented Linux/Windows/macOS-CI
-  sideload workflow.
+  sideload workflow;
+- restart/upgrade the Companion through the documented NAS workflow without
+  losing device or configuration state.
 
 No App Store listing, TestFlight build, public account system, telemetry, or
 WebUI compatibility is required.
@@ -557,15 +778,17 @@ WebUI compatibility is required.
 
 Stop and ask before implementing a choice that depends on one of these:
 
-1. Owner-specific bundle ID and Apple Team ID for the sideload configuration.
-2. The exact Hermes Agent version/commit running on the NAS.
-3. The sanitized live `/v1/capabilities` response from that server.
-4. Whether the owner's public transport will use Cloudflare, Tailscale HTTPS,
-   or another reverse proxy.
-5. Whether persisted session chat or Runs API is the primary turn transport
+1. Companion implementation language, packaging, and approved dependencies.
+2. Owner-specific bundle ID and Apple Team ID for the sideload configuration.
+3. The exact Hermes Agent version/commit running on the NAS.
+4. The sanitized live `/v1/capabilities` response from that server.
+5. Whether remote transport will use Tailscale HTTPS, Cloudflare, or another
+   reverse proxy.
+6. Whether persisted session chat or Runs API is the primary turn transport
    after live verification.
-6. Whether any WebUI-only feature should later be rebuilt against a new direct
-   API rather than simply removed.
+7. Exact NAS workspace roots and upload byte limits.
+8. Whether Companion v1 Memory management is built-in Memory only, as currently
+   specified, or must include a named external provider.
 
 ---
 
@@ -577,6 +800,10 @@ Stop and ask before implementing a choice that depends on one of these:
   https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server
 - Hermes Agent API server source:
   https://github.com/NousResearch/hermes-agent/blob/main/gateway/platforms/api_server.py
+- Hermes Agent Dashboard server patterns:
+  https://github.com/NousResearch/hermes-agent/blob/main/hermes_cli/web_server.py
+- HermesPilot Link pattern (reference only; not a product dependency):
+  https://www.npmjs.com/package/@hermespilot/link
 - Cloudflare Tunnel:
   https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
 - Tailscale:

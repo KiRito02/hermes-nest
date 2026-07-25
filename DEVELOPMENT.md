@@ -1,9 +1,16 @@
 # Development
 
-Hermex Direct is developed against a self-hosted Hermes Agent API Server
-started by `hermes gateway`. It does not require `hermes-webui`.
+Hermex Direct is developed as two cooperating deliverables:
 
-[`PROJECT_SPEC.md`](PROJECT_SPEC.md) is the product/API source of truth.
+- the native iPhone/iPad App;
+- a self-hosted Companion on the owner's NAS.
+
+The App connects only to Companion. Companion connects over loopback to the
+Hermes Agent API Server started by `hermes gateway` and adds restricted file,
+upload, and built-in Memory management. It requires neither `hermes-webui` nor
+a hosted account/relay.
+
+[`PROJECT_SPEC.md`](PROJECT_SPEC.md) is the product/protocol source of truth.
 [`AGENTS.md`](AGENTS.md) contains the working agreement for coding agents.
 
 The initial distribution target is personal sideloading. App Store and
@@ -18,6 +25,7 @@ Linux/NAS and Windows are suitable for:
 
 - source editing and Git/GitHub work;
 - documentation and fixture review;
+- Companion development, unit/contract tests, and live local Gateway tests;
 - non-Xcode scripts and static checks;
 - launching macOS GitHub Actions build/test jobs;
 - downloading a sideload artifact;
@@ -34,15 +42,15 @@ When a macOS environment is available, use XcodeBuildMCP for normal
 simulator build/test/run work. Raw `xcodebuild` remains the fallback for
 low-level diagnosis and archive-oriented validation.
 
-## Primary server target
+## Primary deployment target
 
-Use the owner's Hermes Agent API Server through a system-trusted HTTPS URL:
+The App uses a system-trusted HTTPS Companion URL:
 
 ```text
-https://<your-hermes-host>
+https://<your-companion-host>
 ```
 
-The NAS runs:
+The NAS runs Companion beside a loopback-only Gateway:
 
 ```dotenv
 API_SERVER_ENABLED=true
@@ -55,37 +63,29 @@ Start the server with:
 hermes gateway
 ```
 
-The documented default listener is `127.0.0.1:8642`. Keep it on loopback and
-put a TLS reverse proxy or tunnel in front where practical.
+The documented Gateway default is `127.0.0.1:8642`. Keep it on loopback.
+Companion service commands, listen port, configuration names, and App-facing
+paths are intentionally not documented until Issue #1 locks and tests them.
+Do not invent placeholders and later treat them as a contract.
 
-Before debugging the app, verify liveness:
+Before debugging the App, verify in order:
 
-```bash
-curl https://<your-hermes-host>/health
-```
+1. Companion process and bounded liveness;
+2. App device authentication and Companion capabilities;
+3. Companion-to-Gateway readiness;
+4. sanitized Gateway capabilities carried by Companion.
 
-Then verify authenticated capability discovery without printing the key:
-
-```bash
-curl \
-  -H "Authorization: Bearer $HERMEX_API_KEY" \
-  https://<your-hermes-host>/v1/capabilities
-```
-
-`HERMEX_API_KEY` in the example is a local shell variable containing the
-server's `API_SERVER_KEY` value. Never commit the value or paste it into logs,
-issues, screenshots, fixtures, or command output shared with others.
-
-Onboarding is not considered successful merely because `/health` works. The
-authenticated `/v1/capabilities` call must also succeed and decode.
+Never put `API_SERVER_KEY` on the App device. Local Gateway diagnostics may use
+it on the NAS, but it must not appear in shared logs, issues, screenshots, or
+fixtures.
 
 ## Remote access
 
 Preferred options:
 
-1. HTTPS reverse proxy or Cloudflare Tunnel to `127.0.0.1:8642`.
-2. Tailscale with HTTPS through Tailscale Serve or a valid tailnet
-   certificate.
+1. Tailscale with HTTPS through Tailscale Serve or a valid tailnet
+   certificate to Companion.
+2. An owner-controlled HTTPS reverse proxy or Cloudflare Tunnel to Companion.
 
 Do not solve connectivity by disabling TLS verification. A blanket App
 Transport Security exception is not part of the personal release
@@ -93,12 +93,13 @@ configuration.
 
 If the server appears unavailable, check in this order:
 
-1. `hermes gateway` process state;
-2. local listener on port 8642;
-3. reverse proxy/tunnel/Tailscale state;
-4. public/private DNS and certificate validity;
-5. bearer-key mismatch;
-6. `/v1/capabilities` compatibility.
+1. Companion process state;
+2. reverse proxy/tunnel/Tailscale state;
+3. public/private DNS and certificate validity;
+4. device revocation/authentication state;
+5. Companion/Gateway compatibility;
+6. `hermes gateway` process and loopback listener;
+7. Companion-local Gateway-key mismatch.
 
 Local port inspection on Linux/macOS:
 
@@ -114,11 +115,9 @@ ss -ltnp | grep 8642
 
 ## Simulator-only local fallback
 
-On a Mac running Hermes Agent locally, the iOS simulator can use:
-
-```text
-http://127.0.0.1:8642
-```
+On a Mac running Companion and Hermes Agent locally, the simulator may use a
+narrowly scoped Debug-only HTTP Companion URL. The actual port/path is defined
+by Issue #1 and its development configuration.
 
 This is a Debug-only convenience. Physical devices need a reachable HTTPS
 hostname or an intentionally configured private-network route.
@@ -128,15 +127,18 @@ Follow the official Hermes Agent installation and API Server documentation:
 - https://hermes-agent.nousresearch.com/docs/
 - https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server
 
-Do not copy the old `hermes-webui` server setup into this fork.
+Do not expose Gateway directly to the App and do not copy old `hermes-webui`,
+Dashboard, or HermesPilot Link routes into the Companion contract.
 
-## API contract evidence
+## Protocol contract evidence
 
-For every endpoint or SSE payload, use this precedence:
+For every App-facing endpoint or SSE payload, use this precedence:
 
-1. Sanitized `curl` evidence from the owner's running server.
-2. Official Hermes Agent API Server documentation.
-3. Matching Hermes Agent source and tests at a recorded commit.
+1. Versioned Companion contract and tests.
+2. Sanitized evidence from the owner's running Companion.
+3. For proxied behavior, sanitized local Gateway evidence.
+4. Official Hermes Agent API Server documentation.
+5. Matching Hermes Agent source and tests at a recorded commit.
 
 The read-only upstream checkout lives at:
 
@@ -165,15 +167,17 @@ tests/gateway/
 website/docs/user-guide/features/api-server.md
 ```
 
-The retired WebUI pin and contract runbook do not define the direct API
-compatibility boundary. A future issue may add a Hermes Agent pin and direct
-contract suite after live verification.
+Dashboard filesystem/Memory code may be studied as implementation evidence, but
+its private route shapes are not a Companion contract. HermesPilot Link is an
+architecture reference only. Neither source may be copied into the App-facing
+wire contract by assumption.
 
 ## SSE and reconnect verification
 
-Direct streaming is implemented only after the selected issue verifies whether
+Streaming is implemented only after the selected issue verifies whether
 persisted session chat or the Runs API is the primary turn transport for the
-owner's installed Hermes Agent version.
+owner's installed Hermes Agent version and proves that Companion forwarding
+does not buffer or rewrite the stream.
 
 Regardless of the selected endpoint, validation must cover:
 
@@ -181,13 +185,16 @@ Regardless of the selected endpoint, validation must cover:
 - unknown event types do not fail the stream;
 - assistant/reasoning deltas and tool lifecycle events preserve stable
   identity;
+- Companion preserves ordering, comments, unknown events, `run_id`, and session
+  identity;
 - a transport disconnect does not resend the user's prompt;
 - status/reconnect uses the existing server identifier;
 - stop and approval state reconcile with authoritative server status;
 - background/foreground does not duplicate the turn.
 
 Record the installed Hermes Agent version/commit and sanitized capability
-response alongside the implementation issue.
+response alongside the implementation issue. Record the Companion version and
+contract fixture version as well.
 
 ## XcodeBuildMCP validation
 
@@ -302,8 +309,8 @@ The intended owner workflow is:
 
 1. Push an explicitly approved branch.
 2. Manually run the `PR CI` workflow on that branch for macOS build/test.
-   Packaging is added later in the personal-sideload Phase G issue.
-3. After Phase G lands, download the sideload artifact on Windows.
+   Packaging is added later in the personal-sideload Phase I issue.
+3. After Phase I lands, download the sideload artifact on Windows.
 4. Sign/install it with AltStore or SideStore using the owner's Apple account.
 5. Re-sign when the provisioning period expires.
 
@@ -314,15 +321,16 @@ without a new explicit distribution decision.
 
 Run the sections relevant to the current migration phase.
 
-### Direct connection foundation
+### Companion connection foundation
 
-- Fresh install shows Server URL + API Key onboarding.
-- Valid `/health` plus authenticated `/v1/capabilities` completes onboarding.
-- Wrong API key reports unauthorized/forbidden distinctly.
-- Healthy but incompatible server reports an incompatibility state.
-- Server/tunnel down reports a network/reachability state.
-- API key never appears in visible diagnostics or logs.
-- Reconfigure clears the stored credential but not offline transcript cache.
+- Fresh install shows Companion URL plus local pairing onboarding.
+- A valid single-use pairing secret creates one device credential.
+- Expired/replayed pairing and revoked device credentials fail distinctly.
+- Healthy but incompatible Companion reports an incompatibility state.
+- Companion-up/Gateway-down differs from tunnel/network failure.
+- `API_SERVER_KEY` never reaches the App or visible diagnostics.
+- Reconfigure clears the stored device credential but not offline transcript
+  cache.
 - No WebUI login/cookie or legacy feature route is probed.
 
 ### UI preservation
@@ -333,7 +341,7 @@ Compare matched fixtures against `master`:
 - Composer layout and ordinary text send remain intact.
 - User/assistant bubbles, Markdown, code, math, reasoning, and tool cards retain
   their presentation.
-- Unsupported WebUI-only destinations are hidden or clearly unavailable.
+- Capability-gated destinations match Companion/Gateway support.
 - Light/dark mode, Dynamic Type, and VoiceOver core paths remain functional.
 
 ### Sessions and streaming (after their issues land)
@@ -346,6 +354,17 @@ Compare matched fixtures against `master`:
 - Background/foreground during an active turn.
 - Offline cached transcript remains read-only.
 
+### Companion files and Memory
+
+- Directory browsing cannot escape a NAS-configured allowed root.
+- Sensitive paths, symlink escapes, special files, and oversized previews fail
+  safely.
+- Upload reports progress, supports cancellation, and leaves no partial
+  published file.
+- A completed upload is available to the next verified Hermes turn.
+- Built-in Memory read/mutation preserves limits and rejects stale writes.
+- Destructive Memory reset requires explicit confirmation.
+
 ### Long-chat performance (separate issue)
 
 - Short plain-text fixture.
@@ -353,6 +372,9 @@ Compare matched fixtures against `master`:
 - Multiple code blocks, table, math, and tool activity.
 - Long actively streaming response.
 - Scroll upward while streaming continues.
+- Progressive animation remains bounded and collapses backlog instead of
+  delaying completed text.
+- Record the repeatable baseline and post-change measurements.
 
 ## Git workflow
 

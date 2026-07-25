@@ -35,7 +35,7 @@ Apply `needs-manual-validation` sparingly: only when automated tests genuinely c
 | Label | Covers |
 | --- | --- |
 | `area:streaming` | Streaming chat responses (SSE, run lifecycle) |
-| `area:auth` | Bearer authentication, Keychain credentials, and legacy cookie-removal migration |
+| `area:auth` | Companion pairing, device credentials/revocation, Keychain, and Gateway-key custody |
 | `area:voice` | Voice notes, dictation, speech-to-text |
 | `area:live-activity` | Live Activities and Dynamic Island |
 | `area:i18n` | Localization, RTL, plurals, translations |
