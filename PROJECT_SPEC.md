@@ -1,7 +1,6 @@
 # Hermex Direct — iOS App Project Specification
 
-**Status:** approved product direction; contract transition pending
-`AGENTS.md` alignment  
+**Status:** source of truth for the `KiRito02/hermex` fork  
 **Target:** native iOS client for the self-hosted Hermes Agent API Server  
 **Distribution:** personal sideload first; no App Store or TestFlight requirement
 
@@ -12,10 +11,6 @@
 This specification replaces the inherited `hermes-webui` product contract for
 this fork. The existing SwiftUI application is the implementation starting
 point, but inherited WebUI behavior is not automatically a product requirement.
-
-Do not begin code implementation while `AGENTS.md` still mandates the old
-WebUI API evidence sources. Align that working agreement with this approved
-direction first so agents do not receive contradictory hard rules.
 
 Before implementing an API call:
 
@@ -182,6 +177,12 @@ scope requiring owner approval.
 ---
 
 ## 4. Direct API contract
+
+The paths in this section are documented candidates from the current official
+Hermes Agent API Server documentation. They are not yet a compatibility claim
+for the owner's installed server. Each implementation issue must confirm the
+installed version/commit, sanitized `/v1/capabilities`, and exact live wire
+shape before relying on a path or payload.
 
 Base URL examples:
 
@@ -427,7 +428,7 @@ Tracking issue: https://github.com/KiRito02/hermex/issues/2
 
 - [x] Confirm direct Hermes Agent API Server as the product backend.
 - [x] Replace the inherited WebUI product contract with this specification.
-- [ ] Align `AGENTS.md` API evidence routing after owner approval.
+- [x] Align `AGENTS.md` API evidence routing after owner approval.
 - [ ] Record the owner's Hermes Agent version/commit and live capability
   response without storing secrets.
 
@@ -513,11 +514,13 @@ When live credentials are available locally:
 
 ### 9.3 Xcode validation
 
-The full XCTest suite and signed simulator launch remain required before review
-of UI changes. Because the primary development machines are Linux/Windows,
-macOS CI is the normal compile/test gate. Physical-device checks are required
-for sideload signing, Keychain entitlements, performance, microphone, and
-background behavior.
+Green full-suite macOS CI is required before review of code-affecting changes.
+Because the primary development machines are Linux/Windows, the handoff may
+explicitly carry signed simulator/device validation as owed. For UI changes,
+signed simulator launch is required before merge or final acceptance when
+applicable; the work must not be described as fully UI-validated until that
+check occurs. Physical-device checks are required for sideload signing,
+Keychain entitlements, performance, microphone, and background behavior.
 
 For each migrated supported screen, manual validation compares the same
 fixture/state on `master` and the direct branch. Expected differences are
