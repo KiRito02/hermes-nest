@@ -461,7 +461,16 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
 
-                    SettingsFootnote(String(localized: "Debug builds only. Replay a canned reply and tune the streamed-text fade feel live."))
+                    SettingsDivider()
+
+                    NavigationLink {
+                        LongChatLabView()
+                    } label: {
+                        SettingsAccessoryRow(title: String(localized: "Long Chat Lab"), systemImage: "gauge.with.dots.needle.67percent")
+                    }
+                    .buttonStyle(.plain)
+
+                    SettingsFootnote(String(localized: "Debug builds only. Replay streaming text or profile a deterministic 200-message transcript."))
                 }
                 #endif
 

@@ -55,6 +55,10 @@ struct HermesMobileApp: App {
                 NavigationStack {
                     StreamingLabView()
                 }
+            } else if ProcessInfo.processInfo.arguments.contains("--long-chat-lab") {
+                NavigationStack {
+                    LongChatLabView()
+                }
             } else if ProcessInfo.processInfo.arguments.contains("--kanban-lab") {
                 NavigationStack {
                     KanbanLabView()

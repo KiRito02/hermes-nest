@@ -145,4 +145,55 @@ final class StreamingLabReplayTests: XCTestCase {
         XCTAssertEqual(StreamingTextFadeDefaults.glyphStagger, StreamingTextFadeDefaults.Baseline.glyphStagger)
         XCTAssertEqual(StreamingTextFadeDefaults.maxStampLead, StreamingTextFadeDefaults.Baseline.maxStampLead)
     }
+
+    // MARK: - Long conversation benchmark
+
+    func testLongChatFixtureHasTwoHundredStableUniqueMessages() {
+        let messages = LongChatLabFixture.messages
+
+        XCTAssertEqual(messages.count, 200)
+        XCTAssertEqual(Set(messages.map(\.id)).count, messages.count)
+        XCTAssertEqual(messages.first?.id, "long-chat-0")
+        XCTAssertEqual(messages.last?.id, "long-chat-199")
+    }
+
+    func testShortPlainFixtureContainsOnlyPlainTextMessages() {
+        let messages = LongChatLabFixture.shortPlainTextMessages
+
+        XCTAssertEqual(messages.count, 4)
+        XCTAssertEqual(Set(messages.map(\.id)).count, messages.count)
+        XCTAssertFalse(messages.contains { message in
+            guard let content = message.content else { return false }
+            return content.contains("#")
+                || content.contains("```")
+                || content.contains("|")
+                || content.contains("$$")
+        })
+    }
+
+    func testLongChatFixtureCoversMarkdownCodeTableMathAndToolActivity() {
+        let content = LongChatLabFixture.messages.compactMap(\.content).joined(separator: "\n")
+        let toolIndexes = LongChatLabFixture.messages.indices.filter {
+            LongChatLabFixture.includesToolActivity(after: $0)
+        }
+
+        XCTAssertTrue(content.contains("### Summary"))
+        XCTAssertTrue(content.contains("```swift"))
+        XCTAssertTrue(content.contains("| Metric | Sample |"))
+        XCTAssertTrue(content.contains("T_{render}"))
+        XCTAssertGreaterThanOrEqual(toolIndexes.count, 9)
+        XCTAssertTrue(toolIndexes.allSatisfy {
+            LongChatLabFixture.messages[$0].role == "assistant"
+        })
+    }
+
+    func testLongChatStreamingTailUsesProductionWordBoundariesLosslessly() {
+        let fixture = LongChatLabFixture.streamingContent
+        let totalUnits = StreamingWordDrain.unitCount(in: fixture)
+
+        XCTAssertEqual(
+            StreamingLabReplay.prefix(of: fixture, unitCount: totalUnits),
+            fixture
+        )
+    }
 }

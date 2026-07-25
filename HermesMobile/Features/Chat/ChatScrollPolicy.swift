@@ -36,6 +36,11 @@ enum ChatScrollPolicy {
     /// interacted with the scroll view.
     static let userScrollCooldown: TimeInterval = 0.25
 
+    /// Scroll geometry is decision input, not animation input. Deliver the
+    /// latest observed metrics at a bounded cadence so KVO does not publish
+    /// SwiftUI state on every content-size/offset callback.
+    static let metricDeliveryInterval: TimeInterval = 1.0 / 30.0
+
     static func bottomThreshold(isStreaming: Bool) -> CGFloat {
         isStreaming ? streamingBottomDetectionThreshold : bottomDetectionThreshold
     }
