@@ -81,15 +81,18 @@ final class OnboardingFlowTests: XCTestCase {
         XCTAssertFalse(OnboardingFlowPolicy.showsServerShortcut(for: OnboardingFlowPolicy.connectPageIndex))
     }
 
-    func testAgentSetupPromptIncludesTailscaleRequirements() {
+    func testAgentSetupPromptUsesCompanionAndKeepsGatewaySecretOnNAS() {
         let prompt = OnboardingFlowPolicy.agentSetupPrompt
 
-        XCTAssertTrue(prompt.contains("hermes-webui"))
-        XCTAssertTrue(prompt.contains("HERMES_WEBUI_PASSWORD"))
-        XCTAssertTrue(prompt.contains("tailscale serve --bg 8787"))
-        XCTAssertTrue(prompt.contains("curl http://$(tailscale ip -4):8787/health"))
-        XCTAssertTrue(prompt.contains("Do not use Cloudflare. Optimize for Tailscale + iPhone."))
-        XCTAssertTrue(prompt.contains("Hermex"))
+        XCTAssertTrue(prompt.contains("Hermex Companion"))
+        XCTAssertTrue(prompt.contains("127.0.0.1:8642"))
+        XCTAssertTrue(prompt.contains("API_SERVER_KEY"))
+        XCTAssertTrue(prompt.contains("Lucky HTTPS"))
+        XCTAssertTrue(prompt.contains("/companion/v1/health"))
+        XCTAssertTrue(prompt.contains("trusted NAS shell"))
+        XCTAssertTrue(prompt.contains("Do not create, print, request, or include the pairing secret in this chat."))
+        XCTAssertTrue(prompt.contains("Do not install hermes-webui"))
+        XCTAssertFalse(prompt.contains("HERMES_WEBUI_PASSWORD"))
     }
 
     func testTailscaleAppStoreURLUsesITMSDeepLink() {

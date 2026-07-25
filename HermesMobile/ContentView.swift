@@ -54,9 +54,9 @@ struct ContentView: View {
     private var content: some View {
         switch authManager.state {
         case .unconfigured:
-            OnboardingView(authManager: authManager)
-        case .loggedOut(let server):
-            OnboardingView(authManager: authManager, savedServer: server)
+            Text("Legacy WebUI connection mode is disabled.")
+        case .loggedOut:
+            Text("Legacy WebUI connection mode is disabled.")
         case .loggedIn(let server):
             SessionListView(
                 authManager: authManager,
@@ -129,6 +129,158 @@ struct ContentView: View {
             }
         } catch {
             pendingSharedImport = nil
+        }
+    }
+}
+
+/// Phase-B root for the Companion-only connection boundary. The inherited
+/// session UI remains in the source tree for the later verified Gateway-proxy
+/// migration, but it is intentionally not started here: doing so would probe
+/// old WebUI routes against Companion before the session contract exists.
+struct CompanionRootView: View {
+    @Bindable var connectionManager: CompanionConnectionManager
+
+    var body: some View {
+        Group {
+            switch connectionManager.state {
+            case .restoring:
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    ProgressView("Restoring Companion connection...")
+                        .tint(.white)
+                        .foregroundStyle(.white)
+                }
+            case .unconfigured(let savedURL):
+                OnboardingView(
+                    connectionManager: connectionManager,
+                    savedCompanionURL: savedURL
+                )
+            case .pairingRequired(let savedURL, let message):
+                OnboardingView(
+                    connectionManager: connectionManager,
+                    savedCompanionURL: savedURL,
+                    initialErrorMessage: message
+                )
+            case .disconnected(let savedURL, let message):
+                CompanionFoundationStatusView(
+                    connectionManager: connectionManager,
+                    companionURL: savedURL,
+                    title: String(localized: "Companion unavailable"),
+                    message: message,
+                    gatewayStatus: nil
+                )
+            case .connected(let connection):
+                CompanionFoundationStatusView(
+                    connectionManager: connectionManager,
+                    companionURL: connection.companionURL,
+                    title: String(localized: "Companion connected"),
+                    message: gatewayMessage(for: connection.capabilities.gateway?.status),
+                    gatewayStatus: connection.capabilities.gateway?.status
+                )
+            }
+        }
+        .task {
+            await connectionManager.restoreIfNeeded()
+        }
+    }
+
+    private func gatewayMessage(for status: String?) -> String {
+        switch status {
+        case "ok":
+            return String(localized: "Gateway discovery succeeded. Sessions and chat will be enabled in the next verified migration slice.")
+        case "unavailable":
+            return String(localized: "Companion is reachable, but Hermes Gateway is unavailable.")
+        case "unauthorized":
+            return String(localized: "Companion is reachable, but its NAS-local Gateway credential was rejected.")
+        case "incompatible":
+            return String(localized: "Companion is reachable, but this Hermes Gateway version is incompatible.")
+        case "degraded":
+            return String(localized: "Companion is reachable, but Hermes Gateway reports a degraded state.")
+        default:
+            return String(localized: "Companion is reachable. Gateway status is not available.")
+        }
+    }
+}
+
+private struct CompanionFoundationStatusView: View {
+    @Bindable var connectionManager: CompanionConnectionManager
+    let companionURL: URL?
+    let title: String
+    let message: String
+    let gatewayStatus: String?
+    @State private var isConfirmingForget = false
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        Image("HermesMobileBanner")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 240)
+                            .accessibilityHidden(true)
+
+                        Label(
+                            title,
+                            systemImage: gatewayStatus == "ok"
+                                ? "checkmark.shield.fill"
+                                : "exclamationmark.triangle.fill"
+                        )
+                        .font(.title2.bold())
+                        .foregroundStyle(.white)
+
+                        Text(message)
+                            .foregroundStyle(.white.opacity(0.72))
+
+                        if let companionURL {
+                            LabeledContent("Companion") {
+                                Text(companionURL.absoluteString)
+                                    .multilineTextAlignment(.trailing)
+                                    .textSelection(.enabled)
+                            }
+                            .foregroundStyle(.white.opacity(0.82))
+                        }
+
+                        if let gatewayStatus {
+                            LabeledContent("Gateway status") {
+                                Text(gatewayStatus)
+                            }
+                            .foregroundStyle(.white.opacity(0.82))
+                        }
+
+                        Button {
+                            Task { await connectionManager.resume() }
+                        } label: {
+                            Label("Retry discovery", systemImage: "arrow.clockwise")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(OnboardingPrimaryButtonStyle())
+                        .disabled(connectionManager.isWorking)
+
+                        Button(role: .destructive) {
+                            isConfirmingForget = true
+                        } label: {
+                            Text("Forget this Companion")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(OnboardingSecondaryButtonStyle())
+                        .disabled(connectionManager.isWorking)
+                    }
+                    .padding(24)
+                }
+            }
+            .preferredColorScheme(.dark)
+            .alert("Forget this Companion?", isPresented: $isConfirmingForget) {
+                Button("Cancel", role: .cancel) {}
+                Button("Forget and revoke device", role: .destructive) {
+                    Task { await connectionManager.forgetConnection() }
+                }
+            } message: {
+                Text("Hermex will ask Companion to revoke this device, then remove its local Keychain credential. Cached conversations are kept.")
+            }
         }
     }
 }

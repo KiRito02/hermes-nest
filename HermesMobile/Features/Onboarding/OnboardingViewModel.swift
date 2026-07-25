@@ -4,65 +4,54 @@ import Observation
 @MainActor
 @Observable
 final class OnboardingViewModel {
-    nonisolated static let emptyPasswordMessage = String(localized: "Enter the server password.")
+    nonisolated static let emptyPairingSecretMessage =
+        String(localized: "Enter the one-time pairing secret created on your NAS.")
+    // Kept only for inherited AuthManager tests while the old WebUI stack
+    // remains compiled but unreachable from the Companion-only App root.
+    nonisolated static let emptyPasswordMessage =
+        String(localized: "Enter the server password.")
 
-    var serverURLString = ""
-    var password = ""
-    var customHeaders: [CustomHeader] = []
-    var authStatus: AuthStatusResponse?
+    var companionURLString = ""
+    var pairingSecret = ""
     var connectionMessage: String?
     var errorMessage: String?
     var isWorking = false
 
     init(
-        savedServer: URL? = nil,
-        savedHeaders: [CustomHeader] = [],
+        savedCompanionURL: URL? = nil,
         initialErrorMessage: String? = nil
     ) {
-        if let savedServer {
-            serverURLString = savedServer.absoluteString
-        }
-        customHeaders = savedHeaders
+        companionURLString = savedCompanionURL?.absoluteString ?? ""
         errorMessage = initialErrorMessage
     }
 
-    var isPasswordRequired: Bool {
-        // No auth → no password. Passkey-only (auth on, password auth explicitly
-        // off) → hide the password field; connect() surfaces the unsupported
-        // message instead. Unknown (nil) keeps today's "show the field" default.
-        guard authStatus?.authEnabled != false else { return false }
-        return authStatus?.passwordAuthEnabled != false
-    }
-
-    func testConnection(authManager: AuthManager) async {
+    func testConnection(connectionManager: CompanionConnectionManager) async {
         errorMessage = nil
         connectionMessage = nil
         isWorking = true
         defer { isWorking = false }
 
         do {
-            let status = try await authManager.testConnection(
-                serverURLString: serverURLString,
-                customHeaders: customHeaders
+            let health = try await connectionManager.checkLiveness(
+                companionURLString: companionURLString
             )
-            authStatus = status
-            if status.authEnabled == true, status.passwordAuthEnabled == false {
-                errorMessage = AuthManager.passkeyOnlyMessage
-            } else {
-                connectionMessage = status.authEnabled == true
-                    ? String(localized: "Connection ok. Password required.")
-                    : String(localized: "Connection ok. Password not required.")
-            }
+            let version = health.companionVersion ?? String(localized: "unknown version")
+            connectionMessage = String(
+                localized: "Companion is reachable (\(version)). Enter a pairing secret to continue."
+            )
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    func connect(authManager: AuthManager) async {
+    func connect(connectionManager: CompanionConnectionManager) async {
         errorMessage = nil
         connectionMessage = nil
 
-        if let validationMessage = Self.passwordValidationMessage(authStatus: authStatus, password: password) {
+        if let validationMessage = Self.pairingValidationMessage(
+            companionURL: companionURLString,
+            pairingSecret: pairingSecret
+        ) {
             errorMessage = validationMessage
             return
         }
@@ -70,38 +59,28 @@ final class OnboardingViewModel {
         isWorking = true
         defer { isWorking = false }
 
-        if authStatus == nil {
-            do {
-                authStatus = try await authManager.testConnection(
-                    serverURLString: serverURLString,
-                    customHeaders: customHeaders
-                )
-            } catch {
-                errorMessage = error.localizedDescription
-                return
-            }
-
-            if let validationMessage = Self.passwordValidationMessage(authStatus: authStatus, password: password) {
-                errorMessage = validationMessage
-                return
-            }
-        }
-
-        await authManager.configure(
-            serverURLString: serverURLString,
-            password: password,
-            customHeaders: customHeaders
+        let paired = await connectionManager.pair(
+            companionURLString: companionURLString,
+            secret: pairingSecret
         )
-        errorMessage = authManager.lastErrorMessage
+        if paired {
+            pairingSecret = ""
+            connectionMessage = String(localized: "This device is paired with Hermex Companion.")
+        } else {
+            errorMessage = connectionManager.lastErrorMessage
+        }
     }
 
-    nonisolated static func passwordValidationMessage(authStatus: AuthStatusResponse?, password: String) -> String? {
-        guard authStatus?.authEnabled == true else { return nil }
-        // Passkey-only servers don't take a password — let configure() report the
-        // specific unsupported message instead of demanding one here (#255).
-        guard authStatus?.passwordAuthEnabled != false else { return nil }
-
-        let trimmedPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedPassword.isEmpty ? emptyPasswordMessage : nil
+    nonisolated static func pairingValidationMessage(
+        companionURL: String,
+        pairingSecret: String
+    ) -> String? {
+        if companionURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return String(localized: "Enter the Companion URL.")
+        }
+        if pairingSecret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return emptyPairingSecretMessage
+        }
+        return nil
     }
 }
