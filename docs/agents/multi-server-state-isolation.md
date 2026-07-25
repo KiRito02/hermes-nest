@@ -1,4 +1,11 @@
-# Multi-server state isolation audit (I-039 / issue #18)
+# Legacy WebUI multi-server state isolation audit (I-039 / issue #18)
+
+> Historical implementation record: this document describes the inherited
+> cookie/WebUI client before the Companion migration. It is not a Companion-v1
+> protocol or auth contract. Issue #1 must revalidate server/device isolation
+> for Companion credentials and merged capability snapshots; retain the cache
+> keying lessons, but do not copy cookie or direct-Gateway bearer behavior into
+> new code.
 
 This is the audit deliverable for issue #18 (I-039d). It documents which app
 state is **per-server** versus intentionally **global**, where each lives, and

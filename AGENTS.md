@@ -1,8 +1,12 @@
 # AGENTS.md — working agreement for Hermex
 
-Hermex is a native SwiftUI iPhone app (Xcode target/scheme `HermesMobile`, App Store
-name `Hermex`) for a self-hosted `hermes-webui` server. `PROJECT_SPEC.md` is the
-product/API source of truth — if a request conflicts with it, stop and ask.
+Hermex Direct is a native SwiftUI iPhone/iPad app (Xcode target/scheme
+`HermesMobile`) plus a self-hosted NAS Companion. The App connects only to the
+Companion; the Companion connects over loopback to the Hermes Agent API Server
+started by `hermes gateway` and adds restricted file/upload/built-in-Memory
+capabilities. No `hermes-webui`, vendor account, or hosted relay is required.
+`PROJECT_SPEC.md` is the product/protocol source of truth — if a request
+conflicts with it, stop and ask.
 Read by every agent (Codex, Claude Code, …); keep it tool-agnostic.
 
 ## Session start & wrap-up
@@ -19,23 +23,29 @@ Read by every agent (Codex, Claude Code, …); keep it tool-agnostic.
 ## How work flows
 - One issue → one short `issue/<n>-slug` branch → one PR (branches with no issue use
   `chore/` or `fix/`). Issue/triage/domain conventions live in `docs/agents/`.
-- `master` is the protected release-candidate branch (the source for internal
-  TestFlight builds): keep it buildable, never do feature work on it.
-- Pushing a branch, opening/updating a PR, or merging needs explicit human approval.
-  Triage bot/review comments before accepting them.
+- `master` is the protected integration branch: keep it buildable, never do
+  feature work on it.
+- Pushing a branch or merging needs explicit human approval. Once a branch is
+  pushed, creating or updating its PR does not need separate approval under the
+  owner's standing authorization. Triage bot/review comments before accepting
+  them.
 
 ## Hard rules
-1. **Never invent API endpoints or JSON shapes.** Verify in this precedence order:
-   (a) `curl` your own running server — final arbiter; (b) the official API docs at
-   https://get-hermes.ai/api-docs/ — best for endpoint intent, auth contract, SSE
-   event vocabulary, and conventions (no version pin; tracks the latest release);
-   (c) the pinned upstream copy at `.codex-tmp/hermes-webui/api/routes.py` — ground
-   truth for exact JSON shapes, but may lag the release the docs describe (clone it
-   if missing: `git clone https://github.com/nesquena/hermes-webui .codex-tmp/hermes-webui`).
-   That upstream copy is read-only — never modify it (refreshing via `git pull` is fine).
+1. **Never invent endpoints or JSON shapes.** For App-facing behavior verify:
+   (a) the versioned Companion contract/tests; (b) `curl` the owner's running
+   Companion — final App-facing arbiter. For proxied Gateway behavior then
+   verify: (c) the local Gateway; (d) the official API docs at
+   https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server;
+   (e) the matching pinned Hermes Agent source and tests under
+   `.codex-tmp/hermes-agent/`, especially
+   `gateway/platforms/api_server.py` and `tests/gateway/` (clone it if missing:
+   `git clone https://github.com/NousResearch/hermes-agent .codex-tmp/hermes-agent`).
+   Record the upstream commit before relying on it. That copy is read-only —
+   never modify it (refreshing via `git pull` is fine). Never translate a
+   WebUI, Dashboard, or HermesPilot Link route into a Companion contract.
 2. **No new third-party dependencies** beyond the spec's locked list without approval.
-3. **Tolerant decoding:** every `Codable` model uses optionals for fields upstream
-   might add/rename. Never crash on unknown fields.
+3. **Tolerant decoding:** every `Codable` model uses optionals for fields
+   Companion or Gateway might add/rename. Never crash on unknown fields.
 4. **No destructive commands** (`rm -rf`, `git push --force`, anything touching
    `~/Library/LaunchAgents/` or restarting Mac services). Suggest them; let the human run them.
 5. **Don't commit broken builds.** If a build or test fails, fix it before writing more code.
@@ -49,22 +59,34 @@ Read by every agent (Codex, Claude Code, …); keep it tool-agnostic.
   sim is missing, pick a nearby iPhone and say which.
 - **Simulator installs must be signed.** Never install a `CODE_SIGNING_ALLOWED=NO`
   build on the simulator for manual testing — that flag is for compile-only checks
-  (see `TESTFLIGHT.md`) and strips entitlements, so Keychain writes fail with
+  (see `DEVELOPMENT.md`) and strips entitlements, so Keychain writes fail with
   `errSecMissingEntitlement` and login breaks. Put the app on the sim via XcodeBuildMCP
   `build_run_sim` or a plain signed Debug build (no signing-disabling flags), then install/launch.
-- Before asking for review or committing a slice: run the full XCTest suite, and
-  build + launch the app for the human's manual simulator test when UI changed.
+- On macOS, run the full XCTest suite before asking for review and build +
+  launch the app for the human's manual simulator test when UI changed. On
+  Linux/Windows, a local commit may precede CI: after explicit approval to push,
+  use the macOS GitHub Actions build/test gate. Green full-suite CI is required
+  before review/merge, and the handoff must state any simulator or
+  physical-device validation still owed.
+- Companion unit/contract tests run on Linux/NAS. Gateway proxy tests pin the
+  upstream Hermes Agent commit; public CI uses fixtures and never owner secrets.
+- The App must never receive or store `API_SERVER_KEY`. It stores only its
+  revocable Companion device credential in Keychain.
 
-## App identity (resolved via xcconfig — not grep-able)
-Bundle ID `com.uzairansar.hermesmobile` · tests `….tests` · Team `6GYD9C9N6R` · SKU `hermes-mobile-ios`.
+## Personal signing identity
 
-## "push to branch testflight" (maintainer-only)
-Upload the current branch to the side-by-side **Hermex Branch** internal TestFlight app
-(`com.uzairansar.hermesmobile.branch`) — a TestFlight upload, **not** a git push.
-Requires the maintainer's App Store Connect access; contributors never need this. Use a
-unique `CURRENT_PROJECT_VERSION` (e.g. `YYYYMMDDHHMM`) each time. Full commands + branch
-identity: `DEVELOPMENT.md`. Never touch the production `com.uzairansar.hermesmobile` app
-unless explicitly asked.
+Owner-specific Team ID and bundle IDs belong in gitignored
+`Config/Local.xcconfig`; do not commit them or reuse the upstream maintainer's
+identity. Phase I will add a one-app personal-sideload configuration that
+disables Share Extension, widgets/Live Activities, and App Groups. Until it
+lands, the inherited multi-target scheme and committed upstream defaults still
+exist and may require local overrides; do not describe them as the desired
+personal distribution state.
+
+App Store and TestFlight work is out of scope until the owner explicitly
+changes the distribution decision. Building a sideload artifact or Companion
+package is not a git push; pushing any branch still requires explicit human
+approval.
 
 ## Working with the human
 - Surface tradeoffs in plain English before non-obvious choices; when in doubt, ask.

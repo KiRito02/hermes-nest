@@ -2,7 +2,10 @@
 
 This file is for fast orientation only. `PROJECT_SPEC.md` remains the source of truth for product scope, API behavior, build phases, dependencies, and open decisions.
 
-Hermex is a native iPhone control surface for a self-hosted Hermes AI agent stack. The phone is the control plane and review surface; the macOS/server-side Hermes WebUI stack is the execution plane.
+Hermex is a native iPhone/iPad control surface plus a self-hosted NAS Companion
+for a Hermes AI agent stack. The App is the interaction/review surface;
+Companion is its only remote endpoint; Hermes Gateway remains the execution
+plane behind Companion on loopback.
 
 ## Mental Model
 
@@ -15,10 +18,13 @@ Hermex is a native iPhone control surface for a self-hosted Hermes AI agent stac
 ## Boundaries
 
 - Native SwiftUI app, not a webview wrapper.
-- iOS client only; do not move server responsibilities into this repo.
-- Existing Hermes WebUI API only; never invent endpoint paths or JSON shapes.
+- App plus a small NAS Companion; do not turn Companion into a general WebUI,
+  terminal, arbitrary filesystem API, or hosted relay.
+- Versioned Companion contract plus verified Gateway behavior only; never
+  invent endpoint paths or JSON shapes.
 - Tolerant decoding over brittle model purity; upstream JSON can drift.
-- Server owns execution. The app owns mobile interaction quality.
+- Gateway owns agent execution. Companion owns device auth and approved
+  NAS-local capabilities. The App owns mobile interaction quality.
 
 ## Product Feel
 

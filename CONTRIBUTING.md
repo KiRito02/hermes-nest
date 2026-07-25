@@ -13,11 +13,12 @@ read the [Code of Conduct](CODE_OF_CONDUCT.md).
   `PROJECT_SPEC.md`; do not add new ones without maintainer approval.
 - Build and run the **`HermesMobile`** scheme on an iPhone simulator
   (`iPhone 17` is the reference device; any recent iPhone simulator works).
-- To actually use the app you need your own
-  [hermes-webui](https://github.com/nesquena/hermes-webui) server — the app is
-  a client only. See the [README](README.md#you-need-your-own-server) for
-  reachable-server options (Cloudflare Tunnel, reverse proxy, Tailscale, or
-  `http://localhost:8787` for simulator-only testing).
+- To actually use the target architecture you need the self-hosted Hermex
+  Companion on the same NAS as a
+  [Hermes Agent API Server](https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server).
+  The App connects to Companion; Companion connects to `hermes gateway` over
+  loopback. Until the Companion implementation lands, the current branch is
+  documentation/migration work, not a usable deployment.
 
 ## Running tests
 
@@ -28,28 +29,33 @@ xcodebuild test -project HermesMobile.xcodeproj -scheme HermesMobile -destinatio
 ```
 
 If that simulator name isn't installed, pick a nearby iPhone from
-`xcrun simctl list devices available`. The same suite runs in CI on every pull
-request with code signing disabled, so forks get green CI without any secrets.
+`xcrun simctl list devices available`. The same suite runs with code signing
+disabled for every code-affecting pull request; docs-only PRs use the cheap
+gate, and a manually dispatched `PR CI` run always executes the full suite.
+Fork CI needs no secrets.
 
 ## Code signing for contributors
 
-The project's committed signing identity (`DEVELOPMENT_TEAM`, bundle IDs)
-belongs to the maintainer. **Never edit `project.pbxproj` to sign with your own
-team** — override locally instead:
+Never edit `project.pbxproj` just to sign with your own team. Override signing
+locally instead:
 
 1. Create `Config/Local.xcconfig` (it is gitignored, so it never lands in a PR):
 
    ```xcconfig
    DEVELOPMENT_TEAM = YOUR_TEAM_ID
-   // Optional — only needed if provisioning complains about the bundle ID.
-   // The app-group entitlement must stay in sync with the bundle ID.
-   // APP_BUNDLE_IDENTIFIER = com.yourname.hermex
-   // APP_GROUP_IDENTIFIER = group.com.yourname.hermex
+   APP_BUNDLE_IDENTIFIER = com.yourname.hermex
+   // Temporary while using the inherited multi-target scheme:
+   APP_GROUP_IDENTIFIER = group.com.yourname.hermex
    ```
 
 2. Build normally. `Config/Shared.xcconfig` is wired into the project and ends
    with `#include? "Local.xcconfig"`, so your local values override the
-   committed defaults for every target — no project-file changes needed.
+   committed defaults without putting personal identity in git.
+
+The planned personal-sideload configuration is app-only. After it lands, Share
+extensions, widgets/Live Activities, and App Groups are not part of the initial
+signing requirement; until then, the inherited multi-target scheme may still
+require the temporary App Group override shown above.
 
 For simulator-only development you usually don't need any of this: simulator
 builds don't require a paid team. Note that unit tests and CI run with
@@ -70,15 +76,21 @@ independently useful, it deserves its own PR.
 
 ## App bug or server bug?
 
-Hermex is a thin client over [hermes-webui](https://github.com/nesquena/hermes-webui),
-so a fair share of apparent app bugs are really server bugs. Before filing a
-bug here, reproduce it in the hermes-webui **web UI** against the same server:
+Hermex Direct has three layers: App, self-hosted Companion, and
+[Hermes Agent](https://github.com/NousResearch/hermes-agent). Before filing:
 
-- **Breaks in the web UI too** → it's a server bug. File it
-  [upstream](https://github.com/nesquena/hermes-webui/issues); if the app
-  should still handle it more gracefully, open an issue here that links the
-  upstream ticket (we track those with the `upstream-change` label).
-- **Only breaks in the app** → file it here with the bug-report form.
+- Capture the HTTP status/content type and a sanitized response from the same
+  Companion endpoint with `curl`; never include a device or Gateway credential.
+- Compare App behavior with the versioned Companion contract and capability
+  document.
+- For a proxied route, compare Companion behavior with the local Gateway,
+  `/v1/capabilities`, official API Server docs, and matching Hermes Agent
+  source/tests.
+- If Gateway violates its advertised contract, file it
+  [upstream](https://github.com/NousResearch/hermes-agent/issues) and link that
+  ticket here when Companion/App also need a graceful fallback.
+- If Companion violates its contract, or the wire contract is correct and only
+  the App fails, file it here and identify the failing layer.
 
 ## PR workflow
 
@@ -91,25 +103,28 @@ bug here, reproduce it in the hermes-webui **web UI** against the same server:
    [`AGENTS.md`](AGENTS.md)):
    - **Tolerant decoding:** every `Codable` model uses optionals for fields the
      server might add or rename — never crash on unknown fields.
-   - **Never invent API endpoints or JSON shapes** — verify against the pinned
-     upstream `hermes-webui` source or your own running server.
+   - **Never invent endpoints or JSON shapes** — verify App-facing behavior
+     against the Companion contract and a running Companion. For proxied
+     behavior also verify the local Gateway, official Hermes Agent API Server
+     docs, and matching pinned source/tests.
    - **No new third-party dependencies** without approval.
 4. **Run the full test suite** (command above) and make sure it passes.
 5. **Open a PR** against `master` using the PR template — link the issue with
    `Fixes #<number>`, describe what changed and how you tested it. CI must be
    green; automated review bots may comment, and the maintainer reviews and
-   merges.
+   merges. Pushing a branch and merging still require owner approval; once the
+   branch is pushed, agents may create and update its PR without a separate
+   approval.
 6. **Disclose AI usage** in one line of the PR description: the tool/model
    used (e.g. "built with Claude Code"), or "human-authored". This repo is
    itself built with coding agents, so it's normal context for review — not a
    gate.
 
-`master` is the protected release-candidate branch. Releases and TestFlight
-uploads (`.github/workflows/*-testflight.yml`) are maintainer-only operations —
-contributors never need App Store Connect access.
+`master` is the protected integration branch. The initial distribution target
+is personal sideloading; App Store and TestFlight work is out of scope unless
+the owner explicitly changes that decision.
 
 ## Questions
 
-Ask in [GitHub Discussions](https://github.com/uzairansaruzi/hermex/discussions)
-if something here is unclear or wrong — docs fixes are welcome contributions
-too.
+Open an issue in [this fork](https://github.com/KiRito02/hermex/issues) if
+something here is unclear or wrong — documentation fixes are welcome too.

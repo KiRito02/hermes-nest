@@ -4,10 +4,12 @@ Issues and PRDs for this repo live as GitHub issues. Use the `gh` CLI for issue 
 
 ## Repository
 
-- GitHub repo: `uzairansaruzi/hermex`
-- Remote: `https://github.com/uzairansaruzi/hermex.git`
+- GitHub repo: `KiRito02/hermex`
+- Remote: `https://github.com/KiRito02/hermex.git`
+- Upstream source fork: `uzairansaruzi/hermex`
 
-Infer the repo from `git remote -v` when possible; `gh` does this automatically when run inside the clone.
+Infer the writable repository from `git remote -v`; issue mutations belong on
+`origin`, not `upstream`.
 
 ## Conventions
 
@@ -29,17 +31,24 @@ GitHub Issues are the work queue; pull requests are the review and merge record.
 - `ready-for-agent` issues default to express mode (autonomous from approved plan to review-addressed PR). An issue also labeled `needs-manual-validation` forces staged mode, where the owner manually tests before the PR publishes. See `docs/agents/triage-labels.md`.
 - Create a short `issue/<n>-slug` branch for one issue or narrow slice (no-issue branches use `chore/`/`fix/`).
 - Commit completed, validated work locally with the matching handoff updates.
-- Push feature branches and open draft PRs only when the human asks to publish/open a PR.
+- Push feature branches only when the human approves. Once pushed, agents may
+  create and update draft PRs without separate approval under the owner's
+  standing authorization.
 - Use the PR for review: GitHub/Copilot review, CI, external agent review, and human comments should live there when possible.
 - Address PR review comments by triaging them first; do not blindly accept automated review feedback.
 - Merge into `master` only after validation passes, review feedback is resolved, and the human approves.
-- Keep `master` buildable because it is the internal TestFlight candidate branch.
+- Keep `master` buildable because it is the protected integration branch.
 
-## Upstream Parity Tracking
+## Companion Capability Tracking
 
-- Track upstream parity in the thin, always-current index `docs/agents/feature-gap-index.md` (route group → status + priority + safety + one-line note).
+- Track the Companion/Gateway roadmap in the thin, always-current index
+  `docs/agents/feature-gap-index.md` (capability → status + priority + safety +
+  one-line note).
 - Create GitHub issues from a `roadmap` row in the index only when a specific gap becomes selected or ready for triage.
-- Validate request/response shapes **just-in-time** at implementation time against the pinned upstream copy (not pre-cached in the index); record the validated shape, handler name, and upstream commit in the issue/PR, and reference the archived catalog section when its notes still help.
+- Validate App-facing shapes **just-in-time** against the Companion
+  contract/tests and owner's running Companion. For proxied behavior also
+  validate the local Gateway, official Hermes Agent docs, and a matching pinned
+  source/test checkout. Record sanitized evidence and commits in the issue/PR.
 
 ## Skill Semantics
 

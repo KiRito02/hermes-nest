@@ -24,7 +24,7 @@ Apply `needs-manual-validation` sparingly: only when automated tests genuinely c
 
 | Label | Combines with | Meaning |
 | --- | --- | --- |
-| `upstream-change` | any triage role | The root cause is in hermes-webui/hermes-agent, not this app. Link the upstream issue on the ticket. As a client repo, a chunk of incoming bugs are really server bugs. |
+| `upstream-change` | any triage role | The root cause is in the Hermes Agent API Server, not this app. Link the NousResearch/hermes-agent issue on the ticket. |
 
 > **Why no `needs-response` label?** It was considered ("maintainer replied, waiting on reporter") and judged redundant: `needs-info` already means the ball is in the reporter's court. Keep `needs-info` as the single waiting-on-reporter label.
 
@@ -35,7 +35,7 @@ Apply `needs-manual-validation` sparingly: only when automated tests genuinely c
 | Label | Covers |
 | --- | --- |
 | `area:streaming` | Streaming chat responses (SSE, run lifecycle) |
-| `area:auth` | Login, session cookies, Keychain credentials |
+| `area:auth` | Companion pairing, device credentials/revocation, Keychain, and Gateway-key custody |
 | `area:voice` | Voice notes, dictation, speech-to-text |
 | `area:live-activity` | Live Activities and Dynamic Island |
 | `area:i18n` | Localization, RTL, plurals, translations |
