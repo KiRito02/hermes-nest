@@ -36,6 +36,26 @@ simulators, XCTest execution, and Xcode archive/development signing require
 macOS. AltStore/SideStore on Windows can re-sign and install a prepared
 sideload artifact.
 
+### Companion runtime baseline
+
+The approved Companion implementation baseline is:
+
+- Python 3.11;
+- `aiohttp==3.13.3` as the only direct runtime third-party dependency;
+- Python standard-library `sqlite3`, without an ORM;
+- `Companion/pyproject.toml` with source under `src/hermex_companion/`;
+- `uv.lock` and `uv sync --frozen` creating `Companion/.venv`;
+- a dedicated virtual environment separate from both system Python packages
+  and the Hermes Agent venv;
+- direct NAS-host deployment through systemd.
+
+Configuration, state, and installed releases use the service account's XDG
+config/state/data directories. The repository supplies a systemd unit template;
+rendered owner paths and service identity stay outside git. The service binds
+loopback by default, restarts on failure, and remains available in a degraded
+state when Gateway is down. Exact commands land with Issue #1 and must reproduce
+this locked layout.
+
 ### macOS
 
 When a macOS environment is available, use XcodeBuildMCP for normal
@@ -64,9 +84,11 @@ hermes gateway
 ```
 
 The documented Gateway default is `127.0.0.1:8642`. Keep it on loopback.
-Companion service commands, listen port, configuration names, and App-facing
-paths are intentionally not documented until Issue #1 locks and tests them.
-Do not invent placeholders and later treat them as a contract.
+Companion is implemented as a dedicated Python 3.11 virtual environment and
+systemd host service. Its exact service commands, listen port, configuration
+names, and App-facing paths are intentionally not documented until Issue #1
+locks and tests them. Do not invent placeholders and later treat them as a
+contract.
 
 Before debugging the App, verify in order:
 

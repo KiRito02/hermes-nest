@@ -97,7 +97,7 @@ scope until explicitly approved.
 | Conversation storage | Server-owned sessions; local cache is read-only/offline support |
 | Streaming | SSE over `URLSession`/existing LDSwiftEventSource dependency |
 | Transport | HTTPS reverse proxy/tunnel or private Tailscale access to Companion |
-| Dependencies | Keep the exhaustive locked list in §2.1; add none without approval |
+| Dependencies | Keep the exhaustive locked lists in §§2.1–2.2; add none without approval |
 | Distribution | Personal sideload first |
 | App identity | Owner-specific values supplied through local signing configuration |
 | Hosted control plane | None |
@@ -121,8 +121,44 @@ the Xcode project.
 
 Transitive packages do not become independently approved direct dependencies.
 Any addition or replacement requires owner approval and an update to this
-table. Companion runtime dependencies require their own explicit approval and
-must be recorded before Companion implementation begins.
+table.
+
+### 2.2 Locked Companion runtime, packaging, and deployment
+
+The owner approved this Companion baseline on 2026-07-25:
+
+| Component | Approved value | Purpose |
+| --- | --- | --- |
+| Runtime | Python 3.11 | NAS-hosted Companion process |
+| Direct runtime dependency | `aiohttp==3.13.3` | HTTP server/client and streaming transport |
+| Persistent store | SQLite through Python standard-library `sqlite3` | Device, pairing, revocation, and schema-version state |
+| Package layout | `Companion/pyproject.toml` plus `src/hermex_companion/` | PEP 621 repository package |
+| Locking/environment | `uv.lock`; `uv sync --frozen` creates `Companion/.venv` | Reproducible isolation from system Python and Hermes Agent |
+| Deployment | XDG user directories plus a repository systemd unit template | Restart-safe direct NAS deployment without Docker |
+
+`aiohttp` is the only approved direct third-party runtime dependency. Adding
+another direct runtime or test dependency requires separate approval. The
+Companion must not reuse the Hermes Agent virtual environment.
+
+The deployment layout is:
+
+- configuration under `$XDG_CONFIG_HOME/hermex-companion/`, including an
+  owner-only environment file;
+- SQLite and mutable state under `$XDG_STATE_HOME/hermex-companion/`;
+- installed releases under `$XDG_DATA_HOME/hermex-companion/`, with a
+  replaceable `current` release pointer;
+- a versioned systemd unit template in the repository, rendered with the
+  configured service user/group and XDG paths during installation;
+- service user/group supplied through owner-local deployment configuration,
+  never hardcoded into tracked files;
+- loopback binding by default;
+- `Restart=on-failure`;
+- ordering after network/Gateway startup without requiring the Gateway service,
+  so Companion can remain reachable and report a degraded state when Gateway
+  is unavailable.
+
+Owner-specific paths, credentials, rendered service configuration, the
+Companion database, and virtual environments remain outside git.
 
 ---
 
@@ -594,14 +630,22 @@ Tracking issue: https://github.com/KiRito02/hermex/issues/2
 - [x] Verify the Gateway capability and file/Memory gaps.
 - [x] Select the self-hosted Companion architecture.
 - [x] Align specification, working agreements, roadmap, and Issue #1.
-- [ ] Record the owner's Hermes Agent version/commit and live capability
-  response without storing secrets.
+- [x] Record the owner's Hermes Agent version/commit without storing secrets:
+  Hermes Agent v0.19.0; running checkout HEAD
+  `087732c8c60860888f6c8ac8b9e22271d5269e96` (the CLI separately reports
+  release upstream `199f5580`).
+- [x] Record the sanitized live capability response without storing secrets:
+  bearer auth; Sessions, Runs/SSE, stop, approval, Skills, and Toolsets are
+  advertised; `jobs_admin` and `memory_write_api` are false.
 
 ### Phase B — Companion contract and foundation
 
 Tracking issue: https://github.com/KiRito02/hermex/issues/1
 
-- [ ] Approve the Companion runtime language and dependency list.
+- [x] Approve the Companion runtime language, direct runtime dependency,
+  persistence, isolated environment, and systemd host deployment.
+- [x] Approve repository/package layout, exact dependency version/locking, and
+  systemd unit/install layout.
 - [ ] Define versioned health, pairing, device-auth, capability, error, and
   revocation contracts with tests.
 - [ ] Start the minimal NAS Companion without a hosted relay.
@@ -778,16 +822,13 @@ WebUI compatibility is required.
 
 Stop and ask before implementing a choice that depends on one of these:
 
-1. Companion implementation language, packaging, and approved dependencies.
-2. Owner-specific bundle ID and Apple Team ID for the sideload configuration.
-3. The exact Hermes Agent version/commit running on the NAS.
-4. The sanitized live `/v1/capabilities` response from that server.
-5. Whether remote transport will use Tailscale HTTPS, Cloudflare, or another
+1. Owner-specific bundle ID and Apple Team ID for the sideload configuration.
+2. Whether remote transport will use Tailscale HTTPS, Cloudflare, or another
    reverse proxy.
-6. Whether persisted session chat or Runs API is the primary turn transport
+3. Whether persisted session chat or Runs API is the primary turn transport
    after live verification.
-7. Exact NAS workspace roots and upload byte limits.
-8. Whether Companion v1 Memory management is built-in Memory only, as currently
+4. Exact NAS workspace roots and upload byte limits.
+5. Whether Companion v1 Memory management is built-in Memory only, as currently
    specified, or must include a named external provider.
 
 ---

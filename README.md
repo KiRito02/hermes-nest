@@ -95,9 +95,12 @@ The documented Gateway listener is `127.0.0.1:8642`. Companion calls it
 locally; only Companion is exposed through Tailscale HTTPS or an
 owner-controlled HTTPS reverse proxy.
 
-Companion commands and configuration are intentionally deferred until Issue #1
-locks the implementation and tests. Do not expose Gateway directly or place
-`API_SERVER_KEY` on the iPhone.
+Companion uses Python 3.11, pinned `aiohttp`, standard-library SQLite, a
+`uv`-locked isolated environment, XDG-owned configuration/state/releases, and a
+systemd service installed directly on the NAS host. Exact commands land with
+Issue #1 and must preserve loopback binding and degraded operation when Gateway
+is unavailable. Do not expose Gateway directly or place `API_SERVER_KEY` on the
+iPhone.
 
 Official API Server documentation:
 https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server
