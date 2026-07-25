@@ -112,7 +112,9 @@ Hermex Direct has three layers: App, self-hosted Companion, and
 5. **Open a PR** against `master` using the PR template — link the issue with
    `Fixes #<number>`, describe what changed and how you tested it. CI must be
    green; automated review bots may comment, and the maintainer reviews and
-   merges.
+   merges. Pushing a branch and merging still require owner approval; once the
+   branch is pushed, agents may create and update its PR without a separate
+   approval.
 6. **Disclose AI usage** in one line of the PR description: the tool/model
    used (e.g. "built with Claude Code"), or "human-authored". This repo is
    itself built with coding agents, so it's normal context for review — not a

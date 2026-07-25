@@ -25,8 +25,10 @@ Read by every agent (Codex, Claude Code, …); keep it tool-agnostic.
   `chore/` or `fix/`). Issue/triage/domain conventions live in `docs/agents/`.
 - `master` is the protected integration branch: keep it buildable, never do
   feature work on it.
-- Pushing a branch, opening/updating a PR, or merging needs explicit human approval.
-  Triage bot/review comments before accepting them.
+- Pushing a branch or merging needs explicit human approval. Once a branch is
+  pushed, creating or updating its PR does not need separate approval under the
+  owner's standing authorization. Triage bot/review comments before accepting
+  them.
 
 ## Hard rules
 1. **Never invent endpoints or JSON shapes.** For App-facing behavior verify:

@@ -96,7 +96,7 @@ scope until explicitly approved.
 | Compatibility | Companion capabilities merged with sanitized Gateway capabilities |
 | Conversation storage | Server-owned sessions; local cache is read-only/offline support |
 | Streaming | SSE over `URLSession`/existing LDSwiftEventSource dependency |
-| Transport | HTTPS reverse proxy/tunnel or private Tailscale access to Companion |
+| Transport | Lucky-managed HTTPS reverse proxy to Companion; Tailscale HTTPS is also supported |
 | Dependencies | Keep the exhaustive locked lists in §§2.1–2.2; add none without approval |
 | Distribution | Personal sideload first |
 | App identity | Owner-specific values supplied through local signing configuration |
@@ -482,10 +482,10 @@ implementation issue locks them.
 
 ### 5.2 Remote transport
 
-Preferred options:
-
-1. Tailscale with HTTPS via a tailnet certificate or Tailscale Serve.
-2. HTTPS through an owner-controlled reverse proxy or Cloudflare Tunnel.
+The owner selected Lucky as the primary remote transport. Lucky terminates
+HTTPS and proxies only to the loopback-bound Companion; it must not expose the
+Gateway listener. Tailscale with HTTPS through Tailscale Serve or a valid
+tailnet certificate remains a supported private-access option.
 
 A blanket iOS App Transport Security exception is not part of the release
 configuration. Simulator-only HTTP may use a narrowly scoped debug setting.
@@ -823,12 +823,10 @@ WebUI compatibility is required.
 Stop and ask before implementing a choice that depends on one of these:
 
 1. Owner-specific bundle ID and Apple Team ID for the sideload configuration.
-2. Whether remote transport will use Tailscale HTTPS, Cloudflare, or another
-   reverse proxy.
-3. Whether persisted session chat or Runs API is the primary turn transport
+2. Whether persisted session chat or Runs API is the primary turn transport
    after live verification.
-4. Exact NAS workspace roots and upload byte limits.
-5. Whether Companion v1 Memory management is built-in Memory only, as currently
+3. Exact NAS workspace roots and upload byte limits.
+4. Whether Companion v1 Memory management is built-in Memory only, as currently
    specified, or must include a named external provider.
 
 ---
@@ -845,8 +843,6 @@ Stop and ask before implementing a choice that depends on one of these:
   https://github.com/NousResearch/hermes-agent/blob/main/hermes_cli/web_server.py
 - HermesPilot Link pattern (reference only; not a product dependency):
   https://www.npmjs.com/package/@hermespilot/link
-- Cloudflare Tunnel:
-  https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
 - Tailscale:
   https://tailscale.com/
 - AltStore:

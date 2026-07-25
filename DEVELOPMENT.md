@@ -103,11 +103,10 @@ fixtures.
 
 ## Remote access
 
-Preferred options:
-
-1. Tailscale with HTTPS through Tailscale Serve or a valid tailnet
-   certificate to Companion.
-2. An owner-controlled HTTPS reverse proxy or Cloudflare Tunnel to Companion.
+The primary owner deployment uses Lucky to terminate HTTPS and reverse-proxy
+only to the loopback-bound Companion. Tailscale with HTTPS through Tailscale
+Serve or a valid tailnet certificate is also supported. Neither path may
+expose the Gateway listener.
 
 Do not solve connectivity by disabling TLS verification. A blanket App
 Transport Security exception is not part of the personal release
@@ -405,7 +404,8 @@ Compare matched fixtures against `master`:
 3. Keep the slice focused and test-backed.
 4. Run local checks and commit. On Linux/Windows, ask before pushing the
    branch, then manually run `PR CI` for the full macOS XCTest gate.
-5. Ask separately before opening/updating a PR.
+5. Once an approved push publishes the branch, create and update its PR without
+   a separate approval under the owner's standing authorization.
 6. Link the issue in the PR and report exact validation and any device-only
    checks still owed.
 

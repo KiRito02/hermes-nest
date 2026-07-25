@@ -92,8 +92,8 @@ hermes gateway
 ```
 
 The documented Gateway listener is `127.0.0.1:8642`. Companion calls it
-locally; only Companion is exposed through Tailscale HTTPS or an
-owner-controlled HTTPS reverse proxy.
+locally; only Companion is exposed. The primary owner deployment uses Lucky as
+an HTTPS reverse proxy, with Tailscale HTTPS also supported.
 
 Companion uses Python 3.11, pinned `aiohttp`, standard-library SQLite, a
 `uv`-locked isolated environment, XDG-owned configuration/state/releases, and a
