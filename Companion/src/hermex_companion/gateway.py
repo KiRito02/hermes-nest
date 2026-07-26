@@ -2,7 +2,9 @@
 
 import asyncio
 from dataclasses import dataclass
+import json
 import re
+from collections.abc import Sequence
 from urllib.parse import urlsplit
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
@@ -15,6 +17,14 @@ SAFE_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 SAFE_HEADER_NAME = re.compile(r"^X-[!#$%&'*+\-.^_`|~0-9A-Za-z]{1,126}$")
 SAFE_PATH = re.compile(r"^/[A-Za-z0-9._~!$&'()*+,;=:@%/{}/-]{0,255}$")
 SAFE_METHODS = {"DELETE", "GET", "PATCH", "POST", "PUT"}
+SESSION_LIST_PATH = "/api/sessions"
+SESSION_LIST_QUERY_FIELDS = frozenset(
+    {"limit", "offset", "source", "include_children"}
+)
+SESSION_LIST_MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+SESSION_LIST_BOOL_VALUES = frozenset(
+    {"0", "1", "false", "no", "off", "on", "true", "yes"}
+)
 
 
 @dataclass(frozen=True)
@@ -28,6 +38,16 @@ class GatewayReadinessSnapshot:
     status: str
     platform: str | None
     version: str | None
+
+
+class GatewayProxyError(Exception):
+    """Bounded App-facing classification for a failed Gateway request."""
+
+    def __init__(self, status: int, code: str, message: str) -> None:
+        super().__init__(message)
+        self.status = status
+        self.code = code
+        self.message = message
 
 
 class GatewayDiscovery:
@@ -79,6 +99,99 @@ class GatewayDiscovery:
             return GatewayReadinessSnapshot("incompatible", None, None)
         return GatewayReadinessSnapshot(readiness_status, platform, version)
 
+    async def list_sessions(
+        self,
+        query_items: Sequence[tuple[str, str]],
+    ) -> bytes:
+        """Forward the verified session-list surface with Gateway-only auth."""
+        query = _validated_session_list_query(query_items)
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self._api_key}",
+        }
+        try:
+            async with ClientSession(timeout=self._timeout) as session:
+                async with session.get(
+                    self._base_url + SESSION_LIST_PATH,
+                    params=query,
+                    headers=headers,
+                    allow_redirects=False,
+                ) as response:
+                    if response.status in {401, 403}:
+                        raise GatewayProxyError(
+                            502,
+                            "gateway_unauthorized",
+                            "The Hermes Gateway rejected its NAS-local credential.",
+                        )
+                    if response.status >= 500:
+                        raise GatewayProxyError(
+                            503,
+                            "gateway_unavailable",
+                            "The Hermes Gateway is temporarily unavailable.",
+                        )
+                    if response.status != 200:
+                        raise GatewayProxyError(
+                            502,
+                            "gateway_incompatible",
+                            "The Hermes Gateway returned an unsupported response.",
+                        )
+                    if response.content_type != "application/json":
+                        raise GatewayProxyError(
+                            502,
+                            "gateway_incompatible",
+                            "The Hermes Gateway returned an unsupported content type.",
+                        )
+                    if (
+                        response.content_length is not None
+                        and response.content_length > SESSION_LIST_MAX_RESPONSE_BYTES
+                    ):
+                        raise GatewayProxyError(
+                            502,
+                            "gateway_response_too_large",
+                            "The Hermes Gateway session list exceeded the response limit.",
+                        )
+
+                    body = bytearray()
+                    async for chunk in response.content.iter_chunked(64 * 1024):
+                        body.extend(chunk)
+                        if len(body) > SESSION_LIST_MAX_RESPONSE_BYTES:
+                            raise GatewayProxyError(
+                                502,
+                                "gateway_response_too_large",
+                                "The Hermes Gateway session list exceeded the response limit.",
+                            )
+
+                    try:
+                        payload = json.loads(body)
+                    except (UnicodeDecodeError, json.JSONDecodeError):
+                        raise GatewayProxyError(
+                            502,
+                            "gateway_malformed_response",
+                            "The Hermes Gateway returned malformed JSON.",
+                        ) from None
+                    if not _is_session_list_payload(payload):
+                        raise GatewayProxyError(
+                            502,
+                            "gateway_incompatible",
+                            "The Hermes Gateway session-list shape is incompatible.",
+                        )
+        except GatewayProxyError:
+            raise
+        except asyncio.TimeoutError:
+            raise GatewayProxyError(
+                504,
+                "gateway_timeout",
+                "The Hermes Gateway session-list request timed out.",
+            ) from None
+        except (ClientError, OSError):
+            raise GatewayProxyError(
+                503,
+                "gateway_transport_failure",
+                "The Companion could not reach the Hermes Gateway.",
+            ) from None
+
+        return bytes(body)
+
     async def _get_json(self, path: str) -> tuple[str, object | None]:
         headers = (
             {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
@@ -103,6 +216,84 @@ class GatewayDiscovery:
         except (asyncio.TimeoutError, ClientError, OSError):
             return "unavailable", None
         return "ok", payload
+
+
+def _validated_session_list_query(
+    query_items: Sequence[tuple[str, str]],
+) -> list[tuple[str, str]]:
+    if len(query_items) > len(SESSION_LIST_QUERY_FIELDS):
+        raise GatewayProxyError(
+            400,
+            "invalid_query",
+            "The session-list query contains unsupported or repeated fields.",
+        )
+
+    seen: set[str] = set()
+    validated: list[tuple[str, str]] = []
+    for name, value in query_items:
+        if name not in SESSION_LIST_QUERY_FIELDS or name in seen:
+            raise GatewayProxyError(
+                400,
+                "invalid_query",
+                "The session-list query contains unsupported or repeated fields.",
+            )
+        seen.add(name)
+
+        if name == "limit":
+            _validate_bounded_integer(name, value, maximum=200)
+        elif name == "offset":
+            _validate_bounded_integer(name, value, maximum=1_000_000)
+        elif name == "include_children":
+            if value.strip().lower() not in SESSION_LIST_BOOL_VALUES:
+                raise GatewayProxyError(
+                    400,
+                    "invalid_query",
+                    "include_children must be an explicit boolean value.",
+                )
+        elif (
+            len(value) > 128
+            or any(ord(character) < 32 or ord(character) == 127 for character in value)
+        ):
+            raise GatewayProxyError(
+                400,
+                "invalid_query",
+                "source exceeds the supported query bounds.",
+            )
+
+        # Preserve every accepted value exactly. Hermes owns normalization and
+        # list semantics; Companion owns only the safety bounds.
+        validated.append((name, value))
+    return validated
+
+
+def _validate_bounded_integer(name: str, value: str, *, maximum: int) -> None:
+    if not value.isascii() or not value.isdecimal():
+        raise GatewayProxyError(
+            400,
+            "invalid_query",
+            f"{name} must be a non-negative integer.",
+        )
+    parsed = int(value)
+    if parsed > maximum:
+        raise GatewayProxyError(
+            400,
+            "invalid_query",
+            f"{name} exceeds the supported query bound.",
+        )
+
+
+def _is_session_list_payload(payload: object) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    if (
+        payload.get("object") != "list"
+        or not isinstance(payload.get("data"), list)
+        or type(payload.get("limit")) is not int
+        or type(payload.get("offset")) is not int
+        or type(payload.get("has_more")) is not bool
+    ):
+        return False
+    return all(isinstance(session, dict) for session in payload["data"])
 
 
 def _sanitize_capabilities(payload: object) -> dict[str, object] | None:

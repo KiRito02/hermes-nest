@@ -6,7 +6,11 @@ from datetime import datetime, UTC
 from aiohttp import web
 
 from hermex_companion import COMPANION_VERSION, CONTRACT_VERSION
-from hermex_companion.gateway import GatewayDiscovery
+from hermex_companion.gateway import (
+    GatewayDiscovery,
+    GatewayProxyError,
+    SESSION_LIST_PATH,
+)
 from hermex_companion.registry import (
     DeviceRegistry,
     RegisteredDevice,
@@ -124,7 +128,7 @@ async def _capabilities(request: web.Request) -> web.Response:
                     "device_auth": True,
                     "device_revocation": True,
                     "gateway_discovery": True,
-                    "gateway_proxy": False,
+                    "gateway_proxy": True,
                 },
                 "endpoints": {
                     "health": {"method": "GET", "path": HEALTH_PATH},
@@ -170,6 +174,25 @@ async def _readiness(request: web.Request) -> web.Response:
                 "version": gateway.version,
             },
         }
+    )
+
+
+async def _list_sessions(request: web.Request) -> web.Response:
+    try:
+        _authenticate(request)
+        body = await request.app[GATEWAY_KEY].list_sessions(
+            list(request.query.items())
+        )
+    except RegistryError as error:
+        return _error_response(error)
+    except GatewayProxyError as error:
+        return _proxy_error_response(error)
+
+    return web.Response(
+        body=body,
+        status=200,
+        content_type="application/json",
+        headers={"Cache-Control": "no-store"},
     )
 
 
@@ -221,6 +244,18 @@ def _error_response(error: RegistryError) -> web.Response:
     return response
 
 
+def _proxy_error_response(error: GatewayProxyError) -> web.Response:
+    return _json_response(
+        {
+            "error": {
+                "code": error.code,
+                "message": error.message,
+            }
+        },
+        status=error.status,
+    )
+
+
 async def _close_registry(app: web.Application) -> None:
     app[REGISTRY_KEY].close()
 
@@ -242,5 +277,6 @@ def create_app(
     app.router.add_delete(f"{DEVICES_PATH}/{{device_id}}", _revoke_device)
     app.router.add_get(CAPABILITIES_PATH, _capabilities)
     app.router.add_get(READINESS_PATH, _readiness)
+    app.router.add_get(SESSION_LIST_PATH, _list_sessions, allow_head=False)
     app.on_cleanup.append(_close_registry)
     return app

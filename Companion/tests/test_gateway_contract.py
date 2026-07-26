@@ -57,7 +57,7 @@ class GatewayCapabilityContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("hermex.companion.capabilities", body["object"])
         self.assertEqual("1", body["contract_version"])
         self.assertTrue(body["companion"]["features"]["device_auth"])
-        self.assertFalse(body["companion"]["features"]["gateway_proxy"])
+        self.assertTrue(body["companion"]["features"]["gateway_proxy"])
         self.assertEqual("ok", body["gateway"]["status"])
         self.assertEqual(
             "hermes.api_server.capabilities",

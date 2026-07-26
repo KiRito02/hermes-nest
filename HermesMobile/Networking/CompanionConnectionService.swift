@@ -368,7 +368,7 @@ actor LiveCompanionConnectionService: CompanionConnectionServing {
             companion.features?["device_auth"] == .bool(true),
             companion.features?["device_revocation"] == .bool(true),
             companion.features?["gateway_discovery"] == .bool(true),
-            companion.features?["gateway_proxy"] == .bool(false),
+            companion.features?["gateway_proxy"] == .bool(true),
             companion.endpoints?["health"]?.method == "GET",
             companion.endpoints?["health"]?.path == "/companion/v1/health",
             let gateway = capabilities.gateway,
@@ -381,6 +381,9 @@ actor LiveCompanionConnectionService: CompanionConnectionServing {
         case "ok":
             return gateway.capabilities?.object == "hermes.api_server.capabilities"
                 && gateway.capabilities?.platform == "hermes-agent"
+                && gateway.capabilities?.features?["session_resources"] == .bool(true)
+                && gateway.capabilities?.endpoints?["sessions"]?.method == "GET"
+                && gateway.capabilities?.endpoints?["sessions"]?.path == "/api/sessions"
         case "unavailable", "unauthorized", "incompatible":
             return gateway.capabilities == nil
         default:
@@ -545,7 +548,7 @@ private struct CompanionErrorBody: Decodable {
 
 /// Pairing secrets and device credentials must never follow an HTTP redirect.
 /// Operators configure the final Lucky/Tailscale HTTPS origin in the App.
-private final class CompanionRedirectBlocker: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+final class CompanionRedirectBlocker: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
