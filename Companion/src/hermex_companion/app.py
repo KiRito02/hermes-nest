@@ -17,6 +17,7 @@ from hermex_companion.gateway import (
 from hermex_companion.run_proxy_contract import (
     RUN_REQUEST_MAX_BODY_BYTES,
     RUNS_PATH,
+    validate_approval_payload,
 )
 from hermex_companion.registry import (
     DeviceRegistry,
@@ -152,6 +153,7 @@ async def _capabilities(request: web.Request) -> web.Response:
                     "device_revocation": True,
                     "gateway_discovery": True,
                     "gateway_proxy": True,
+                    "run_approval_proxy": True,
                 },
                 "endpoints": {
                     "health": {"method": "GET", "path": HEALTH_PATH},
@@ -166,6 +168,10 @@ async def _capabilities(request: web.Request) -> web.Response:
                     },
                     "capabilities": {"method": "GET", "path": CAPABILITIES_PATH},
                     "readiness": {"method": "GET", "path": READINESS_PATH},
+                    "run_approval": {
+                        "method": "POST",
+                        "path": f"{RUNS_PATH}/{{run_id}}/approval",
+                    },
                 },
             },
             "gateway": {
@@ -335,6 +341,23 @@ async def _run_request(
                     "invalid_json",
                     "The run request body must be a JSON object.",
                 )
+        elif action == "approval":
+            if request.content_type != "application/json":
+                raise GatewayProxyError(
+                    415,
+                    "invalid_content_type",
+                    "Approval request bodies must use application/json.",
+                )
+            body = await request.read()
+            try:
+                payload = json.loads(body)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                raise GatewayProxyError(
+                    400,
+                    "invalid_json",
+                    "The approval request body must be valid JSON.",
+                ) from None
+            validate_approval_payload(payload)
         elif request.can_read_body:
             raise GatewayProxyError(
                 400,
@@ -371,6 +394,10 @@ async def _run_status(request: web.Request) -> web.Response:
 
 async def _stop_run(request: web.Request) -> web.Response:
     return await _run_request(request, action="stop")
+
+
+async def _approve_run(request: web.Request) -> web.Response:
+    return await _run_request(request, action="approval")
 
 
 async def _run_events(request: web.Request) -> web.StreamResponse:
@@ -543,6 +570,10 @@ def create_app(
     app.router.add_post(
         f"{RUNS_PATH}/{{run_id}}/stop",
         _stop_run,
+    )
+    app.router.add_post(
+        f"{RUNS_PATH}/{{run_id}}/approval",
+        _approve_run,
     )
     app.on_cleanup.append(_close_registry)
     return app

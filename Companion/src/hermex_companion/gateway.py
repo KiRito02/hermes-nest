@@ -219,7 +219,14 @@ class GatewayDiscovery:
             body=body,
         )
         if status in contract.success_statuses:
-            if not is_run_payload(payload, contract.payload_kind):
+            if (
+                not is_run_payload(payload, contract.payload_kind)
+                or (
+                    run_id is not None
+                    and isinstance(payload, dict)
+                    and payload.get("run_id") != run_id
+                )
+            ):
                 raise GatewayProxyError(
                     502,
                     "gateway_incompatible",

@@ -348,6 +348,7 @@ The exact allowlist is:
 | GET | `/v1/runs/{run_id}` | Read authoritative status |
 | GET | `/v1/runs/{run_id}/events` | Consume ordered SSE |
 | POST | `/v1/runs/{run_id}/stop` | Request interruption |
+| POST | `/v1/runs/{run_id}/approval` | Resolve one pending approval |
 
 Start requires a JSON object and permits up to and including 2 MiB so an
 existing server-authoritative conversation can be supplied:
@@ -402,6 +403,35 @@ Repeated UI stop actions are coalesced and never create another run. If the
 stop response is lost, the App retains the stop latch and reconciles the same
 `run_id` rather than sending an ambiguous second stop request.
 
+Approval submission is capability-gated by the Gateway
+`approval_events`/`run_approval_response` features and `run_approval` endpoint.
+It accepts only one canonical, server-offered decision:
+
+```json
+{"choice":"once"}
+```
+
+Supported choices are `once`, `session`, `always`, and `deny`. Companion
+intentionally rejects Gateway aliases, `all`, `resolve_all`, unknown fields,
+queries, and non-JSON bodies so one App action can resolve only the next
+pending item on the exact existing `run_id`. Hermes Agent 0.19.0 exposes no
+separate approval ID; Companion does not invent one. Success is
+`200 application/json`:
+
+```json
+{
+  "object": "hermes.run.approval_response",
+  "run_id": "<run-id>",
+  "choice": "once",
+  "resolved": 1
+}
+```
+
+The returned `run_id` must match the requested run. A missing run remains 404;
+an inactive, already-resolved, or expired approval remains a sanitized 409.
+The App reconciles either outcome through the authoritative status of that
+same run and never restarts it or resends its prompt.
+
 Events success is `200 text/event-stream`. Companion forwards each upstream
 byte chunk as it arrives without JSON decoding, re-encoding, buffering, event
 reordering, or automatic stop. This preserves `data:` records, future
@@ -419,8 +449,11 @@ cannot be correlated exactly until Gateway emits an identity.
 
 If SSE disconnects after subscription, the Gateway may release that transport
 queue while retaining authoritative run status. Recovery polls the same
-`run_id` and refreshes session history after terminal state. Neither Companion
-nor App automatically resubmits the prompt.
+`run_id`. If status is `waiting_for_approval` but the original request event
+is no longer available, the App presents a non-actionable waiting state rather
+than guessing hidden context or submitting a blind approval. Stop remains
+available. Terminal recovery refreshes session history. Neither Companion nor
+App automatically resubmits the prompt.
 
 Safe Gateway client failures (`400`, `404`, `409`, and `429`) preserve their
 status and only the bounded `error.code` / `error.message` envelope. JSON

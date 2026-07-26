@@ -150,6 +150,99 @@ final class ConversationRunServiceTests: APIClientTestCase {
         XCTAssertNotEqual(.cancelled, stopping.state)
     }
 
+    func testApprovalPostsCanonicalChoiceToExactExistingRun() async throws {
+        let keychain = InMemoryKeychainStore()
+        try keychain.save(
+            "device-credential",
+            forKey: .companionDeviceCredential
+        )
+        let session = makeSession { request in
+            XCTAssertEqual(
+                "/v1/runs/run-1/approval",
+                request.url?.path
+            )
+            XCTAssertEqual("POST", request.httpMethod)
+            XCTAssertEqual(
+                "Bearer device-credential",
+                request.value(forHTTPHeaderField: "Authorization")
+            )
+            let body = try apiTestJSONBody(from: request)
+            XCTAssertEqual(["choice"], body.keys.sorted())
+            XCTAssertEqual("deny", body["choice"] as? String)
+            return self.response(
+                status: 200,
+                json: """
+                {
+                  "object": "hermes.run.approval_response",
+                  "run_id": "run-1",
+                  "choice": "deny",
+                  "resolved": 1,
+                  "future_field": true
+                }
+                """,
+                request: request
+            )
+        }
+        let service = ConversationRunService(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            keychain: keychain,
+            session: session
+        )
+
+        let response = try await service.respondToApproval(
+            runID: "run-1",
+            choice: .deny
+        )
+
+        XCTAssertEqual("run-1", response.runID)
+        XCTAssertEqual(.deny, response.choice)
+        XCTAssertEqual(1, response.resolved)
+    }
+
+    func testExpiredApprovalMapsToReconciliationError() async throws {
+        let keychain = InMemoryKeychainStore()
+        try keychain.save(
+            "device-credential",
+            forKey: .companionDeviceCredential
+        )
+        let session = makeSession { request in
+            self.response(
+                status: 409,
+                json: """
+                {
+                  "error": {
+                    "code": "approval_not_pending",
+                    "message": "No approval is pending for this run."
+                  }
+                }
+                """,
+                request: request
+            )
+        }
+        let service = ConversationRunService(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            keychain: keychain,
+            session: session
+        )
+
+        do {
+            _ = try await service.respondToApproval(
+                runID: "run-1",
+                choice: .once
+            )
+            XCTFail("Expected an expired approval error")
+        } catch {
+            XCTAssertEqual(
+                .approvalNotPending,
+                error as? ConversationRunServiceError
+            )
+        }
+    }
+
     func testParserKeepsTransportAndJSONEventNamesIndependent() throws {
         var parser = ConversationRunSSEParser()
 
@@ -193,6 +286,51 @@ final class ConversationRunServiceTests: APIClientTestCase {
         }
         XCTAssertNil(transportOnly.event)
         XCTAssertEqual("run.completed", transportOnly.semanticEvent)
+    }
+
+    func testApprovalEventUsesOnlyBoundedVerifiedDisplayFields() throws {
+        var parser = ConversationRunSSEParser()
+        // Approval request fixture pinned to Hermes Agent 0.19.0 commit
+        // 07e97d2f5dc3d2092cfe693ef07b2527a36cd2d8.
+        let object: [String: Any] = [
+            "event": "approval.request",
+            "run_id": "run-1",
+            "command": String(repeating: "x", count: 5_000),
+            "description": String(repeating: "y", count: 3_000),
+            "choices": ["once", "future_choice", "deny", "once"],
+            "timestamp": 123.0,
+            "pattern_keys": ["sudo with privilege flag"],
+            "allow_permanent": true,
+            "smart_denied": false,
+            "private_path": "/volume/private/approval-state.json",
+            "unsupported_payload": ["secret": true],
+        ]
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let line = "data: " + String(decoding: data, as: UTF8.self)
+        XCTAssertEqual([], parser.consume(line: line))
+        guard
+            case .data(let payload) = try XCTUnwrap(
+                parser.consume(line: "").first
+            ),
+            let approval = payload.approvalRequest(
+                expectedRunID: "run-1"
+            )
+        else {
+            XCTFail("Expected a verified approval request")
+            return
+        }
+
+        XCTAssertEqual(
+            ConversationApprovalRequest.maximumCommandCharacters,
+            approval.commandPreview?.count
+        )
+        XCTAssertEqual(
+            ConversationApprovalRequest.maximumDescriptionCharacters,
+            approval.description?.count
+        )
+        XCTAssertEqual([.deny], approval.choices)
+        XCTAssertFalse(approval.contextIsComplete)
+        XCTAssertNil(payload.approvalRequest(expectedRunID: "another-run"))
     }
 
     func testLineDecoderPreservesSSEBlankLinesAndLineEndings() throws {
@@ -332,6 +470,354 @@ final class ConversationRunServiceTests: APIClientTestCase {
         XCTAssertEqual("session-1", startRequests[0].sessionID)
         XCTAssertEqual(["run-1"], statusRunIDs)
         XCTAssertEqual(.completed, viewModel.runState)
+    }
+
+    @MainActor
+    func testApprovalDecisionIsSingleFlightAndNeverRestartsRun() async throws {
+        let session = try makeSessionSummary()
+        let repository = RunHistoryRepositoryStub(session: session)
+        let approvalEvent = ConversationRunEvent.data(
+            ConversationRunEventData(
+                transportEvent: nil,
+                event: "approval.request",
+                runID: "run-1",
+                delta: nil,
+                output: nil,
+                error: nil,
+                timestamp: 123,
+                command: "sudo -S true",
+                description: "sudo with privilege flag",
+                approvalChoices: ["once", "deny"]
+            )
+        )
+        let runService = RunServiceStub(
+            eventResult: .eventBatchesThenWait(
+                [approvalEvent],
+                [approvalEvent],
+                100_000_000,
+                1_000_000_000
+            ),
+            statuses: [
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .waitingForApproval,
+                    sessionID: "session-1",
+                    lastEvent: "approval.request",
+                    output: nil,
+                    errorMessage: nil
+                ),
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .cancelled,
+                    sessionID: "session-1",
+                    lastEvent: "run.cancelled",
+                    output: nil,
+                    errorMessage: nil
+                )
+            ],
+            approvalDelayNanoseconds: 300_000_000
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: runService,
+            supportsRunApprovals: true,
+            reconciliationDelayNanoseconds: 0
+        )
+        await viewModel.load()
+        let didSend = await viewModel.send("Inspect safely")
+        XCTAssertTrue(didSend)
+        await waitUntil { viewModel.pendingApproval != nil }
+
+        async let first: Void = viewModel.respondToApproval(.deny)
+        async let duplicate: Void = viewModel.respondToApproval(.deny)
+        _ = await (first, duplicate)
+
+        XCTAssertNil(viewModel.pendingApproval)
+        XCTAssertTrue(viewModel.approvalContextUnavailable)
+        let approvalRequests = await runService.approvalRequests
+        let startRequests = await runService.startRequests
+        XCTAssertEqual(1, approvalRequests.count)
+        XCTAssertEqual(
+            "run-1",
+            approvalRequests.first?.runID
+        )
+        XCTAssertEqual(
+            .deny,
+            approvalRequests.first?.choice
+        )
+        XCTAssertEqual(1, startRequests.count)
+
+        await viewModel.stopRun()
+        await waitUntil { viewModel.activeRunID == nil }
+    }
+
+    @MainActor
+    func testExpiredApprovalReconcilesTheSameRun() async throws {
+        let session = try makeSessionSummary()
+        let repository = RunHistoryRepositoryStub(session: session)
+        let approvalEvent = ConversationRunEvent.data(
+            ConversationRunEventData(
+                transportEvent: nil,
+                event: "approval.request",
+                runID: "run-1",
+                delta: nil,
+                output: nil,
+                error: nil,
+                timestamp: 123,
+                command: "command",
+                description: "approval required",
+                approvalChoices: ["once", "deny"]
+            )
+        )
+        let runService = RunServiceStub(
+            eventResult: .eventsThenWait(
+                [approvalEvent],
+                1_000_000_000
+            ),
+            statuses: [
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .running,
+                    sessionID: "session-1",
+                    lastEvent: "approval.responded",
+                    output: nil,
+                    errorMessage: nil
+                ),
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .cancelled,
+                    sessionID: "session-1",
+                    lastEvent: "run.cancelled",
+                    output: nil,
+                    errorMessage: nil
+                ),
+            ],
+            approvalError: .approvalNotPending
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: runService,
+            supportsRunApprovals: true,
+            reconciliationDelayNanoseconds: 0
+        )
+        await viewModel.load()
+        let didSend = await viewModel.send("Inspect safely")
+        XCTAssertTrue(didSend)
+        await waitUntil { viewModel.pendingApproval != nil }
+
+        await viewModel.respondToApproval(.once)
+
+        XCTAssertNil(viewModel.pendingApproval)
+        let statusRunIDs = await runService.statusRunIDs
+        let startRequests = await runService.startRequests
+        XCTAssertEqual(["run-1"], statusRunIDs)
+        XCTAssertEqual(1, startRequests.count)
+        XCTAssertNotNil(viewModel.approvalErrorMessage)
+
+        await viewModel.stopRun()
+        await waitUntil { viewModel.activeRunID == nil }
+    }
+
+    @MainActor
+    func testAmbiguousApprovalFailureBecomesNonActionable() async throws {
+        let session = try makeSessionSummary()
+        let repository = RunHistoryRepositoryStub(session: session)
+        let approvalEvent = ConversationRunEvent.data(
+            ConversationRunEventData(
+                transportEvent: nil,
+                event: "approval.request",
+                runID: "run-1",
+                delta: nil,
+                output: nil,
+                error: nil,
+                timestamp: 123,
+                command: "command",
+                description: "approval required",
+                approvalChoices: ["once", "deny"]
+            )
+        )
+        let runService = RunServiceStub(
+            eventResult: .eventsThenWait(
+                [approvalEvent],
+                1_000_000_000
+            ),
+            statuses: [
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .waitingForApproval,
+                    sessionID: "session-1",
+                    lastEvent: "approval.request",
+                    output: nil,
+                    errorMessage: nil
+                ),
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .cancelled,
+                    sessionID: "session-1",
+                    lastEvent: "run.cancelled",
+                    output: nil,
+                    errorMessage: nil
+                ),
+            ],
+            approvalError: .gatewayTransportFailure
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: runService,
+            supportsRunApprovals: true,
+            reconciliationDelayNanoseconds: 0
+        )
+        await viewModel.load()
+        let didSend = await viewModel.send("Inspect safely")
+        XCTAssertTrue(didSend)
+        await waitUntil { viewModel.pendingApproval != nil }
+
+        await viewModel.respondToApproval(.once)
+
+        XCTAssertNil(viewModel.pendingApproval)
+        XCTAssertTrue(viewModel.approvalContextUnavailable)
+        let approvalRequests = await runService.approvalRequests
+        let statusRunIDs = await runService.statusRunIDs
+        XCTAssertEqual(1, approvalRequests.count)
+        XCTAssertEqual(["run-1"], statusRunIDs)
+
+        await viewModel.stopRun()
+        await waitUntil { viewModel.activeRunID == nil }
+    }
+
+    @MainActor
+    func testDisconnectedApprovalWaitNeverOffersBlindActions() async throws {
+        let session = try makeSessionSummary()
+        let repository = RunHistoryRepositoryStub(session: session)
+        let approvalEvent = ConversationRunEvent.data(
+            ConversationRunEventData(
+                transportEvent: nil,
+                event: "approval.request",
+                runID: "run-1",
+                delta: nil,
+                output: nil,
+                error: nil,
+                timestamp: 123,
+                command: "command",
+                description: "approval required",
+                approvalChoices: ["once", "deny"]
+            )
+        )
+        let runService = RunServiceStub(
+            eventResult: .eventsThenWait([approvalEvent], 0),
+            statuses: [
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .waitingForApproval,
+                    sessionID: "session-1",
+                    lastEvent: "approval.request",
+                    output: nil,
+                    errorMessage: nil
+                ),
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .cancelled,
+                    sessionID: "session-1",
+                    lastEvent: "run.cancelled",
+                    output: nil,
+                    errorMessage: nil
+                ),
+            ]
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: runService,
+            supportsRunApprovals: true,
+            reconciliationDelayNanoseconds: 100_000_000
+        )
+        await viewModel.load()
+        let didSend = await viewModel.send("Inspect safely")
+        XCTAssertTrue(didSend)
+        await waitUntil {
+            viewModel.runState == .waitingForApproval
+        }
+
+        XCTAssertNil(viewModel.pendingApproval)
+        XCTAssertTrue(viewModel.approvalContextUnavailable)
+        let startRequests = await runService.startRequests
+        XCTAssertEqual(1, startRequests.count)
+
+        await viewModel.stopRun()
+        await waitUntil { viewModel.activeRunID == nil }
+    }
+
+    @MainActor
+    func testLateApprovalEventCannotRegressStoppingState() async throws {
+        let session = try makeSessionSummary()
+        let repository = RunHistoryRepositoryStub(session: session)
+        let approvalEvent = ConversationRunEvent.data(
+            ConversationRunEventData(
+                transportEvent: nil,
+                event: "approval.request",
+                runID: "run-1",
+                delta: nil,
+                output: nil,
+                error: nil,
+                timestamp: 123,
+                command: "command",
+                description: "approval required",
+                approvalChoices: ["once", "deny"]
+            )
+        )
+        let runService = RunServiceStub(
+            eventResult: .eventsAfterDelay(
+                [approvalEvent],
+                100_000_000
+            ),
+            statuses: [
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .cancelled,
+                    sessionID: "session-1",
+                    lastEvent: "run.cancelled",
+                    output: nil,
+                    errorMessage: nil
+                )
+            ],
+            statusDelayNanoseconds: 300_000_000
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: runService,
+            supportsRunApprovals: true,
+            reconciliationDelayNanoseconds: 0
+        )
+        await viewModel.load()
+        let didSend = await viewModel.send("Inspect safely")
+        XCTAssertTrue(didSend)
+
+        await viewModel.stopRun()
+        XCTAssertEqual(.stopping, viewModel.runState)
+        try await Task.sleep(nanoseconds: 175_000_000)
+        XCTAssertEqual(.stopping, viewModel.runState)
+        XCTAssertNil(viewModel.pendingApproval)
+
+        await waitUntil { viewModel.activeRunID == nil }
     }
 
     @MainActor
@@ -1016,12 +1502,23 @@ private actor RunHistoryRepositoryStub: SessionRepository {
 }
 
 private actor RunServiceStub: ConversationRunServing {
+    struct ApprovalRequest: Sendable {
+        let runID: String
+        let choice: ConversationApprovalChoice
+    }
+
     enum EventResult {
         case disconnect
         case holdOpen
         case deltasThenWait([String], UInt64)
         case eventsThenWait([ConversationRunEvent], UInt64)
         case eventsAfterDelay([ConversationRunEvent], UInt64)
+        case eventBatchesThenWait(
+            [ConversationRunEvent],
+            [ConversationRunEvent],
+            UInt64,
+            UInt64
+        )
     }
 
     private let eventResult: EventResult
@@ -1029,22 +1526,29 @@ private actor RunServiceStub: ConversationRunServing {
     private(set) var startRequests: [ConversationRunStartRequest] = []
     private(set) var statusRunIDs: [String] = []
     private(set) var stopCallCount = 0
+    private(set) var approvalRequests: [ApprovalRequest] = []
     private let stopError: ConversationRunServiceError?
+    private let approvalError: ConversationRunServiceError?
     private let statusDelayNanoseconds: UInt64
     private let stopDelayNanoseconds: UInt64
+    private let approvalDelayNanoseconds: UInt64
 
     init(
         eventResult: EventResult,
         statuses: [ConversationRunSnapshot],
         stopError: ConversationRunServiceError? = nil,
+        approvalError: ConversationRunServiceError? = nil,
         statusDelayNanoseconds: UInt64 = 0,
-        stopDelayNanoseconds: UInt64 = 0
+        stopDelayNanoseconds: UInt64 = 0,
+        approvalDelayNanoseconds: UInt64 = 0
     ) {
         self.eventResult = eventResult
         self.statuses = statuses
         self.stopError = stopError
+        self.approvalError = approvalError
         self.statusDelayNanoseconds = statusDelayNanoseconds
         self.stopDelayNanoseconds = stopDelayNanoseconds
+        self.approvalDelayNanoseconds = approvalDelayNanoseconds
     }
 
     func start(
@@ -1087,6 +1591,28 @@ private actor RunServiceStub: ConversationRunServing {
             lastEvent: "run.stopping",
             output: nil,
             errorMessage: nil
+        )
+    }
+
+    func respondToApproval(
+        runID: String,
+        choice: ConversationApprovalChoice
+    ) async throws -> ConversationApprovalResponse {
+        approvalRequests.append(
+            ApprovalRequest(runID: runID, choice: choice)
+        )
+        if approvalDelayNanoseconds > 0 {
+            try? await Task.sleep(
+                nanoseconds: approvalDelayNanoseconds
+            )
+        }
+        if let approvalError {
+            throw approvalError
+        }
+        return ConversationApprovalResponse(
+            runID: runID,
+            choice: choice,
+            resolved: 1
         )
     }
 
@@ -1146,6 +1672,28 @@ private actor RunServiceStub: ConversationRunServing {
                     for event in events {
                         continuation.yield(event)
                     }
+                    continuation.finish()
+                }
+                continuation.onTermination = { _ in task.cancel() }
+            case .eventBatchesThenWait(
+                let first,
+                let second,
+                let delayBetween,
+                let closeDelay
+            ):
+                let task = Task {
+                    for event in first {
+                        continuation.yield(event)
+                    }
+                    try? await Task.sleep(
+                        nanoseconds: delayBetween
+                    )
+                    for event in second {
+                        continuation.yield(event)
+                    }
+                    try? await Task.sleep(
+                        nanoseconds: closeDelay
+                    )
                     continuation.finish()
                 }
                 continuation.onTermination = { _ in task.cancel() }

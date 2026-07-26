@@ -397,6 +397,77 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
         XCTAssertEqual(capabilities.gateway?.status, "incompatible")
     }
 
+    func testRunApprovalSupportRequiresBothFeaturesAndExactEndpoint() throws {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let capabilities = try decoder.decode(
+            CompanionCapabilities.self,
+            from: Data(
+                """
+                {
+                  "companion": {
+                    "features": {"run_approval_proxy": true},
+                    "endpoints": {
+                      "run_approval": {
+                        "method": "POST",
+                        "path": "/v1/runs/{run_id}/approval"
+                      }
+                    }
+                  },
+                  "gateway": {
+                    "status": "ok",
+                    "capabilities": {
+                      "features": {
+                        "approval_events": true,
+                        "run_approval_response": true
+                      },
+                      "endpoints": {
+                        "run_approval": {
+                          "method": "POST",
+                          "path": "/v1/runs/{run_id}/approval"
+                        }
+                      }
+                    }
+                  }
+                }
+                """.utf8
+            )
+        )
+        let missingResponseFeature = try decoder.decode(
+            CompanionCapabilities.self,
+            from: Data(
+                """
+                {
+                  "companion": {
+                    "features": {"run_approval_proxy": true},
+                    "endpoints": {
+                      "run_approval": {
+                        "method": "POST",
+                        "path": "/v1/runs/{run_id}/approval"
+                      }
+                    }
+                  },
+                  "gateway": {
+                    "status": "ok",
+                    "capabilities": {
+                      "features": {"approval_events": true},
+                      "endpoints": {
+                        "run_approval": {
+                          "method": "POST",
+                          "path": "/v1/runs/{run_id}/approval"
+                        }
+                      }
+                    }
+                  }
+                }
+                """.utf8
+            )
+        )
+
+        XCTAssertTrue(capabilities.supportsRunApprovals)
+        XCTAssertFalse(missingResponseFeature.supportsRunApprovals)
+    }
+
     @MainActor
     func testManagerTreatsGatewayUnavailableAsConnectedCompanionState() async throws {
         let connection = CompanionConnection(

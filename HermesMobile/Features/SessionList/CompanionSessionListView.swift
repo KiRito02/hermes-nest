@@ -97,6 +97,8 @@ struct CompanionSessionListView: View {
                     session: session,
                     repository: repository,
                     companionURL: connection.companionURL,
+                    supportsRunApprovals:
+                        connection.capabilities.supportsRunApprovals,
                     onUpdated: { session in
                         viewModel.updateSessionSnapshot(
                             session,
@@ -264,6 +266,7 @@ struct CompanionSessionListView: View {
 private struct CompanionSessionHistoryView: View {
     let repository: any SessionRepository
     let companionURL: URL
+    let supportsRunApprovals: Bool
     let onUpdated: (SessionSummary) -> Void
     let onForked: () -> Void
     let onDeleted: (String) -> Void
@@ -282,12 +285,14 @@ private struct CompanionSessionHistoryView: View {
         session: SessionSummary,
         repository: any SessionRepository,
         companionURL: URL,
+        supportsRunApprovals: Bool,
         onUpdated: @escaping (SessionSummary) -> Void,
         onForked: @escaping () -> Void,
         onDeleted: @escaping (String) -> Void
     ) {
         self.repository = repository
         self.companionURL = companionURL
+        self.supportsRunApprovals = supportsRunApprovals
         self.onUpdated = onUpdated
         self.onForked = onForked
         self.onDeleted = onDeleted
@@ -295,7 +300,8 @@ private struct CompanionSessionHistoryView: View {
             initialValue: CompanionSessionHistoryViewModel(
                 session: session,
                 repository: repository,
-                companionURL: companionURL
+                companionURL: companionURL,
+                supportsRunApprovals: supportsRunApprovals
             )
         )
     }
@@ -382,6 +388,26 @@ private struct CompanionSessionHistoryView: View {
                     ToolCallCardView(toolCall: toolCall)
                 }
 
+                if let approval = viewModel.pendingApproval {
+                    CompanionRunApprovalCard(
+                        approval: approval,
+                        submissionChoice:
+                            viewModel.approvalSubmissionChoice,
+                        errorMessage:
+                            viewModel.approvalErrorMessage,
+                        canRespond: viewModel.canRespondToApproval
+                    ) { choice in
+                        Task {
+                            await viewModel.respondToApproval(
+                                choice,
+                                modelContext: modelContext
+                            )
+                        }
+                    }
+                } else if viewModel.approvalContextUnavailable {
+                    CompanionRunApprovalUnavailableCard()
+                }
+
                 if let streamingMessage = viewModel.streamingMessage {
                     MessageBubbleView(
                         message: streamingMessage,
@@ -434,6 +460,7 @@ private struct CompanionSessionHistoryView: View {
                 session: session,
                 repository: repository,
                 companionURL: companionURL,
+                supportsRunApprovals: supportsRunApprovals,
                 onUpdated: onUpdated,
                 onForked: onForked,
                 onDeleted: onDeleted
@@ -610,6 +637,205 @@ private struct CompanionSessionHistoryView: View {
                 composerIsFocused = false
             }
         }
+    }
+}
+
+@MainActor
+private struct CompanionRunApprovalCard: View {
+    let approval: ConversationApprovalRequest
+    let submissionChoice: ConversationApprovalChoice?
+    let errorMessage: String?
+    let canRespond: (ConversationApprovalChoice) -> Bool
+    let onChoice: (ConversationApprovalChoice) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(
+                "Approval required",
+                systemImage: "exclamationmark.shield.fill"
+            )
+            .font(.headline)
+            .foregroundStyle(.orange)
+
+            if let description = approval.description {
+                Text(description)
+                    .font(.subheadline)
+                    .textSelection(.enabled)
+            }
+
+            if let command = approval.commandPreview {
+                Text(command)
+                    .font(.system(.footnote, design: .monospaced))
+                    .textSelection(.enabled)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        Color(.secondarySystemBackground),
+                        in: RoundedRectangle(cornerRadius: 9)
+                    )
+            }
+
+            if !approval.contextIsComplete {
+                Label(
+                    "Approval context was missing or truncated. Allowing is disabled; deny or stop the run.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.footnote)
+                .foregroundStyle(.orange)
+            }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .accessibilityLabel(
+                        "Approval failed. \(errorMessage)"
+                    )
+            }
+
+            HStack(spacing: 10) {
+                if approval.choices.contains(.deny) {
+                    choiceButton(
+                        .deny,
+                        title: "Deny",
+                        systemImage: "xmark",
+                        role: .destructive,
+                        prominent: false
+                    )
+                }
+                if approval.choices.contains(.once) {
+                    choiceButton(
+                        .once,
+                        title: "Allow Once",
+                        systemImage: "checkmark",
+                        prominent: true
+                    )
+                }
+                if approval.choices.contains(.session)
+                    || approval.choices.contains(.always) {
+                    Menu {
+                        if approval.choices.contains(.session) {
+                            Button {
+                                onChoice(.session)
+                            } label: {
+                                Label(
+                                    "Allow for Session",
+                                    systemImage: "clock"
+                                )
+                            }
+                            .disabled(!canRespond(.session))
+                        }
+                        if approval.choices.contains(.always) {
+                            Button {
+                                onChoice(.always)
+                            } label: {
+                                Label(
+                                    "Always Allow",
+                                    systemImage: "infinity"
+                                )
+                            }
+                            .disabled(!canRespond(.always))
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .frame(width: 36, height: 36)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(submissionChoice != nil)
+                    .accessibilityLabel("More approval choices")
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: 680, alignment: .leading)
+        .background(
+            .orange.opacity(0.10),
+            in: RoundedRectangle(cornerRadius: 14)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(.orange.opacity(0.35), lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("companion.run.approval")
+    }
+
+    @ViewBuilder
+    private func choiceButton(
+        _ choice: ConversationApprovalChoice,
+        title: LocalizedStringKey,
+        systemImage: String,
+        role: ButtonRole? = nil,
+        prominent: Bool
+    ) -> some View {
+        let button = Button(role: role) {
+            onChoice(choice)
+        } label: {
+            choiceLabel(
+                choice,
+                title: title,
+                systemImage: systemImage
+            )
+        }
+        .disabled(!canRespond(choice))
+        .accessibilityIdentifier(
+            "companion.run.approval.\(choice.rawValue)"
+        )
+
+        if prominent {
+            button
+            .buttonStyle(.borderedProminent)
+        } else {
+            button
+            .buttonStyle(.bordered)
+        }
+    }
+
+    @ViewBuilder
+    private func choiceLabel(
+        _ choice: ConversationApprovalChoice,
+        title: LocalizedStringKey,
+        systemImage: String
+    ) -> some View {
+        Group {
+            if submissionChoice == choice {
+                ProgressView()
+                    .accessibilityLabel("Submitting approval")
+            } else {
+                Label(title, systemImage: systemImage)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+@MainActor
+private struct CompanionRunApprovalUnavailableCard: View {
+    var body: some View {
+        Label {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Approval is waiting in Hermes")
+                    .font(.subheadline.weight(.semibold))
+                Text(
+                    "The live approval details disconnected, so this app will not submit a blind decision. You can stop the run or resolve it from another connected Hermes surface."
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+        } icon: {
+            Image(systemName: "wifi.exclamationmark")
+                .foregroundStyle(.orange)
+        }
+        .padding(14)
+        .frame(maxWidth: 680, alignment: .leading)
+        .background(
+            .orange.opacity(0.10),
+            in: RoundedRectangle(cornerRadius: 14)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(
+            "companion.run.approval-context-unavailable"
+        )
     }
 }
 

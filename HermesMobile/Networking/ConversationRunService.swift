@@ -63,6 +63,38 @@ struct ConversationRunSnapshot: Equatable, Sendable {
     let errorMessage: String?
 }
 
+enum ConversationApprovalChoice:
+    String,
+    CaseIterable,
+    Codable,
+    Equatable,
+    Hashable,
+    Sendable
+{
+    case once
+    case session
+    case always
+    case deny
+}
+
+struct ConversationApprovalRequest: Equatable, Sendable {
+    static let maximumCommandCharacters = 2_000
+    static let maximumDescriptionCharacters = 1_000
+
+    let runID: String
+    let commandPreview: String?
+    let description: String?
+    let choices: [ConversationApprovalChoice]
+    let timestamp: Double?
+    let contextIsComplete: Bool
+}
+
+struct ConversationApprovalResponse: Equatable, Sendable {
+    let runID: String
+    let choice: ConversationApprovalChoice
+    let resolved: Int
+}
+
 struct ConversationRunEventData: Equatable, Sendable {
     let transportEvent: String?
     let event: String?
@@ -77,6 +109,9 @@ struct ConversationRunEventData: Equatable, Sendable {
     let duration: Double?
     let isError: Bool?
     let timestamp: Double?
+    let command: String?
+    let description: String?
+    let approvalChoices: [String]?
 
     init(
         transportEvent: String?,
@@ -91,7 +126,10 @@ struct ConversationRunEventData: Equatable, Sendable {
         toolCallID: String? = nil,
         duration: Double? = nil,
         isError: Bool? = nil,
-        timestamp: Double?
+        timestamp: Double?,
+        command: String? = nil,
+        description: String? = nil,
+        approvalChoices: [String]? = nil
     ) {
         self.transportEvent = transportEvent
         self.event = event
@@ -106,10 +144,72 @@ struct ConversationRunEventData: Equatable, Sendable {
         self.duration = duration
         self.isError = isError
         self.timestamp = timestamp
+        self.command = command
+        self.description = description
+        self.approvalChoices = approvalChoices
     }
 
     var semanticEvent: String? {
         event?.nilIfEmpty ?? transportEvent?.nilIfEmpty
+    }
+
+    func approvalRequest(
+        expectedRunID: String
+    ) -> ConversationApprovalRequest? {
+        guard
+            semanticEvent == "approval.request",
+            runID == expectedRunID,
+            let approvalChoices
+        else {
+            return nil
+        }
+        let boundedCommand = Self.bounded(
+            command,
+            maximumCharacters:
+                ConversationApprovalRequest.maximumCommandCharacters
+        )
+        let boundedDescription = Self.bounded(
+            description,
+            maximumCharacters:
+                ConversationApprovalRequest.maximumDescriptionCharacters
+        )
+        let contextIsComplete = (
+            boundedCommand.value != nil
+                || boundedDescription.value != nil
+        ) && !boundedCommand.wasTruncated
+            && !boundedDescription.wasTruncated
+        var seen: Set<ConversationApprovalChoice> = []
+        let verifiedChoices = approvalChoices.compactMap {
+            ConversationApprovalChoice(rawValue: $0)
+        }.filter {
+            seen.insert($0).inserted
+        }.filter {
+            contextIsComplete || $0 == .deny
+        }
+        guard !verifiedChoices.isEmpty else { return nil }
+        return ConversationApprovalRequest(
+            runID: expectedRunID,
+            commandPreview: boundedCommand.value,
+            description: boundedDescription.value,
+            choices: verifiedChoices,
+            timestamp: timestamp,
+            contextIsComplete: contextIsComplete
+        )
+    }
+
+    private static func bounded(
+        _ value: String?,
+        maximumCharacters: Int
+    ) -> (value: String?, wasTruncated: Bool) {
+        guard let value else { return (nil, false) }
+        let trimmed = value.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !trimmed.isEmpty else { return (nil, false) }
+        return (
+            String(trimmed.prefix(maximumCharacters)),
+            trimmed.count > maximumCharacters
+        )
     }
 }
 
@@ -192,7 +292,10 @@ struct ConversationRunSSEParser {
                     duration: Self.double(object["duration"]),
                     isError: Self.bool(object["is_error"])
                         ?? Self.bool(object["error"]),
-                    timestamp: Self.double(object["timestamp"])
+                    timestamp: Self.double(object["timestamp"]),
+                    command: Self.string(object["command"]),
+                    description: Self.string(object["description"]),
+                    approvalChoices: Self.stringArray(object["choices"])
                 )
             )
         ]
@@ -231,6 +334,11 @@ struct ConversationRunSSEParser {
             }
         }
         return nil
+    }
+
+    private static func stringArray(_ value: Any?) -> [String]? {
+        guard let values = value as? [Any] else { return nil }
+        return values.compactMap { $0 as? String }
     }
 }
 
@@ -283,6 +391,10 @@ protocol ConversationRunServing: Sendable {
     ) async throws -> ConversationRunSnapshot
     func status(runID: String) async throws -> ConversationRunSnapshot
     func stop(runID: String) async throws -> ConversationRunSnapshot
+    func respondToApproval(
+        runID: String,
+        choice: ConversationApprovalChoice
+    ) async throws -> ConversationApprovalResponse
     func events(
         runID: String
     ) async throws -> AsyncThrowingStream<ConversationRunEvent, Error>
@@ -296,6 +408,7 @@ enum ConversationRunServiceError: LocalizedError, Equatable {
     case invalidRequest
     case invalidRunID
     case runNotFound
+    case approvalNotPending
     case rateLimited
     case requestTooLarge
     case gatewayUnauthorized
@@ -322,6 +435,8 @@ enum ConversationRunServiceError: LocalizedError, Equatable {
             return String(localized: "The Hermes run identity is invalid.")
         case .runNotFound:
             return String(localized: "This Hermes run is no longer available.")
+        case .approvalNotPending:
+            return String(localized: "This approval already changed or expired. Checking the existing run.")
         case .rateLimited:
             return String(localized: "Hermes is already handling the maximum number of runs.")
         case .requestTooLarge:
@@ -433,6 +548,49 @@ actor ConversationRunService: ConversationRunServing {
             throw ConversationRunServiceError.unexpectedResponse
         }
         return snapshot
+    }
+
+    func respondToApproval(
+        runID: String,
+        choice: ConversationApprovalChoice
+    ) async throws -> ConversationApprovalResponse {
+        let encoded: Data
+        do {
+            encoded = try JSONEncoder().encode(
+                RunApprovalBody(choice: choice)
+            )
+        } catch {
+            throw ConversationRunServiceError.invalidRequest
+        }
+        let data = try await sendJSON(
+            url: try runURL(runID: runID, action: "approval"),
+            method: "POST",
+            body: encoded,
+            expectedStatusCodes: [200]
+        )
+        let payload: RunApprovalWireResponse
+        do {
+            payload = try decoder.decode(
+                RunApprovalWireResponse.self,
+                from: data
+            )
+        } catch {
+            throw ConversationRunServiceError.unexpectedResponse
+        }
+        guard
+            payload.object == "hermes.run.approval_response",
+            payload.runID == runID,
+            payload.choice == choice,
+            let resolved = payload.resolved,
+            resolved > 0
+        else {
+            throw ConversationRunServiceError.unexpectedResponse
+        }
+        return ConversationApprovalResponse(
+            runID: runID,
+            choice: choice,
+            resolved: resolved
+        )
     }
 
     func events(
@@ -677,6 +835,9 @@ actor ConversationRunService: ConversationRunServing {
             return .invalidRequest
         case (404, "run_not_found"):
             return .runNotFound
+        case (409, "approval_not_active"),
+             (409, "approval_not_pending"):
+            return .approvalNotPending
         case (429, _):
             return .rateLimited
         case (413, "request_too_large"):
@@ -730,6 +891,35 @@ private struct RunStartBody: Encodable {
         case sessionID = "session_id"
         case conversationHistory = "conversation_history"
         case model
+    }
+}
+
+private struct RunApprovalBody: Encodable {
+    let choice: ConversationApprovalChoice
+}
+
+private struct RunApprovalWireResponse: Decodable {
+    let object: String?
+    let runID: String?
+    let choice: ConversationApprovalChoice?
+    let resolved: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case object
+        case runID = "run_id"
+        case choice
+        case resolved
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        object = container.decodeLossyStringIfPresent(forKey: .object)
+        runID = container.decodeLossyStringIfPresent(forKey: .runID)
+        choice = try? container.decodeIfPresent(
+            ConversationApprovalChoice.self,
+            forKey: .choice
+        )
+        resolved = container.decodeLossyIntIfPresent(forKey: .resolved)
     }
 }
 
