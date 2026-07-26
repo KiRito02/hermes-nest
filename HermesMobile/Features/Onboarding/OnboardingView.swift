@@ -115,7 +115,11 @@ struct OnboardingView: View {
                         .padding(.vertical, 15)
                         .background(
                             Color(red: 1.0, green: 0.74, blue: 0.10),
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            in: RoundedRectangle(
+                                cornerRadius:
+                                    HermesNestDesign.compactCornerRadius,
+                                style: .continuous
+                            )
                         )
                 }
                 .buttonStyle(.plain)

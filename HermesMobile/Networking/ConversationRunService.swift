@@ -61,6 +61,65 @@ struct ConversationRunSnapshot: Equatable, Sendable {
     let lastEvent: String?
     let output: String?
     let errorMessage: String?
+    let usage: ConversationRunUsage?
+
+    init(
+        runID: String,
+        state: ConversationRunState,
+        sessionID: String?,
+        lastEvent: String?,
+        output: String?,
+        errorMessage: String?,
+        usage: ConversationRunUsage? = nil
+    ) {
+        self.runID = runID
+        self.state = state
+        self.sessionID = sessionID
+        self.lastEvent = lastEvent
+        self.output = output
+        self.errorMessage = errorMessage
+        self.usage = usage
+    }
+}
+
+struct ConversationRunUsage: Decodable, Equatable, Sendable {
+    let inputTokens: Int?
+    let outputTokens: Int?
+    let totalTokens: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case totalTokens = "total_tokens"
+    }
+
+    init(
+        inputTokens: Int?,
+        outputTokens: Int?,
+        totalTokens: Int?
+    ) {
+        self.inputTokens = Self.nonnegative(inputTokens)
+        self.outputTokens = Self.nonnegative(outputTokens)
+        self.totalTokens = Self.nonnegative(totalTokens)
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        inputTokens = Self.nonnegative(
+            container.decodeLossyIntIfPresent(forKey: .inputTokens)
+        )
+        outputTokens = Self.nonnegative(
+            container.decodeLossyIntIfPresent(forKey: .outputTokens)
+        )
+        totalTokens = Self.nonnegative(
+            container.decodeLossyIntIfPresent(forKey: .totalTokens)
+        )
+    }
+
+    private static func nonnegative(_ value: Int?) -> Int? {
+        guard let value, value >= 0 else { return nil }
+        return value
+    }
 }
 
 enum ConversationApprovalChoice:
@@ -112,6 +171,7 @@ struct ConversationRunEventData: Equatable, Sendable {
     let command: String?
     let description: String?
     let approvalChoices: [String]?
+    let usage: ConversationRunUsage?
 
     init(
         transportEvent: String?,
@@ -129,7 +189,8 @@ struct ConversationRunEventData: Equatable, Sendable {
         timestamp: Double?,
         command: String? = nil,
         description: String? = nil,
-        approvalChoices: [String]? = nil
+        approvalChoices: [String]? = nil,
+        usage: ConversationRunUsage? = nil
     ) {
         self.transportEvent = transportEvent
         self.event = event
@@ -147,6 +208,7 @@ struct ConversationRunEventData: Equatable, Sendable {
         self.command = command
         self.description = description
         self.approvalChoices = approvalChoices
+        self.usage = usage
     }
 
     var semanticEvent: String? {
@@ -295,7 +357,8 @@ struct ConversationRunSSEParser {
                     timestamp: Self.double(object["timestamp"]),
                     command: Self.string(object["command"]),
                     description: Self.string(object["description"]),
-                    approvalChoices: Self.stringArray(object["choices"])
+                    approvalChoices: Self.stringArray(object["choices"]),
+                    usage: Self.usage(object["usage"])
                 )
             )
         ]
@@ -339,6 +402,19 @@ struct ConversationRunSSEParser {
     private static func stringArray(_ value: Any?) -> [String]? {
         guard let values = value as? [Any] else { return nil }
         return values.compactMap { $0 as? String }
+    }
+
+    private static func usage(_ value: Any?) -> ConversationRunUsage? {
+        guard
+            let object = value as? [String: Any],
+            let data = try? JSONSerialization.data(withJSONObject: object)
+        else {
+            return nil
+        }
+        return try? JSONDecoder().decode(
+            ConversationRunUsage.self,
+            from: data
+        )
     }
 }
 
@@ -754,7 +830,8 @@ actor ConversationRunService: ConversationRunServing {
             sessionID: payload.sessionID?.nilIfEmpty,
             lastEvent: payload.lastEvent?.nilIfEmpty,
             output: payload.output,
-            errorMessage: payload.error
+            errorMessage: payload.error,
+            usage: payload.usage
         )
     }
 
@@ -938,6 +1015,7 @@ private struct RunWireResponse: Decodable {
     let lastEvent: String?
     let output: String?
     let error: String?
+    let usage: ConversationRunUsage?
 
     enum CodingKeys: String, CodingKey {
         case runID = "run_id"
@@ -946,6 +1024,7 @@ private struct RunWireResponse: Decodable {
         case lastEvent = "last_event"
         case output
         case error
+        case usage
     }
 
     init(from decoder: Decoder) throws {
@@ -956,6 +1035,10 @@ private struct RunWireResponse: Decodable {
         lastEvent = container.decodeLossyStringIfPresent(forKey: .lastEvent)
         output = container.decodeLossyStringIfPresent(forKey: .output)
         error = container.decodeLossyStringIfPresent(forKey: .error)
+        usage = try? container.decode(
+            ConversationRunUsage.self,
+            forKey: .usage
+        )
     }
 }
 

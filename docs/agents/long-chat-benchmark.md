@@ -20,6 +20,18 @@ provides:
   Swift code blocks, tables, display math, and periodic tool-activity cards;
 - a production-cadence streaming tail for each fixture.
 
+For the Companion-native chat surface, distinguish two independent cadences:
+
+- Run SSE deltas are coalesced before publishing Markdown state, with a
+  33 ms minimum publication interval and a bounded per-tick character budget;
+- the deterministic lab reveals word units every 48 ms so visual fade behavior
+  remains directly comparable with earlier baselines.
+
+Neither value caps display refresh. On supported iPhone Pro hardware,
+`CADisableMinimumFrameDurationOnPhone` lets SwiftUI/Core Animation render
+scrolling and transitions at the system-selected variable refresh rate up to
+120 Hz.
+
 ## Scenarios
 
 Run each scenario twice after one unrecorded warm-up:
@@ -35,6 +47,10 @@ Run each scenario twice after one unrecorded warm-up:
 7. Confirm the actively streaming tail does not enter selection mode.
 8. Open the visible message-actions menu and verify whole-message copy plus
    role-appropriate edit/listen/regenerate/fork actions.
+9. Repeat the finalized-scroll and active-stream scenarios in the Companion
+   chat on an iPhone Pro Max and a 13-inch iPad Pro; confirm the iPad sidebar
+   remains independently usable and the transcript stays within its readable
+   content column.
 
 ## Record
 
@@ -47,7 +63,8 @@ Run each scenario twice after one unrecorded warm-up:
 | Build configuration | Debug |
 | Message count | |
 | Content mix | |
-| Stream cadence | 48 ms per word unit |
+| Run publication cadence | 33 ms minimum; max 192 queued characters per tick |
+| Lab animation cadence | 48 ms per word unit |
 | Peak memory | |
 | Hitch/dropped frames | |
 | Stream-to-presentation latency | |

@@ -18,7 +18,7 @@ struct ContextWindowSnapshot: Decodable, Equatable {
     }
 
     var tokensUsed: Int? {
-        lastPromptTokens ?? inputTokens
+        lastPromptTokens
     }
 
     var percentage: Double? {

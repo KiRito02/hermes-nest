@@ -361,6 +361,7 @@ final class CompanionSessionHistoryViewModel {
     private(set) var isLoadingModelOptions = false
     private(set) var isApplyingModelSelection = false
     private(set) var modelSelectionErrorMessage: String?
+    private(set) var latestRunUsage: ConversationRunUsage?
 
     private let repository: any SessionRepository
     private let runService: any ConversationRunServing
@@ -463,7 +464,12 @@ final class CompanionSessionHistoryViewModel {
     var selectedModelDisplayName: String {
         selectedModelOption?.model
             ?? selectedModel?.model
+            ?? session.model
             ?? String(localized: "Model")
+    }
+
+    var selectedModelProviderDisplayName: String? {
+        selectedModel?.provider ?? session.modelProvider
     }
 
     var selectedModelSupportsReasoning: Bool {
@@ -779,6 +785,7 @@ final class CompanionSessionHistoryViewModel {
         fastForwardedDelta = ""
         hasRequestedStop = false
         terminalOutputFallback = nil
+        latestRunUsage = nil
         nextToolOrdinal = 0
         runState = .starting
         errorMessage = nil
@@ -1082,6 +1089,7 @@ final class CompanionSessionHistoryViewModel {
                         error: payload.error
                     ) {
                         observedTerminal = true
+                        latestRunUsage = payload.usage
                         runState = terminal
                         terminalOutputFallback = payload.output
                         runTask = nil
@@ -1210,6 +1218,9 @@ final class CompanionSessionHistoryViewModel {
     }
 
     private func applyRunSnapshot(_ snapshot: ConversationRunSnapshot) {
+        if let usage = snapshot.usage {
+            latestRunUsage = usage
+        }
         switch snapshot.state {
         case .started, .queued, .running:
             if runState != .transportDisconnected,

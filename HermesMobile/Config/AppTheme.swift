@@ -41,6 +41,35 @@ enum AppTheme: String, CaseIterable, Identifiable {
     }
 }
 
+/// Shared visual constants for the Companion-native Hermes Nest experience.
+///
+/// These values intentionally describe hierarchy and rhythm rather than a
+/// vendor-branded skin. Keeping the palette semantic lets the same shell work
+/// in light/dark mode and across iPhone and iPad without per-screen colors.
+enum HermesNestDesign {
+    static let transcriptMaximumWidth: CGFloat = 760
+    static let sidebarIdealWidth: CGFloat = 320
+    static let compactCornerRadius: CGFloat = 12
+    static let cardCornerRadius: CGFloat = 18
+    static let composerCornerRadius: CGFloat = 24
+
+    static var canvas: Color {
+        Color(uiColor: .systemBackground)
+    }
+
+    static var sidebar: Color {
+        Color(uiColor: .secondarySystemBackground)
+    }
+
+    static var raisedSurface: Color {
+        Color(uiColor: .tertiarySystemBackground)
+    }
+
+    static var subtleBorder: Color {
+        Color(uiColor: .separator).opacity(0.28)
+    }
+}
+
 struct HeaderLogoColorPreset: Identifiable, Equatable {
     let name: String
     let hex: String

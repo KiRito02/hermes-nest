@@ -29,17 +29,17 @@ Issue/PR, not this index.
 | Capability | Status | Priority | Safety | Tracking / note |
 | --- | --- | :---: | :---: | --- |
 | Companion pairing, device auth, health, capabilities | implemented | P0 | secret | [#1](https://github.com/KiRito02/hermes-nest/issues/1) |
-| Loopback Gateway proxy and capability merge | in-progress | P0 | secret | [#6](https://github.com/KiRito02/hermes-nest/issues/6) starts with bounded session-list REST proxying; SSE follows |
-| Session list/create/detail/update/delete/fork/messages | in-progress | P0 | write | [#6](https://github.com/KiRito02/hermes-nest/issues/6) list/page; [#7](https://github.com/KiRito02/hermes-nest/issues/7) lifecycle/history |
-| Persisted streaming turn | roadmap | P0 | exec | Choose session chat vs Runs coordination from live evidence |
-| Run status/reconnect/stop | roadmap | P0 | exec | Never resend a prompt on reconnect |
-| Approval request/response | roadmap | P0 | exec | Capability-gated; preserve explicit human decision |
-| Progressive streaming + long-chat benchmark | roadmap | P0 | — | Windowed history and bounded presentation cadence |
-| Rich model/provider/reasoning options | in-progress | P1 | secret | [#15](https://github.com/KiRito02/hermes-nest/issues/15); implemented from Hermes `d9f1043`, live-accepted on `37a27664` |
+| Loopback Gateway proxy and capability merge | implemented | P0 | secret | [#11](https://github.com/KiRito02/hermes-nest/pull/11) and subsequent bounded proxies |
+| Session list/create/detail/update/delete/fork/messages | implemented | P0 | write | [#11](https://github.com/KiRito02/hermes-nest/pull/11), [#12](https://github.com/KiRito02/hermes-nest/pull/12) |
+| Persisted streaming turn | implemented | P0 | exec | Gateway Runs coordination in [#13](https://github.com/KiRito02/hermes-nest/pull/13) |
+| Run status/reconnect/stop | implemented | P0 | exec | Same-run reconciliation in [#13](https://github.com/KiRito02/hermes-nest/pull/13); never resubmits a prompt |
+| Approval request/response | implemented | P0 | exec | Capability-gated approval loop in [#14](https://github.com/KiRito02/hermes-nest/pull/14) |
+| Progressive streaming + long-chat benchmark | in-progress | P0 | — | [#19](https://github.com/KiRito02/hermes-nest/issues/19): windowed history, bounded presentation, adaptive chat surface |
+| Rich model/provider/reasoning options | implemented | P1 | secret | [#17](https://github.com/KiRito02/hermes-nest/pull/17); live-accepted on Hermes `37a27664` |
 | Jobs | roadmap | P1 | write | Capability-gated scheduled/background work |
-| Skills/toolsets discovery | roadmap | P1 | read | Read-only in Companion v1 |
-| Inline images | roadmap | P1 | privacy | Verified Gateway multimodal input |
-| Adaptive iPhone/iPad layout | roadmap | P1 | — | Navigation, composer, sheets, transcript |
+| Skills/toolsets discovery | implemented | P1 | read | Read-only proxy and native discovery in [#18](https://github.com/KiRito02/hermes-nest/pull/18) |
+| Inline images | in-progress | P1 | privacy | [#19](https://github.com/KiRito02/hermes-nest/issues/19); current Runs transport does not advertise a safe multimodal contract |
+| Adaptive iPhone/iPad layout | in-progress | P1 | — | [#19](https://github.com/KiRito02/hermes-nest/issues/19): split shell, composer, sheets, transcript |
 | Allowed-root file browse/preview/download | roadmap | P1 | privacy | Companion-native; no arbitrary filesystem |
 | Streaming upload + turn availability | roadmap | P1 | write | Bounded, cancelable, atomic |
 | Built-in Memory management | roadmap | P1 | privacy | `MEMORY.md`/`USER.md`, locking and stale-write defense |

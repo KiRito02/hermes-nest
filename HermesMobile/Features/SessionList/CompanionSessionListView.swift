@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 /// Native Companion-backed session management and paged history presentation.
 @MainActor
@@ -11,7 +12,8 @@ struct CompanionSessionListView: View {
     @State private var viewModel: CompanionSessionListViewModel
     @State private var searchText = ""
     @State private var isConfirmingForget = false
-    @State private var navigationPath = NavigationPath()
+    @State private var selectedSessionID: String?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var sessionPendingDelete: SessionSummary?
     @State private var isCreatingSession = false
     private let repository: any SessionRepository
@@ -38,15 +40,15 @@ struct CompanionSessionListView: View {
     var body: some View {
         let displayedSessions = viewModel.matchingSessions(searchText: searchText)
 
-        NavigationStack(path: $navigationPath) {
-            List {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            List(selection: $selectedSessionID) {
                 if viewModel.isViewingCachedData {
                     OfflineCacheBanner()
                         .listRowSeparator(.hidden)
                 }
 
                 ForEach(displayedSessions) { session in
-                    NavigationLink(value: session) {
+                    NavigationLink(value: session.id) {
                         SessionRowView(
                             session: session,
                             showsMessageCount: true,
@@ -54,9 +56,16 @@ struct CompanionSessionListView: View {
                             isViewingCachedData: viewModel.isViewingCachedData
                         )
                     }
+                    .tag(session.id)
                     .listRowInsets(
-                        EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8)
+                        EdgeInsets(
+                            top: 4,
+                            leading: 10,
+                            bottom: 4,
+                            trailing: 10
+                        )
                     )
+                    .listRowBackground(Color.clear)
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) {
                             sessionPendingDelete = session
@@ -84,55 +93,22 @@ struct CompanionSessionListView: View {
                 }
             }
             .listStyle(.plain)
-            .navigationTitle("Sessions")
-            .searchable(text: $searchText, prompt: "Search sessions")
+            .scrollContentBackground(.hidden)
+            .background(HermesNestDesign.sidebar)
+            .navigationTitle("Chats")
+            .searchable(text: $searchText, prompt: "Search chats")
             .refreshable {
                 await viewModel.loadInitial(modelContext: modelContext)
             }
             .overlay {
                 listOverlay
             }
-            .navigationDestination(for: SessionSummary.self) { session in
-                CompanionSessionHistoryView(
-                    session: session,
-                    repository: repository,
-                    companionURL: connection.companionURL,
-                    supportsRunApprovals:
-                        connection.capabilities.supportsRunApprovals,
-                    supportsModelSelection:
-                        connection.capabilities.supportsModelSelection,
-                    onUpdated: { session in
-                        viewModel.updateSessionSnapshot(
-                            session,
-                            modelContext: modelContext
-                        )
-                    },
-                    onForked: {
-                        Task {
-                            await viewModel.refreshAfterMembershipMutation(
-                                modelContext: modelContext
-                            )
-                        }
-                    },
-                    onDeleted: { sessionID in
-                        Task {
-                            await viewModel.reconcileDeletedSession(
-                                id: sessionID,
-                                modelContext: modelContext
-                            )
-                        }
-                    }
-                )
-            }
+            .navigationSplitViewColumnWidth(
+                min: 280,
+                ideal: HermesNestDesign.sidebarIdealWidth,
+                max: 390
+            )
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Image("HermesMobileBanner")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 112, height: 28, alignment: .leading)
-                        .accessibilityLabel("Hermes Nest")
-                }
-
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
                         CompanionDiscoveryView(
@@ -166,7 +142,7 @@ struct CompanionSessionListView: View {
                         }
                     }
                     .disabled(isCreatingSession || viewModel.isViewingCachedData)
-                    .accessibilityLabel("New session")
+                    .accessibilityLabel("New chat")
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -191,7 +167,18 @@ struct CompanionSessionListView: View {
                     .accessibilityLabel("Connection actions")
                 }
             }
+        } detail: {
+            if let selectedSession {
+                historyView(for: selectedSession)
+            } else {
+                CompanionChatWelcomeView(
+                    isCreatingSession: isCreatingSession,
+                    canCreateSession: !viewModel.isViewingCachedData,
+                    onCreateSession: createSession
+                )
+            }
         }
+        .navigationSplitViewStyle(.balanced)
         .task {
             if viewModel.sessions.isEmpty {
                 await viewModel.loadInitial(modelContext: modelContext)
@@ -217,10 +204,14 @@ struct CompanionSessionListView: View {
                 guard let session = sessionPendingDelete else { return }
                 sessionPendingDelete = nil
                 Task {
-                    _ = await viewModel.deleteSession(
+                    let didDelete = await viewModel.deleteSession(
                         session,
                         modelContext: modelContext
                     )
+                    if didDelete,
+                       selectedSessionID == session.id {
+                        selectedSessionID = nil
+                    }
                 }
             }
             Button("Cancel", role: .cancel) {
@@ -244,6 +235,11 @@ struct CompanionSessionListView: View {
         }
     }
 
+    private var selectedSession: SessionSummary? {
+        guard let selectedSessionID else { return nil }
+        return viewModel.sessions.first { $0.id == selectedSessionID }
+    }
+
     private func createSession() {
         guard !isCreatingSession else { return }
         isCreatingSession = true
@@ -252,9 +248,47 @@ struct CompanionSessionListView: View {
             if let created = await viewModel.createSession(
                 modelContext: modelContext
             ) {
-                navigationPath.append(created)
+                selectedSessionID = created.id
             }
         }
+    }
+
+    private func historyView(
+        for session: SessionSummary
+    ) -> some View {
+        CompanionSessionHistoryView(
+            session: session,
+            repository: repository,
+            companionURL: connection.companionURL,
+            supportsRunApprovals:
+                connection.capabilities.supportsRunApprovals,
+            supportsModelSelection:
+                connection.capabilities.supportsModelSelection,
+            onUpdated: { session in
+                selectedSessionID = session.id
+                viewModel.updateSessionSnapshot(
+                    session,
+                    modelContext: modelContext
+                )
+            },
+            onForked: {
+                Task {
+                    await viewModel.refreshAfterMembershipMutation(
+                        modelContext: modelContext
+                    )
+                }
+            },
+            onDeleted: { sessionID in
+                selectedSessionID = nil
+                Task {
+                    await viewModel.reconcileDeletedSession(
+                        id: sessionID,
+                        modelContext: modelContext
+                    )
+                }
+            }
+        )
+        .id(session.sessionId)
     }
 
     @ViewBuilder
@@ -287,6 +321,36 @@ struct CompanionSessionListView: View {
 }
 
 @MainActor
+private struct CompanionChatWelcomeView: View {
+    let isCreatingSession: Bool
+    let canCreateSession: Bool
+    let onCreateSession: () -> Void
+
+    var body: some View {
+        ContentUnavailableView {
+            Label("Hermes Nest", systemImage: "sparkles")
+        } description: {
+            Text(
+                "Choose a chat from the sidebar or start a new conversation with your Hermes Agent."
+            )
+        } actions: {
+            Button(action: onCreateSession) {
+                if isCreatingSession {
+                    ProgressView()
+                        .frame(minWidth: 92)
+                } else {
+                    Label("New Chat", systemImage: "square.and.pencil")
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(isCreatingSession || !canCreateSession)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(HermesNestDesign.canvas)
+    }
+}
+
+@MainActor
 private struct CompanionSessionHistoryView: View {
     let repository: any SessionRepository
     let companionURL: URL
@@ -297,6 +361,7 @@ private struct CompanionSessionHistoryView: View {
     let onDeleted: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel: CompanionSessionHistoryViewModel
     @State private var isRenaming = false
@@ -304,7 +369,9 @@ private struct CompanionSessionHistoryView: View {
     @State private var isConfirmingDelete = false
     @State private var forkedSession: SessionSummary?
     @State private var showsModelPicker = false
+    @State private var showsUsage = false
     @State private var draftMessage = ""
+    @State private var isUserInteractingWithScroll = false
     @FocusState private var composerIsFocused: Bool
 
     init(
@@ -393,7 +460,7 @@ private struct CompanionSessionHistoryView: View {
                 }
 
                 ForEach(viewModel.visibleMessages) { message in
-                    MessageBubbleView(
+                    CompanionMessageRow(
                         message: message,
                         transcriptMediaCacheNamespace: companionURL.absoluteString
                     )
@@ -448,7 +515,29 @@ private struct CompanionSessionHistoryView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            .frame(
+                maxWidth: HermesNestDesign.transcriptMaximumWidth,
+                alignment: .leading
+            )
+            .frame(maxWidth: .infinity)
         }
+        .scrollIndicators(.hidden)
+        .background(HermesNestDesign.canvas)
+        .background {
+            ZStack {
+                ChatScrollObserver(
+                    isStreaming: viewModel.isRunActive
+                ) { metrics in
+                    isUserInteractingWithScroll = metrics.isUserInteracting
+                }
+                ChatVerticalScrollAxisGuard()
+            }
+            .accessibilityHidden(true)
+        }
+        .environment(
+            \.chatIsUserInteractingWithScroll,
+            isUserInteractingWithScroll
+        )
         .defaultScrollAnchor(.bottom)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             companionComposer
@@ -583,6 +672,11 @@ private struct CompanionSessionHistoryView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showsUsage) {
+            CompanionUsageView(viewModel: viewModel)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     private var companionComposer: some View {
@@ -599,13 +693,34 @@ private struct CompanionSessionHistoryView: View {
                     .accessibilityIdentifier("companion.run.status")
             }
 
-            if !viewModel.modelGroups.isEmpty
-                || viewModel.isLoadingModelOptions
-                || viewModel.modelSelectionErrorMessage != nil {
-                modelControls
-            }
+            modelControls
 
-            HStack(alignment: .bottom, spacing: 10) {
+            composerInputLayout {
+                Menu {
+                    Section("Attachments") {
+                        Button {} label: {
+                            Label(
+                                "Images unavailable with Hermes Runs",
+                                systemImage:
+                                    "photo.badge.exclamationmark"
+                            )
+                        }
+                        .disabled(true)
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Add image")
+                .accessibilityHint(
+                    "Unavailable because the current Hermes Runs API does not advertise image input."
+                )
+                .accessibilityIdentifier(
+                    "companion.attachment.unavailable"
+                )
+
                 TextField(
                     "Message Hermes...",
                     text: $draftMessage,
@@ -656,16 +771,31 @@ private struct CompanionSessionHistoryView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                Color(.secondarySystemBackground),
-                in: RoundedRectangle(cornerRadius: 20)
+                HermesNestDesign.sidebar,
+                in: RoundedRectangle(
+                    cornerRadius: HermesNestDesign.composerCornerRadius,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: HermesNestDesign.composerCornerRadius,
+                    style: .continuous
+                )
+                .stroke(HermesNestDesign.subtleBorder, lineWidth: 0.5)
+            }
+            .shadow(
+                color: .black.opacity(0.08),
+                radius: 14,
+                y: 4
             )
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 6)
-        .frame(maxWidth: 760)
+        .frame(maxWidth: HermesNestDesign.transcriptMaximumWidth)
         .frame(maxWidth: .infinity)
-        .background(.ultraThinMaterial)
+        .background(.regularMaterial)
     }
 
     @ViewBuilder
@@ -690,9 +820,9 @@ private struct CompanionSessionHistoryView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if !viewModel.modelGroups.isEmpty
-                || viewModel.modelSelectionErrorMessage == nil {
-                HStack(spacing: 8) {
+            controlLayout {
+                if !viewModel.modelGroups.isEmpty
+                    || viewModel.isLoadingModelOptions {
                     Button {
                         showsModelPicker = true
                     } label: {
@@ -755,11 +885,52 @@ private struct CompanionSessionHistoryView: View {
                         .accessibilityLabel("Choose reasoning effort")
                         .accessibilityIdentifier("companion.reasoning.picker")
                     }
-
-                    Spacer(minLength: 0)
                 }
+
+                Button {
+                    showsUsage = true
+                } label: {
+                    Label(
+                        usageControlLabel,
+                        systemImage: "chart.bar.xaxis"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .frame(minHeight: 32)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityLabel("Model and token usage")
+                .accessibilityHint(
+                    "Shows exact run and session usage. Context occupancy is shown only when Hermes reports it."
+                )
+                .accessibilityIdentifier("companion.usage")
+
+                Spacer(minLength: 0)
             }
         }
+    }
+
+    private var usageControlLabel: String {
+        guard let tokens = viewModel.latestRunUsage?.totalTokens else {
+            return String(localized: "Usage")
+        }
+        return String(
+            localized:
+                "\(ContextWindowFormatter.formatTokens(tokens)) tokens"
+        )
+    }
+
+    private var composerInputLayout: AnyLayout {
+        if dynamicTypeSize.isAccessibilitySize {
+            return AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+        }
+        return AnyLayout(HStackLayout(alignment: .bottom, spacing: 10))
+    }
+
+    private var controlLayout: AnyLayout {
+        if dynamicTypeSize.isAccessibilitySize {
+            return AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+        }
+        return AnyLayout(HStackLayout(spacing: 8))
     }
 
     private func sendDraft() {
@@ -772,6 +943,238 @@ private struct CompanionSessionHistoryView: View {
                 draftMessage = ""
                 composerIsFocused = false
             }
+        }
+    }
+}
+
+@MainActor
+private struct CompanionMessageRow: View {
+    let message: ChatMessage
+    let transcriptMediaCacheNamespace: String
+
+    var body: some View {
+        VStack(alignment: actionAlignment, spacing: 2) {
+            MessageBubbleView(
+                message: message,
+                transcriptMediaCacheNamespace:
+                    transcriptMediaCacheNamespace
+            )
+
+            if copyText != nil {
+                ChatMessageActionsButton {
+                    Button {
+                        UIPasteboard.general.string = copyText
+                    } label: {
+                        Label("Copy Message", systemImage: "doc.on.doc")
+                    }
+
+                    if let copyText {
+                        ShareLink(item: copyText) {
+                            Label(
+                                "Share Message",
+                                systemImage: "square.and.arrow.up"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: message.role == "user" ? .trailing : .leading
+        )
+    }
+
+    private var actionAlignment: HorizontalAlignment {
+        message.role == "user" ? .trailing : .leading
+    }
+
+    private var copyText: String? {
+        guard let content = message.content else { return nil }
+        let trimmed = content.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        return trimmed.isEmpty ? nil : content
+    }
+}
+
+@MainActor
+private struct CompanionUsageView: View {
+    @Bindable var viewModel: CompanionSessionHistoryViewModel
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    modelCard
+                    runUsageCard
+                    sessionUsageCard
+                    contextCard
+                }
+                .frame(maxWidth: 640, alignment: .leading)
+                .padding(20)
+                .frame(maxWidth: .infinity)
+            }
+            .background(HermesNestDesign.canvas)
+            .navigationTitle("Model & Usage")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private var modelCard: some View {
+        usageCard(title: "Current model", systemImage: "cpu") {
+            Text(viewModel.selectedModelDisplayName)
+                .font(.headline)
+                .textSelection(.enabled)
+
+            if let provider = viewModel.selectedModelProviderDisplayName {
+                Text(provider)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+
+            if let effort = viewModel.selectedModel?.reasoningEffort {
+                Label(effort.displayName, systemImage: "brain")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var runUsageCard: some View {
+        usageCard(title: "Latest response", systemImage: "sparkles") {
+            metricLayout {
+                usageMetric(
+                    title: "Input",
+                    value: tokenLabel(viewModel.latestRunUsage?.inputTokens)
+                )
+                usageMetric(
+                    title: "Output",
+                    value: tokenLabel(viewModel.latestRunUsage?.outputTokens)
+                )
+                usageMetric(
+                    title: "Total",
+                    value: tokenLabel(viewModel.latestRunUsage?.totalTokens)
+                )
+            }
+
+            Text("These are exact token counts reported by the completed Hermes Run.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var sessionUsageCard: some View {
+        usageCard(title: "Session totals", systemImage: "text.bubble") {
+            metricLayout {
+                usageMetric(
+                    title: "Input",
+                    value: tokenLabel(viewModel.session.inputTokens)
+                )
+                usageMetric(
+                    title: "Output",
+                    value: tokenLabel(viewModel.session.outputTokens)
+                )
+                usageMetric(
+                    title: "Cost",
+                    value: viewModel.session.estimatedCost?
+                        .formattedCost() ?? String(localized: "Unavailable")
+                )
+            }
+        }
+    }
+
+    private var metricLayout: AnyLayout {
+        if dynamicTypeSize.isAccessibilitySize {
+            return AnyLayout(VStackLayout(spacing: 10))
+        }
+        return AnyLayout(HStackLayout(spacing: 10))
+    }
+
+    private var contextCard: some View {
+        usageCard(
+            title: "Context window",
+            systemImage: "rectangle.split.3x1"
+        ) {
+            Text("Unavailable")
+                .font(.headline)
+
+            Text(
+                "Hermes Runs currently report token usage, but not the exact current prompt size together with this model's context limit. Hermes Nest will not estimate a percentage from cumulative session tokens."
+            )
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+        }
+    }
+
+    private func tokenLabel(_ tokens: Int?) -> String {
+        guard let tokens else { return String(localized: "Unavailable") }
+        return ContextWindowFormatter.formatTokens(tokens)
+    }
+
+    private func usageMetric(
+        title: LocalizedStringKey,
+        value: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .textSelection(.enabled)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(
+            HermesNestDesign.raisedSurface,
+            in: RoundedRectangle(
+                cornerRadius: HermesNestDesign.compactCornerRadius,
+                style: .continuous
+            )
+        )
+    }
+
+    private func usageCard<Content: View>(
+        title: LocalizedStringKey,
+        systemImage: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            content()
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            HermesNestDesign.sidebar,
+            in: RoundedRectangle(
+                cornerRadius: HermesNestDesign.cardCornerRadius,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: HermesNestDesign.cardCornerRadius,
+                style: .continuous
+            )
+            .stroke(HermesNestDesign.subtleBorder, lineWidth: 0.5)
         }
     }
 }

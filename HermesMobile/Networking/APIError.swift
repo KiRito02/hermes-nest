@@ -10,7 +10,7 @@ enum APIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidServerURL:
-            return String(localized: "Enter a valid server URL, for example https://hermes.yourdomain.com or http://<server-tailscale-ip>:8787.")
+            return String(localized: "Enter a valid server URL, for example https://hermes.yourdomain.com or http://<server-tailscale-ip>:8643.")
         case .network(let underlying):
             return Self.networkMessage(for: underlying)
         case .http(let statusCode, let body):

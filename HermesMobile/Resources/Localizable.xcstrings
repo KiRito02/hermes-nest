@@ -31495,214 +31495,214 @@
         }
       }
     },
-    "Enter a valid server URL, for example https://hermes.yourdomain.com or http://<server-tailscale-ip>:8787." : {
+    "Enter a valid server URL, for example https://hermes.yourdomain.com or http://<server-tailscale-ip>:8643." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "أدخل عنوان URL صالحًا للخادم، على سبيل المثال https://hermes.yourdomain.com أو http://<server-tailscale-ip>:8787."
+            "value" : "أدخل عنوان URL صالحًا للخادم، على سبيل المثال https://hermes.yourdomain.com أو http://<server-tailscale-ip>:8643."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Gib eine gültige Server-URL ein, zum Beispiel https://hermes.yourdomain.com oder http://<server-tailscale-ip>:8787."
+            "value" : "Gib eine gültige Server-URL ein, zum Beispiel https://hermes.yourdomain.com oder http://<server-tailscale-ip>:8643."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Introduce una URL de servidor válida, por ejemplo https://hermes.yourdomain.com o http://<server-tailscale-ip>:8787."
+            "value" : "Introduce una URL de servidor válida, por ejemplo https://hermes.yourdomain.com o http://<server-tailscale-ip>:8643."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Saisissez une URL de serveur valide, par exemple https://hermes.votredomaine.com ou http://<ip-tailscale-serveur>:8787."
+            "value" : "Saisissez une URL de serveur valide, par exemple https://hermes.votredomaine.com ou http://<ip-tailscale-serveur>:8643."
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "הזן כתובת URL תקינה של שרת, לדוגמה https://hermes.yourdomain.com או http://<server-tailscale-ip>:8787."
+            "value" : "הזן כתובת URL תקינה של שרת, לדוגמה https://hermes.yourdomain.com או http://<server-tailscale-ip>:8643."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Inserisci un URL server valido, ad esempio https://hermes.tuodominio.com o http://<server-tailscale-ip>:8787."
+            "value" : "Inserisci un URL server valido, ad esempio https://hermes.tuodominio.com o http://<server-tailscale-ip>:8643."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "有効なサーバURLを入力してください。例：https://hermes.yourdomain.com または http://<server-tailscale-ip>:8787。"
+            "value" : "有効なサーバURLを入力してください。例：https://hermes.yourdomain.com または http://<server-tailscale-ip>:8643。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "유효한 서버 URL을 입력하세요. 예: https://hermes.yourdomain.com 또는 http://<server-tailscale-ip>:8787."
+            "value" : "유효한 서버 URL을 입력하세요. 예: https://hermes.yourdomain.com 또는 http://<server-tailscale-ip>:8643."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Voer een geldige server-URL in, bijvoorbeeld https://hermes.yourdomain.com of http://<server-tailscale-ip>:8787."
+            "value" : "Voer een geldige server-URL in, bijvoorbeeld https://hermes.yourdomain.com of http://<server-tailscale-ip>:8643."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Wprowadź prawidłowy URL serwera, na przykład https://hermes.yourdomain.com lub http://<server-tailscale-ip>:8787."
+            "value" : "Wprowadź prawidłowy URL serwera, na przykład https://hermes.yourdomain.com lub http://<server-tailscale-ip>:8643."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Digite uma URL de servidor válida, por exemplo https://hermes.yourdomain.com ou http://<server-tailscale-ip>:8787."
+            "value" : "Digite uma URL de servidor válida, por exemplo https://hermes.yourdomain.com ou http://<server-tailscale-ip>:8643."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Введите корректный URL сервера, например https://hermes.yourdomain.com или http://<server-tailscale-ip>:8787."
+            "value" : "Введите корректный URL сервера, например https://hermes.yourdomain.com или http://<server-tailscale-ip>:8643."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Geçerli bir sunucu URL'si girin, örneğin https://hermes.yourdomain.com veya http://<server-tailscale-ip>:8787."
+            "value" : "Geçerli bir sunucu URL'si girin, örneğin https://hermes.yourdomain.com veya http://<server-tailscale-ip>:8643."
           }
         },
         "ur" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "ایک درست سرور URL درج کریں، مثلاً https://hermes.yourdomain.com یا http://<server-tailscale-ip>:8787۔"
+            "value" : "ایک درست سرور URL درج کریں، مثلاً https://hermes.yourdomain.com یا http://<server-tailscale-ip>:8643۔"
           }
         },
         "zh-HK" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "請輸入有效的伺服器 URL，例如 https://hermes.yourdomain.com 或 http://<server-tailscale-ip>:8787。"
+            "value" : "請輸入有效的伺服器 URL，例如 https://hermes.yourdomain.com 或 http://<server-tailscale-ip>:8643。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "请输入有效的服务器 URL，例如 https://hermes.yourdomain.com 或 http://<server-tailscale-ip>:8787。"
+            "value" : "请输入有效的服务器 URL，例如 https://hermes.yourdomain.com 或 http://<server-tailscale-ip>:8643。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "請輸入有效的伺服器 URL，例如 https://hermes.yourdomain.com 或 http://<server-tailscale-ip>:8787。"
+            "value" : "請輸入有效的伺服器 URL，例如 https://hermes.yourdomain.com 或 http://<server-tailscale-ip>:8643。"
           }
         }
       }
     },
-    "Enter the Tailscale URL your agent returned, for example `http://<tailnet-ip>:8787`." : {
+    "Enter the Tailscale URL your agent returned, for example `http://<tailnet-ip>:8643`." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "أدخل عنوان Tailscale URL الذي أعاده عميلك، على سبيل المثال `http://<tailnet-ip>:8787`."
+            "value" : "أدخل عنوان Tailscale URL الذي أعاده عميلك، على سبيل المثال `http://<tailnet-ip>:8643`."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Gib die Tailscale-URL ein, die dein Agent zurückgegeben hat, zum Beispiel `http://<tailnet-ip>:8787`."
+            "value" : "Gib die Tailscale-URL ein, die dein Agent zurückgegeben hat, zum Beispiel `http://<tailnet-ip>:8643`."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Introduce la URL de Tailscale que devolvió tu agente, por ejemplo `http://<tailnet-ip>:8787`."
+            "value" : "Introduce la URL de Tailscale que devolvió tu agente, por ejemplo `http://<tailnet-ip>:8643`."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Saisissez l'URL Tailscale renvoyée par votre agent, par exemple `http://<ip-tailnet>:8787`."
+            "value" : "Saisissez l'URL Tailscale renvoyée par votre agent, par exemple `http://<ip-tailnet>:8643`."
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "הזן את כתובת ה-URL של Tailscale שהסוכן שלך החזיר, לדוגמה `http://<tailnet-ip>:8787`."
+            "value" : "הזן את כתובת ה-URL של Tailscale שהסוכן שלך החזיר, לדוגמה `http://<tailnet-ip>:8643`."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Inserisci l'URL Tailscale restituito dal tuo agente, ad esempio `http://<tailnet-ip>:8787`."
+            "value" : "Inserisci l'URL Tailscale restituito dal tuo agente, ad esempio `http://<tailnet-ip>:8643`."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "エージェントが返したTailscale URLを入力してください。例：`http://<tailnet-ip>:8787`。"
+            "value" : "エージェントが返したTailscale URLを入力してください。例：`http://<tailnet-ip>:8643`。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "에이전트가 반환한 Tailscale URL을 입력하세요. 예: `http://<tailnet-ip>:8787`."
+            "value" : "에이전트가 반환한 Tailscale URL을 입력하세요. 예: `http://<tailnet-ip>:8643`."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Voer de Tailscale-URL in die uw agent heeft teruggegeven, bijvoorbeeld `http://<tailnet-ip>:8787`."
+            "value" : "Voer de Tailscale-URL in die uw agent heeft teruggegeven, bijvoorbeeld `http://<tailnet-ip>:8643`."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Wprowadź URL Tailscale zwrócony przez agenta, na przykład `http://<tailnet-ip>:8787`."
+            "value" : "Wprowadź URL Tailscale zwrócony przez agenta, na przykład `http://<tailnet-ip>:8643`."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Digite a URL do Tailscale que seu agente retornou, por exemplo `http://<tailnet-ip>:8787`."
+            "value" : "Digite a URL do Tailscale que seu agente retornou, por exemplo `http://<tailnet-ip>:8643`."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Введите URL Tailscale, который вернул ваш агент, например `http://<tailnet-ip>:8787`."
+            "value" : "Введите URL Tailscale, который вернул ваш агент, например `http://<tailnet-ip>:8643`."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Ajanınızın döndürdüğü Tailscale URL'sini girin, örneğin `http://<tailnet-ip>:8787`."
+            "value" : "Ajanınızın döndürdüğü Tailscale URL'sini girin, örneğin `http://<tailnet-ip>:8643`."
           }
         },
         "ur" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "وہ Tailscale URL درج کریں جو آپ کے ایجنٹ نے واپس کیا، مثلاً `http://<tailnet-ip>:8787`۔"
+            "value" : "وہ Tailscale URL درج کریں جو آپ کے ایجنٹ نے واپس کیا، مثلاً `http://<tailnet-ip>:8643`۔"
           }
         },
         "zh-HK" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "請輸入你的代理返回的 Tailscale URL，例如 `http://<tailnet-ip>:8787`。"
+            "value" : "請輸入你的代理返回的 Tailscale URL，例如 `http://<tailnet-ip>:8643`。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "请输入你的智能体返回的 Tailscale URL，例如 `http://<tailnet-ip>:8787`。"
+            "value" : "请输入你的智能体返回的 Tailscale URL，例如 `http://<tailnet-ip>:8643`。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "請輸入你的代理人傳回的 Tailscale URL，例如 `http://<tailnet-ip>:8787`。"
+            "value" : "請輸入你的代理人傳回的 Tailscale URL，例如 `http://<tailnet-ip>:8643`。"
           }
         }
       }

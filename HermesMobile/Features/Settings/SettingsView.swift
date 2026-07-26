@@ -2162,7 +2162,7 @@ struct AddServerView: View {
                         SettingsTextFieldRow(
                             title: String(localized: "URL"),
                             text: $serverURLString,
-                            placeholder: "100.64.0.1:8787",
+                            placeholder: "100.64.0.1:8643",
                             keyboardType: .URL,
                             autocapitalization: .never,
                             submitLabel: .go,

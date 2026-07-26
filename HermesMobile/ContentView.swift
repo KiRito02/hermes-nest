@@ -218,7 +218,7 @@ private struct CompanionFoundationStatusView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.black.ignoresSafeArea()
+                HermesNestDesign.canvas.ignoresSafeArea()
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
@@ -235,10 +235,9 @@ private struct CompanionFoundationStatusView: View {
                                 : "exclamationmark.triangle.fill"
                         )
                         .font(.title2.bold())
-                        .foregroundStyle(.white)
 
                         Text(message)
-                            .foregroundStyle(.white.opacity(0.72))
+                            .foregroundStyle(.secondary)
 
                         if let companionURL {
                             LabeledContent("Companion") {
@@ -246,14 +245,12 @@ private struct CompanionFoundationStatusView: View {
                                     .multilineTextAlignment(.trailing)
                                     .textSelection(.enabled)
                             }
-                            .foregroundStyle(.white.opacity(0.82))
                         }
 
                         if let gatewayStatus {
                             LabeledContent("Gateway status") {
                                 Text(gatewayStatus)
                             }
-                            .foregroundStyle(.white.opacity(0.82))
                         }
 
                         Button {
@@ -262,7 +259,7 @@ private struct CompanionFoundationStatusView: View {
                             Label("Retry discovery", systemImage: "arrow.clockwise")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(OnboardingPrimaryButtonStyle())
+                        .buttonStyle(.borderedProminent)
                         .disabled(connectionManager.isWorking)
 
                         Button(role: .destructive) {
@@ -271,13 +268,17 @@ private struct CompanionFoundationStatusView: View {
                             Text("Forget this Companion")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(OnboardingSecondaryButtonStyle())
+                        .buttonStyle(.bordered)
                         .disabled(connectionManager.isWorking)
                     }
                     .padding(24)
+                    .frame(
+                        maxWidth: HermesNestDesign.transcriptMaximumWidth,
+                        alignment: .leading
+                    )
+                    .frame(maxWidth: .infinity)
                 }
             }
-            .preferredColorScheme(.dark)
             .alert("Forget this Companion?", isPresented: $isConfirmingForget) {
                 Button("Cancel", role: .cancel) {}
                 Button("Forget and revoke device", role: .destructive) {

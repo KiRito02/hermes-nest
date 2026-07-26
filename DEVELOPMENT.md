@@ -85,10 +85,10 @@ hermes gateway
 
 The documented Gateway default is `127.0.0.1:8642`. Keep it on loopback.
 Companion is implemented as a dedicated Python 3.11 virtual environment and
-systemd host service. Its exact service commands, listen port, configuration
-names, and App-facing paths are intentionally not documented until Issue #1
-locks and tests them. Do not invent placeholders and later treat them as a
-contract.
+systemd host service. It binds `127.0.0.1:8643` by default; its exact
+configuration and App-facing routes are versioned in
+[`Companion/CONTRACT.md`](Companion/CONTRACT.md). Lucky or Tailscale exposes
+only that Companion listener, never Gateway port `8642`.
 
 Before debugging the App, verify in order:
 
@@ -137,8 +137,8 @@ ss -ltnp | grep 8642
 ## Simulator-only local fallback
 
 On a Mac running Companion and Hermes Agent locally, the simulator may use a
-narrowly scoped Debug-only HTTP Companion URL. The actual port/path is defined
-by Issue #1 and its development configuration.
+narrowly scoped Debug-only HTTP Companion URL such as
+`http://127.0.0.1:8643`.
 
 This is a Debug-only convenience. Physical devices need a reachable HTTPS
 hostname or an intentionally configured private-network route.
