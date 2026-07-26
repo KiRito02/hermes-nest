@@ -1,9 +1,32 @@
 import Highlightr
 import MarkdownUI
 import OSLog
+import Combine
 import Splash
 import SwiftUI
 import UIKit
+
+enum ChatMessageSelectionPolicy {
+    static func allowsSelection(isStreaming: Bool) -> Bool {
+        !isStreaming
+    }
+}
+
+enum StreamingAnimationPolicy {
+    static func allowsDecorativeAnimation(
+        isEnabled: Bool,
+        reduceMotion: Bool,
+        isUserInteractingWithScroll: Bool,
+        sceneIsActive: Bool,
+        isLowPowerModeEnabled: Bool
+    ) -> Bool {
+        isEnabled
+            && !reduceMotion
+            && !isUserInteractingWithScroll
+            && sceneIsActive
+            && !isLowPowerModeEnabled
+    }
+}
 
 struct MarkdownRenderer: View {
     let content: String
@@ -36,6 +59,9 @@ struct MarkdownRenderer: View {
                 markdownContent
             }
         }
+        .chatTextSelection(
+            isEnabled: ChatMessageSelectionPolicy.allowsSelection(isStreaming: isStreaming)
+        )
         .onChange(of: isStreaming) { wasStreaming, nowStreaming in
             if wasStreaming, !nowStreaming {
                 lingersAfterStreaming = true
@@ -70,14 +96,12 @@ struct MarkdownRenderer: View {
                     }
                 }
             }
-            .textSelection(.enabled)
         } else {
             ChatMarkdownView(
                 content: MarkdownMathFormatter.replacingInlineMath(in: content),
                 colorScheme: colorScheme,
                 isStreaming: isStreaming
             )
-            .textSelection(.enabled)
         }
     }
 }
@@ -149,7 +173,10 @@ private struct StreamingMarkdownChunkedView: View {
     let colorScheme: ColorScheme
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.chatIsUserInteractingWithScroll) private var isUserInteractingWithScroll
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(StreamedTextAnimationSettings.isEnabledKey) private var isStreamedTextAnimationEnabled = true
+    @State private var isLowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
 
     /// First block ordinal still in the fade window. Starts at `Int.max`
     /// (everything solid) until `onAppear` anchors it at the current block,
@@ -171,12 +198,19 @@ private struct StreamingMarkdownChunkedView: View {
     }
 
     var body: some View {
+        let allowsDecorativeAnimation = StreamingAnimationPolicy.allowsDecorativeAnimation(
+            isEnabled: isStreamedTextAnimationEnabled,
+            reduceMotion: reduceMotion,
+            isUserInteractingWithScroll: isUserInteractingWithScroll,
+            sceneIsActive: scenePhase == .active,
+            isLowPowerModeEnabled: isLowPowerModeEnabled
+        )
         let blockSplit = StreamingTextFadeTailSplitter.split(
             segments.activeMarkdown,
             firstFadeOrdinal: StreamedTextAnimationSettings.effectiveFirstFadeOrdinal(
                 firstFadeOrdinal,
-                reduceMotion: reduceMotion,
-                isEnabled: isStreamedTextAnimationEnabled
+                reduceMotion: false,
+                isEnabled: allowsDecorativeAnimation
             )
         )
 
@@ -202,7 +236,12 @@ private struct StreamingMarkdownChunkedView: View {
                 // the renderer's clock input changes; each block's markdown
                 // inputs are untouched, so their bodies (and text layout) are
                 // not re-evaluated.
-                TimelineView(.animation(minimumInterval: nil, paused: !fadesActive)) { context in
+                TimelineView(
+                    .animation(
+                        minimumInterval: nil,
+                        paused: !fadesActive || !allowsDecorativeAnimation
+                    )
+                ) { context in
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(blockSplit.blocks, id: \.ordinal) { block in
                             StreamingFadeBlockView(
@@ -224,15 +263,19 @@ private struct StreamingMarkdownChunkedView: View {
         .onChange(of: content) { oldContent, newContent in
             advanceFadeWindow(from: oldContent, to: newContent)
         }
-        .onChange(of: isStreamedTextAnimationEnabled) { _, isEnabled in
-            if isEnabled {
+        .onChange(of: allowsDecorativeAnimation) { _, isAllowed in
+            if isAllowed {
                 anchorFadeWindowAtCurrentBlock()
+            } else {
+                fadesActive = false
             }
         }
-        .onChange(of: reduceMotion) { _, reduceMotion in
-            if !reduceMotion {
-                anchorFadeWindowAtCurrentBlock()
-            }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: Notification.Name.NSProcessInfoPowerStateDidChange
+            )
+        ) { _ in
+            isLowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
         }
         .task(id: content) {
             // Let queued reveals and the newest fade finish, then pause frame
@@ -381,6 +424,17 @@ private struct ChatMarkdownView: View {
                     .relativeLineSpacing(.em(0.18))
                     .markdownMargin(top: 0, bottom: 8)
             }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func chatTextSelection(isEnabled: Bool) -> some View {
+        if isEnabled {
+            textSelection(.enabled)
+        } else {
+            textSelection(.disabled)
+        }
     }
 }
 
@@ -1173,7 +1227,6 @@ private struct PlainMarkdownFallbackView: View {
             .font(.body)
             .foregroundStyle(.primary)
             .fixedSize(horizontal: false, vertical: true)
-            .textSelection(.enabled)
             .onAppear {
                 logger.info(
                     "Markdown plain fallback reason=\(reason.rawValue, privacy: .public) characters=\(content.count, privacy: .public) lines=\(MarkdownHighlightPolicy.lineCount(in: content), privacy: .public)"

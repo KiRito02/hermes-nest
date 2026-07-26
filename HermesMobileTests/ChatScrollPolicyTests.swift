@@ -118,4 +118,43 @@ final class ChatScrollPolicyTests: XCTestCase {
             accuracy: 0.0001
         )
     }
+
+    func testScrollMetricsUseABoundedThirtyHertzCadence() {
+        XCTAssertEqual(
+            ChatScrollPolicy.metricDeliveryInterval,
+            1.0 / 30.0,
+            accuracy: 0.0001
+        )
+    }
+
+    func testTextSelectionIsDisabledOnlyForTheActivelyStreamingMessage() {
+        XCTAssertFalse(ChatMessageSelectionPolicy.allowsSelection(isStreaming: true))
+        XCTAssertTrue(ChatMessageSelectionPolicy.allowsSelection(isStreaming: false))
+    }
+
+    func testDecorativeStreamingAnimationRespectsRuntimeConstraints() {
+        XCTAssertTrue(StreamingAnimationPolicy.allowsDecorativeAnimation(
+            isEnabled: true,
+            reduceMotion: false,
+            isUserInteractingWithScroll: false,
+            sceneIsActive: true,
+            isLowPowerModeEnabled: false
+        ))
+
+        for constraints in [
+            (false, false, false, true, false),
+            (true, true, false, true, false),
+            (true, false, true, true, false),
+            (true, false, false, false, false),
+            (true, false, false, true, true)
+        ] {
+            XCTAssertFalse(StreamingAnimationPolicy.allowsDecorativeAnimation(
+                isEnabled: constraints.0,
+                reduceMotion: constraints.1,
+                isUserInteractingWithScroll: constraints.2,
+                sceneIsActive: constraints.3,
+                isLowPowerModeEnabled: constraints.4
+            ))
+        }
+    }
 }

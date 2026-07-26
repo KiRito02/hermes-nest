@@ -1,6 +1,35 @@
 import SwiftUI
 import UIKit
 
+private struct ChatScrollInteractionEnvironmentKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var chatIsUserInteractingWithScroll: Bool {
+        get { self[ChatScrollInteractionEnvironmentKey.self] }
+        set { self[ChatScrollInteractionEnvironmentKey.self] = newValue }
+    }
+}
+
+/// The collection used by both the production transcript and its deterministic
+/// performance lab, keeping lazy row mounting on the exact same SwiftUI path.
+struct ChatTranscriptLazyStack<Content: View>: View {
+    let spacing: CGFloat
+    let content: Content
+
+    init(spacing: CGFloat, @ViewBuilder content: () -> Content) {
+        self.spacing = spacing
+        self.content = content()
+    }
+
+    var body: some View {
+        LazyVStack(spacing: spacing) {
+            content
+        }
+    }
+}
+
 struct ChatScrollMetrics: Equatable {
     let distanceFromBottom: CGFloat
     let isUserInteracting: Bool
@@ -160,7 +189,9 @@ struct ChatScrollObserver: UIViewRepresentable {
                 guard !hasScheduledMetricDelivery else { return }
 
                 hasScheduledMetricDelivery = true
-                DispatchQueue.main.async { [weak self] in
+                DispatchQueue.main.asyncAfter(
+                    deadline: .now() + ChatScrollPolicy.metricDeliveryInterval
+                ) { [weak self] in
                     MainActor.assumeIsolated {
                         guard let self else { return }
                         let metrics = self.pendingMetrics

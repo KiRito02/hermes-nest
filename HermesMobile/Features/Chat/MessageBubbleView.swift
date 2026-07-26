@@ -4,6 +4,7 @@ struct MessageBubbleView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.chatIsUserInteractingWithScroll) private var isUserInteractingWithScroll
     @AppStorage(ChatTranscriptDisplaySettings.hidesAttachmentPathsKey) private var hidesAttachmentPaths = true
     @AppStorage(ChatTranscriptDisplaySettings.showsAssistantTurnTimestampsKey) private var showsAssistantTurnTimestamps = false
 
@@ -108,7 +109,9 @@ struct MessageBubbleView: View {
         // growth at the same curve as the bottom-follow scroll so the streaming
         // edge stays visually stationary instead of stepping per word flush.
         .animation(
-            isStreaming ? ChatMotion.streamingFollow(reduceMotion: reduceMotion) : nil,
+            isStreaming && !isUserInteractingWithScroll
+                ? ChatMotion.streamingFollow(reduceMotion: reduceMotion)
+                : nil,
             value: messageText
         )
     }

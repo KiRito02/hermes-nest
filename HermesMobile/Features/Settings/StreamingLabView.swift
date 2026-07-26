@@ -1,5 +1,6 @@
 #if DEBUG
 import SwiftUI
+import UIKit
 
 /// Debug-only Streaming Lab (issue #234): replays a canned markdown fixture
 /// through the real display pipeline (`MarkdownRenderer(content:isStreaming:)`
@@ -204,9 +205,258 @@ struct StreamingLabView: View {
     }
 }
 
+/// Debug-only, server-free long transcript harness. Launch with
+/// `--long-chat-lab`, start Instruments, then scroll upward while the final
+/// response continues to stream.
+struct LongChatLabView: View {
+    private enum Fixture: String, CaseIterable, Identifiable {
+        case shortPlain = "Short plain"
+        case longMixed = "200 mixed"
+
+        var id: Self { self }
+    }
+
+    @State private var displayedStreamingContent = ""
+    @State private var isStreaming = false
+    @State private var replayID = 0
+    @State private var fixture: Fixture = .longMixed
+    @State private var scrollMetrics = ChatScrollMetrics(
+        distanceFromBottom: 0,
+        isUserInteracting: false
+    )
+
+    private static let topAnchorID = "long-chat-lab-top"
+    private static let bottomAnchorID = "long-chat-lab-bottom"
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                ChatTranscriptLazyStack(spacing: 14) {
+                    benchmarkHeader
+                        .id(Self.topAnchorID)
+
+                    ForEach(messages.indices, id: \.self) { index in
+                        let message = messages[index]
+
+                        benchmarkBlock(
+                            message: message,
+                            index: index,
+                            rendersAsStreaming: false
+                        )
+                            .id(message.id)
+                    }
+
+                    benchmarkBlock(
+                        message: ChatMessage(
+                            role: "assistant",
+                            content: displayedStreamingContent,
+                            timestamp: 1_700_000_001 + Double(messages.count),
+                            messageId: "\(fixture.id)-streaming-tail"
+                        ),
+                        index: messages.count,
+                        rendersAsStreaming: isStreaming
+                    )
+
+                    Color.clear
+                        .frame(height: 1)
+                        .id(Self.bottomAnchorID)
+                }
+                .padding(16)
+                .environment(
+                    \.chatIsUserInteractingWithScroll,
+                    scrollMetrics.isUserInteracting
+                )
+                .background {
+                    ChatScrollObserver(isStreaming: isStreaming) { metrics in
+                        scrollMetrics = metrics
+                    }
+                    .accessibilityHidden(true)
+                }
+            }
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        proxy.scrollTo(Self.topAnchorID, anchor: .top)
+                    } label: {
+                        Image(systemName: "arrow.up.to.line")
+                    }
+                    .accessibilityLabel("Scroll to benchmark start")
+
+                    Button {
+                        proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+                    } label: {
+                        Image(systemName: "arrow.down.to.line")
+                    }
+                    .accessibilityLabel("Scroll to streaming tail")
+
+                    Button {
+                        replayID += 1
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                    }
+                    .accessibilityLabel("Restart streaming tail")
+                }
+            }
+        }
+        .background(Color(.systemBackground))
+        .navigationTitle("Long Chat Lab")
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: "\(fixture.id)-\(replayID)") {
+            await replayStreamingTail()
+        }
+    }
+
+    private var messages: [ChatMessage] {
+        switch fixture {
+        case .shortPlain:
+            LongChatLabFixture.shortPlainTextMessages
+        case .longMixed:
+            LongChatLabFixture.messages
+        }
+    }
+
+    private var benchmarkHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Long conversation benchmark", systemImage: "gauge.with.dots.needle.67percent")
+                .font(.headline)
+
+            Picker("Fixture", selection: $fixture) {
+                ForEach(Fixture.allCases) { fixture in
+                    Text(fixture.rawValue).tag(fixture)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Text("\(LongChatLabFixture.version) · \(messages.count) messages · "
+                + (isStreaming ? "streaming" : "settled"))
+            .font(.subheadline.monospacedDigit())
+            .foregroundStyle(.secondary)
+
+            Text(
+                scrollMetrics.isUserInteracting
+                    ? "Scrolling: decorative stream animation is simplified."
+                    : "Scroll upward while the tail streams; long-press finalized text to select it in place."
+            )
+            .font(.footnote)
+            .foregroundStyle(
+                scrollMetrics.isUserInteracting
+                    ? Color.orange
+                    : Color(.secondaryLabel)
+            )
+
+            Text("Record device, OS, Debug build, peak memory, hitch/dropped frames, stream latency, and settle time.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func benchmarkBlock(
+        message: ChatMessage,
+        index: Int,
+        rendersAsStreaming: Bool
+    ) -> some View {
+        ChatTranscriptMessageBlock(
+            transcriptMessage: TranscriptMessage(
+                loadedIndex: index,
+                renderID: message.id,
+                anchorID: message.id,
+                message: message
+            ),
+            transcriptBlockSpacing: 10,
+            showsThinkingAndToolCards: true,
+            reasoningGroups: [],
+            toolCallGroups: benchmarkToolCallGroups(
+                after: index,
+                rendersAsStreaming: rendersAsStreaming
+            ),
+            liveReasoningText: "",
+            reasoningAnchorMessageID: nil,
+            liveToolCalls: [],
+            toolCallAnchorMessageID: nil,
+            streamingAssistantMessageID: rendersAsStreaming ? message.messageId : nil,
+            localAttachmentPreviews: nil,
+            listeningMessageID: nil,
+            isViewingCachedData: false,
+            hasActiveStream: isStreaming,
+            isRegeneratingMessage: false,
+            isEditingMessage: false,
+            isForkingMessage: false,
+            loadAttachmentImage: { _ in nil },
+            loadAttachmentData: { _ in nil },
+            loadTranscriptMediaImage: { _ in nil },
+            loadTranscriptMediaData: { _ in nil },
+            transcriptMediaCacheNamespace: "long-chat-lab",
+            actionContext: { message, visibleIndex in
+                MessageActionContext(
+                    message: message,
+                    visibleIndex: visibleIndex,
+                    messagesOffset: 0
+                )
+            },
+            shouldRenderMessageRow: { _ in true },
+            onPreviewAttachment: { _, _ in },
+            onPreviewTranscriptMedia: { _ in },
+            onToggleListening: { _ in },
+            onRegenerate: { _ in },
+            onEdit: { _ in },
+            onFork: { _ in },
+            onCopy: { context in
+                UIPasteboard.general.string = context.copyText
+            }
+        )
+        .equatable()
+    }
+
+    private func benchmarkToolCallGroups(
+        after index: Int,
+        rendersAsStreaming: Bool
+    ) -> [ToolCallGroup] {
+        guard !rendersAsStreaming,
+              fixture == .longMixed,
+              LongChatLabFixture.includesToolActivity(after: index) else {
+            return []
+        }
+        return [LongChatLabFixture.toolGroup(after: index)]
+    }
+
+    private func replayStreamingTail() async {
+        displayedStreamingContent = ""
+        isStreaming = true
+
+        let content = switch fixture {
+        case .shortPlain:
+            LongChatLabFixture.shortPlainStreamingContent
+        case .longMixed:
+            LongChatLabFixture.streamingContent
+        }
+        let totalUnits = StreamingWordDrain.unitCount(in: content)
+        for revealed in 1...totalUnits {
+            try? await Task.sleep(for: .seconds(StreamingLabReplay.tickInterval))
+            guard !Task.isCancelled else { return }
+            displayedStreamingContent = StreamingLabReplay.prefix(
+                of: content,
+                unitCount: revealed
+            )
+        }
+
+        guard !Task.isCancelled else { return }
+        isStreaming = false
+    }
+}
+
 #Preview {
     NavigationStack {
         StreamingLabView()
+    }
+}
+
+#Preview("Long Chat Lab") {
+    NavigationStack {
+        LongChatLabView()
     }
 }
 #endif

@@ -48,7 +48,6 @@ struct DisplayMathView: View {
                 .lineSpacing(4)
                 .fixedSize(horizontal: true, vertical: true)
                 .padding(.vertical, 8)
-                .textSelection(.enabled)
         }
     }
 

@@ -297,7 +297,6 @@ struct ChatView: View {
     @State private var showEditDiscardConfirmation = false
     @State private var regenerateContext: MessageActionContext?
     @State private var showRegenerateDiscardConfirmation = false
-    @State private var selectableResponseText: SelectableResponseText?
     @State private var attachmentPreviewItem: ChatAttachmentPreviewItem?
     @State private var transcriptMediaPreviewItem: TranscriptMediaPreviewItem?
     @State private var pendingProfileSelection: ProfileSummary?
@@ -659,9 +658,6 @@ struct ChatView: View {
             }
             .navigationDestination(item: $forkedSession) { session in
                 ChatView(session: session, server: server, onAPIError: onAPIError)
-            }
-            .fullScreenCover(item: $selectableResponseText) { selectableText in
-                SelectableResponseTextView(selection: selectableText)
             }
             .sheet(item: $attachmentPreviewItem) { item in
                 ChatAttachmentPreviewView(
@@ -1088,6 +1084,7 @@ struct ChatView: View {
             shouldFollowLatestMessage: shouldFollowLatestMessage,
             latestTranscriptMessageRole: latestTranscriptMessageRole,
             isScrolledNearBottom: isScrolledNearBottom,
+            isUserInteractingWithScroll: isUserInteractingWithScroll,
             activeStreamID: viewModel.activeStreamID,
             streamingScrollTrigger: viewModel.streamingScrollTrigger,
             cacheFirstReconcileScrollToken: viewModel.cacheFirstReconcileScrollToken,
@@ -1154,9 +1151,6 @@ struct ChatView: View {
                         ChatHaptics.clarificationSubmitted(isEnabled: isHapticsEnabled)
                     }
                 }
-            },
-            onSelectText: { context in
-                selectableResponseText = SelectableResponseText(context: context)
             },
             onRegenerate: beginRegenerateResponse,
             onEdit: beginEditMessage,
