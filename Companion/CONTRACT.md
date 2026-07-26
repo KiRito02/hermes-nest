@@ -161,7 +161,9 @@ capability snapshot when Gateway is reachable, authorized, and compatible.
       "gateway_discovery": true,
       "gateway_proxy": true,
       "model_options_proxy": true,
-      "session_model_lock_proxy": true
+      "session_model_lock_proxy": true,
+      "skills_proxy": true,
+      "toolsets_proxy": true
     },
     "endpoints": {
       "health": {
@@ -195,6 +197,14 @@ capability snapshot when Gateway is reachable, authorized, and compatible.
       "session_model_lock": {
         "method": "POST",
         "path": "/api/sessions/{session_id}/model"
+      },
+      "skills": {
+        "method": "GET",
+        "path": "/v1/skills"
+      },
+      "toolsets": {
+        "method": "GET",
+        "path": "/v1/toolsets"
       }
     }
   },
@@ -420,6 +430,74 @@ runtime model/provider matching the selection. The App changes its visible
 selection only after this acknowledgement, then sends the same model,
 provider, and reasoning options on subsequent Runs. The persisted lock remains
 authoritative if another client later resumes the Hermes session.
+
+## Gateway-compatible Skills and Toolsets discovery
+
+`GET /v1/skills` and `GET /v1/toolsets` are the only discovery routes exposed
+by this slice. Both require the App's device bearer, accept no query string or
+request body, reject implicit HEAD, and replace the device bearer with the
+NAS-local Gateway bearer. Companion never exposes Skill/Toolset mutation
+routes or forwards other App headers.
+
+This contract was verified against the owner's live Gateway on Hermes Agent
+commit `37a27664cc11a33d36739fafe864d1d084370c47`, its matching source/tests,
+and the official API Server documentation. Gateway capabilities advertise
+`features.skills_api == true` plus exact `endpoints.skills` and
+`endpoints.toolsets` descriptors. This upstream pin has no separate
+`toolsets_api` feature. The App therefore enables discovery only when both
+exact endpoint descriptors and `skills_api` are present on the Gateway
+snapshot and both proxy features/endpoints are present on Companion.
+
+Skills success is `200 application/json`:
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "name": "github-pr-workflow",
+      "description": "Review and publish a pull request.",
+      "category": "github"
+    }
+  ]
+}
+```
+
+`name` is the stable identity. `description` is a string and `category` is a
+string or null. Gateway filters disabled Skills for the active API Server
+platform and sorts rows by `(category-or-empty, name)`. It does not supply an
+enabled/configured field, so neither Companion nor App invents one.
+
+Toolsets success is `200 application/json`:
+
+```json
+{
+  "object": "list",
+  "platform": "api_server",
+  "data": [
+    {
+      "name": "file",
+      "label": "File Tools",
+      "description": "Read and write files.",
+      "enabled": true,
+      "configured": true,
+      "tools": ["read_file", "write_file"]
+    }
+  ]
+}
+```
+
+`name` is the stable identity. Gateway preserves its configurable-toolset
+declaration order. `enabled` and `configured` are booleans. `tools` is sorted
+and unique; if one upstream toolset cannot resolve, Gateway preserves its row
+with an empty tools list.
+
+Both envelopes allow additive fields but enforce the verified identity and
+field types. Responses are capped at 2 MiB and 2,048 rows. Names, labels,
+categories, descriptions, tool names, and per-toolset membership have fixed
+bounds. Gateway auth, transport, 5xx, malformed JSON, unsupported media type,
+oversize, and incompatible-shape failures use bounded sanitized errors and
+never return raw upstream details.
 
 ## Gateway-compatible Runs
 

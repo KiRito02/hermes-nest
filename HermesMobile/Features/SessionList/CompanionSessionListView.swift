@@ -134,6 +134,28 @@ struct CompanionSessionListView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        CompanionDiscoveryView(
+                            companionURL: connection.companionURL,
+                            capabilities: connection.capabilities
+                        )
+                    } label: {
+                        Image(systemName: "books.vertical")
+                    }
+                    .disabled(
+                        !connection.capabilities
+                            .supportsSkillsAndToolsetsDiscovery
+                    )
+                    .accessibilityLabel("Skills and Toolsets")
+                    .accessibilityHint(Text(
+                        connection.capabilities
+                            .supportsSkillsAndToolsetsDiscovery
+                            ? "Browses read-only Hermes capabilities"
+                            : "Unavailable with this Gateway or Companion"
+                    ))
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         createSession()
                     } label: {
