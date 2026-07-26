@@ -2,6 +2,7 @@
 
 from collections.abc import Awaitable, Callable
 from datetime import datetime, UTC
+import json
 
 from aiohttp import web
 
@@ -196,6 +197,79 @@ async def _list_sessions(request: web.Request) -> web.Response:
     )
 
 
+async def _session_request(
+    request: web.Request,
+    *,
+    action: str | None = None,
+) -> web.Response:
+    try:
+        _authenticate(request)
+        if request.query:
+            raise GatewayProxyError(
+                400,
+                "invalid_query",
+                "Session resource requests do not accept query parameters.",
+            )
+
+        body: bytes | None = None
+        if request.method in {"PATCH", "POST"}:
+            if request.content_type != "application/json":
+                raise GatewayProxyError(
+                    415,
+                    "invalid_content_type",
+                    "Session request bodies must use application/json.",
+                )
+            body = await request.read()
+            try:
+                payload = json.loads(body)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                raise GatewayProxyError(
+                    400,
+                    "invalid_json",
+                    "The session request body must be valid JSON.",
+                ) from None
+            if not isinstance(payload, dict):
+                raise GatewayProxyError(
+                    400,
+                    "invalid_json",
+                    "The session request body must be a JSON object.",
+                )
+
+        response = await request.app[GATEWAY_KEY].session_request(
+            request.method,
+            session_id=request.match_info.get("session_id"),
+            action=action,
+            body=body,
+        )
+    except RegistryError as error:
+        return _error_response(error)
+    except GatewayProxyError as error:
+        return _proxy_error_response(error)
+
+    return web.Response(
+        body=response.body,
+        status=response.status,
+        content_type="application/json",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+async def _create_session(request: web.Request) -> web.Response:
+    return await _session_request(request)
+
+
+async def _session_resource(request: web.Request) -> web.Response:
+    return await _session_request(request)
+
+
+async def _session_messages(request: web.Request) -> web.Response:
+    return await _session_request(request, action="messages")
+
+
+async def _fork_session(request: web.Request) -> web.Response:
+    return await _session_request(request, action="fork")
+
+
 def _authenticate(request: web.Request) -> RegisteredDevice:
     scheme, separator, credential = request.headers.get("Authorization", "").partition(
         " "
@@ -278,5 +352,28 @@ def create_app(
     app.router.add_get(CAPABILITIES_PATH, _capabilities)
     app.router.add_get(READINESS_PATH, _readiness)
     app.router.add_get(SESSION_LIST_PATH, _list_sessions, allow_head=False)
+    app.router.add_post(SESSION_LIST_PATH, _create_session)
+    app.router.add_get(
+        f"{SESSION_LIST_PATH}/{{session_id}}",
+        _session_resource,
+        allow_head=False,
+    )
+    app.router.add_patch(
+        f"{SESSION_LIST_PATH}/{{session_id}}",
+        _session_resource,
+    )
+    app.router.add_delete(
+        f"{SESSION_LIST_PATH}/{{session_id}}",
+        _session_resource,
+    )
+    app.router.add_get(
+        f"{SESSION_LIST_PATH}/{{session_id}}/messages",
+        _session_messages,
+        allow_head=False,
+    )
+    app.router.add_post(
+        f"{SESSION_LIST_PATH}/{{session_id}}/fork",
+        _fork_session,
+    )
     app.on_cleanup.append(_close_registry)
     return app
