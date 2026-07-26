@@ -23,6 +23,25 @@ struct CompanionCapabilities: Codable, Equatable, Sendable {
     let contractVersion: String?
     let companion: CompanionCapabilityBlock?
     let gateway: CompanionGatewayCapabilityBlock?
+
+    var supportsRunApprovals: Bool {
+        guard
+            gateway?.status == "ok",
+            companion?.features?["run_approval_proxy"] == .bool(true),
+            companion?.endpoints?["run_approval"]?.method == "POST",
+            companion?.endpoints?["run_approval"]?.path
+                == "/v1/runs/{run_id}/approval",
+            let capabilities = gateway?.capabilities,
+            capabilities.features?["approval_events"] == .bool(true),
+            capabilities.features?["run_approval_response"] == .bool(true),
+            capabilities.endpoints?["run_approval"]?.method == "POST",
+            capabilities.endpoints?["run_approval"]?.path
+                == "/v1/runs/{run_id}/approval"
+        else {
+            return false
+        }
+        return true
+    }
 }
 
 struct CompanionCapabilityBlock: Codable, Equatable, Sendable {

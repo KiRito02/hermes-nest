@@ -37,6 +37,10 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
             "/v1/runs/{run_id}/stop",
             self._gateway_stop,
         )
+        gateway_app.router.add_post(
+            "/v1/runs/{run_id}/approval",
+            self._gateway_approval,
+        )
         self.gateway_server = TestServer(gateway_app)
         await self.gateway_server.start_server()
 
@@ -152,6 +156,126 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
             self.gateway_requests,
+        )
+
+    async def test_approval_preserves_exact_run_choice_and_gateway_auth(
+        self,
+    ) -> None:
+        headers = {
+            "Authorization": f"Bearer {self.device_credential}",
+            "X-Private-Client-Header": "must-not-cross-boundary",
+        }
+
+        response = await self.client.post(
+            "/v1/runs/run-approval-1/approval",
+            json={"choice": "deny"},
+            headers=headers,
+        )
+
+        self.assertEqual(200, response.status)
+        self.assertEqual(
+            {
+                "object": "hermes.run.approval_response",
+                "run_id": "run-approval-1",
+                "choice": "deny",
+                "resolved": 1,
+            },
+            await response.json(),
+        )
+        self.assertEqual(
+            [
+                {
+                    "method": "POST",
+                    "path": "/v1/runs/run-approval-1/approval",
+                    "query": [],
+                    "body": {"choice": "deny"},
+                    "authorization": "Bearer gateway-run-key",
+                    "private_header": None,
+                }
+            ],
+            self.gateway_requests,
+        )
+
+    async def test_approval_rejects_unsupported_input_before_gateway(
+        self,
+    ) -> None:
+        headers = {"Authorization": f"Bearer {self.device_credential}"}
+
+        without_device = await self.client.post(
+            "/v1/runs/run-1/approval",
+            json={"choice": "deny"},
+        )
+        with_query = await self.client.post(
+            "/v1/runs/run-1/approval?all=true",
+            json={"choice": "deny"},
+            headers=headers,
+        )
+        wrong_content = await self.client.post(
+            "/v1/runs/run-1/approval",
+            data="choice=deny",
+            headers={**headers, "Content-Type": "text/plain"},
+        )
+        alias_choice = await self.client.post(
+            "/v1/runs/run-1/approval",
+            json={"choice": "approve"},
+            headers=headers,
+        )
+        resolve_all = await self.client.post(
+            "/v1/runs/run-1/approval",
+            json={"choice": "deny", "resolve_all": True},
+            headers=headers,
+        )
+
+        self.assertEqual(401, without_device.status)
+        self.assertEqual(400, with_query.status)
+        self.assertEqual(
+            "invalid_query",
+            (await with_query.json())["error"]["code"],
+        )
+        self.assertEqual(415, wrong_content.status)
+        self.assertEqual(400, alias_choice.status)
+        self.assertEqual(
+            "invalid_approval_choice",
+            (await alias_choice.json())["error"]["code"],
+        )
+        self.assertEqual(400, resolve_all.status)
+        self.assertEqual(
+            "invalid_approval_request",
+            (await resolve_all.json())["error"]["code"],
+        )
+        self.assertEqual([], self.gateway_requests)
+
+    async def test_approval_expiry_error_is_bounded_and_sanitized(self) -> None:
+        headers = {"Authorization": f"Bearer {self.device_credential}"}
+        self.gateway_mode = "approval_not_pending"
+
+        response = await self.client.post(
+            "/v1/runs/run-1/approval",
+            json={"choice": "once"},
+            headers=headers,
+        )
+
+        self.assertEqual(409, response.status)
+        self.assertEqual(
+            {
+                "error": {
+                    "code": "approval_not_pending",
+                    "message": "No approval is pending for this run.",
+                }
+            },
+            await response.json(),
+        )
+
+        self.gateway_mode = "approval_identity_mismatch"
+        mismatch = await self.client.post(
+            "/v1/runs/run-1/approval",
+            json={"choice": "once"},
+            headers=headers,
+        )
+        self.assertEqual(502, mismatch.status)
+        self.assertEqual(
+            "gateway_incompatible",
+            (await mismatch.json())["error"]["code"],
         )
 
     async def test_run_allowlist_rejects_unverified_requests_before_gateway(
@@ -332,6 +456,34 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
             {
                 "run_id": request.match_info["run_id"],
                 "status": "stopping",
+            }
+        )
+
+    async def _gateway_approval(self, request: web.Request) -> web.Response:
+        body = await self._record(request)
+        if self.gateway_mode == "approval_not_pending":
+            return web.json_response(
+                {
+                    "error": {
+                        "code": "approval_not_pending",
+                        "message": "No approval is pending for this run.",
+                        "private_path": "/volume/private/approval-state.json",
+                    },
+                    "private_gateway_detail": "loopback-only",
+                },
+                status=409,
+            )
+        response_run_id = (
+            "another-run"
+            if self.gateway_mode == "approval_identity_mismatch"
+            else request.match_info["run_id"]
+        )
+        return web.json_response(
+            {
+                "object": "hermes.run.approval_response",
+                "run_id": response_run_id,
+                "choice": body["choice"],
+                "resolved": 1,
             }
         )
 

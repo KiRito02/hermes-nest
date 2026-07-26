@@ -333,6 +333,7 @@ final class CompanionSessionHistoryViewModel {
         case idle
         case starting
         case streaming
+        case waitingForApproval
         case transportDisconnected
         case stopping
         case completed
@@ -352,12 +353,16 @@ final class CompanionSessionHistoryViewModel {
     private(set) var reasoningText = ""
     private(set) var liveToolCalls: [ToolCall] = []
     private(set) var needsTerminalHistoryRetry = false
+    private(set) var pendingApproval: ConversationApprovalRequest?
+    private(set) var approvalErrorMessage: String?
+    private(set) var approvalSubmissionChoice: ConversationApprovalChoice?
 
     private let repository: any SessionRepository
     private let runService: any ConversationRunServing
     private let companionURL: URL
     private let pageSize: Int
     private let reconciliationDelayNanoseconds: UInt64
+    private let supportsRunApprovals: Bool
     private var visibleStartIndex = 0
     private var runTask: Task<Void, Never>?
     private var reconciliationTask: Task<Void, Never>?
@@ -377,6 +382,7 @@ final class CompanionSessionHistoryViewModel {
         companionURL: URL,
         pageSize: Int = 50,
         runService: (any ConversationRunServing)? = nil,
+        supportsRunApprovals: Bool = false,
         reconciliationDelayNanoseconds: UInt64 = 1_000_000_000
     ) {
         self.session = session
@@ -386,6 +392,7 @@ final class CompanionSessionHistoryViewModel {
         self.runService = runService ?? ConversationRunService(
             companionURL: companionURL
         )
+        self.supportsRunApprovals = supportsRunApprovals
         self.reconciliationDelayNanoseconds =
             reconciliationDelayNanoseconds
     }
@@ -415,6 +422,32 @@ final class CompanionSessionHistoryViewModel {
         activeRunID != nil && !hasRequestedStop
     }
 
+    var isApprovalSubmissionInFlight: Bool {
+        approvalSubmissionChoice != nil
+    }
+
+    var approvalContextUnavailable: Bool {
+        supportsRunApprovals
+            && isRunActive
+            && runState == .waitingForApproval
+            && pendingApproval == nil
+    }
+
+    func canRespondToApproval(
+        _ choice: ConversationApprovalChoice
+    ) -> Bool {
+        guard
+            let pendingApproval,
+            pendingApproval.runID == activeRunID
+        else {
+            return false
+        }
+        return supportsRunApprovals
+            && pendingApproval.choices.contains(choice)
+            && !isApprovalSubmissionInFlight
+            && !hasRequestedStop
+    }
+
     var terminalHistoryRetryMessage: String {
         errorMessage ?? String(
             localized: "Could not refresh authoritative session history."
@@ -429,6 +462,8 @@ final class CompanionSessionHistoryViewModel {
             return String(localized: "Starting...")
         case .streaming:
             return String(localized: "Hermes is responding")
+        case .waitingForApproval:
+            return String(localized: "Hermes is waiting for your approval")
         case .transportDisconnected:
             return String(localized: "Live response disconnected · checking run")
         case .stopping:
@@ -598,6 +633,9 @@ final class CompanionSessionHistoryViewModel {
         streamedAssistantText = ""
         reasoningText = ""
         liveToolCalls = []
+        pendingApproval = nil
+        approvalErrorMessage = nil
+        approvalSubmissionChoice = nil
         deltaBuffer.removeAll()
         fastForwardedDelta = ""
         hasRequestedStop = false
@@ -672,6 +710,88 @@ final class CompanionSessionHistoryViewModel {
         }
     }
 
+    func respondToApproval(
+        _ choice: ConversationApprovalChoice,
+        modelContext: ModelContext? = nil
+    ) async {
+        guard
+            canRespondToApproval(choice),
+            let runID = activeRunID,
+            let approval = pendingApproval
+        else {
+            return
+        }
+        approvalSubmissionChoice = choice
+        approvalErrorMessage = nil
+
+        do {
+            _ = try await runService.respondToApproval(
+                runID: runID,
+                choice: choice
+            )
+            guard activeRunID == runID else { return }
+            guard pendingApproval == approval else {
+                approvalSubmissionChoice = nil
+                approvalErrorMessage = String(
+                    localized: "Approval changed while the decision was in flight. Checking the existing run."
+                )
+                await reconcileApproval(
+                    runID: runID,
+                    modelContext: modelContext
+                )
+                return
+            }
+            pendingApproval = nil
+            approvalSubmissionChoice = nil
+            if runState != .stopping {
+                runState = .streaming
+            }
+        } catch is CancellationError {
+            guard activeRunID == runID else { return }
+            pendingApproval = nil
+            approvalSubmissionChoice = nil
+            approvalErrorMessage = String(
+                localized: "Approval submission was cancelled. Checking the existing run."
+            )
+            if runState != .stopping {
+                runState = .transportDisconnected
+            }
+            beginReconciliation(
+                runID: runID,
+                modelContext: modelContext
+            )
+        } catch {
+            guard activeRunID == runID else { return }
+            pendingApproval = nil
+            approvalSubmissionChoice = nil
+            approvalErrorMessage = error.localizedDescription
+            guard
+                let serviceError =
+                    error as? ConversationRunServiceError
+            else {
+                return
+            }
+            switch serviceError {
+            case .approvalNotPending:
+                await reconcileApproval(
+                    runID: runID,
+                    modelContext: modelContext
+                )
+            case .runNotFound:
+                runState = .failed(error.localizedDescription)
+                await finishRun(
+                    runID: runID,
+                    modelContext: modelContext
+                )
+            default:
+                await reconcileApproval(
+                    runID: runID,
+                    modelContext: modelContext
+                )
+            }
+        }
+    }
+
     private func consumeEvents(
         runID: String,
         modelContext: ModelContext?
@@ -691,6 +811,38 @@ final class CompanionSessionHistoryViewModel {
                         continue
                     }
                     let event = payload.semanticEvent
+                    if event == "approval.request" {
+                        let submissionWasInFlight =
+                            approvalSubmissionChoice != nil
+                        pendingApproval = nil
+                        approvalErrorMessage = submissionWasInFlight
+                            ? String(
+                                localized: "Approval changed while the decision was in flight. Checking the existing run."
+                            )
+                            : nil
+                        if !submissionWasInFlight {
+                            approvalSubmissionChoice = nil
+                        }
+                        if runState != .stopping {
+                            runState = .waitingForApproval
+                        }
+                        if !submissionWasInFlight,
+                           runState != .stopping,
+                           supportsRunApprovals,
+                           let approval = payload.approvalRequest(
+                               expectedRunID: runID
+                           ) {
+                            pendingApproval = approval
+                        }
+                    }
+                    if event == "approval.responded" {
+                        pendingApproval = nil
+                        approvalErrorMessage = nil
+                        approvalSubmissionChoice = nil
+                        if runState != .stopping {
+                            runState = .streaming
+                        }
+                    }
                     if event == "message.delta",
                        let delta = payload.delta {
                         enqueue(delta)
@@ -730,7 +882,14 @@ final class CompanionSessionHistoryViewModel {
         guard !observedTerminal, activeRunID == runID else { return }
         runTask = nil
         flushPendingDelta(forceAll: true)
-        runState = .transportDisconnected
+        pendingApproval = nil
+        approvalSubmissionChoice = nil
+        approvalErrorMessage = String(
+            localized: "Live approval details disconnected. Checking the existing run."
+        )
+        if runState != .stopping {
+            runState = .transportDisconnected
+        }
         beginReconciliation(
             runID: runID,
             modelContext: modelContext
@@ -802,12 +961,44 @@ final class CompanionSessionHistoryViewModel {
         }
     }
 
+    private func reconcileApproval(
+        runID: String,
+        modelContext: ModelContext?
+    ) async {
+        do {
+            let snapshot = try await runService.status(runID: runID)
+            guard activeRunID == runID else { return }
+            terminalOutputFallback = snapshot.output
+                ?? terminalOutputFallback
+            applyRunSnapshot(snapshot)
+            if snapshot.state.isTerminal {
+                await finishRun(
+                    runID: runID,
+                    modelContext: modelContext
+                )
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            guard activeRunID == runID else { return }
+            runState = .transportDisconnected
+            beginReconciliation(
+                runID: runID,
+                modelContext: modelContext
+            )
+        }
+    }
+
     private func applyRunSnapshot(_ snapshot: ConversationRunSnapshot) {
         switch snapshot.state {
-        case .started, .queued, .running, .waitingForApproval:
+        case .started, .queued, .running:
             if runState != .transportDisconnected,
                runState != .stopping {
                 runState = .streaming
+            }
+        case .waitingForApproval:
+            if runState != .stopping {
+                runState = .waitingForApproval
             }
         case .stopping:
             runState = .stopping
@@ -851,6 +1042,9 @@ final class CompanionSessionHistoryViewModel {
         let messagesBeforeRefresh = allMessages
         isTerminalRefreshPending = true
         activeRunID = nil
+        pendingApproval = nil
+        approvalErrorMessage = nil
+        approvalSubmissionChoice = nil
         runTask?.cancel()
         runTask = nil
         reconciliationTask?.cancel()

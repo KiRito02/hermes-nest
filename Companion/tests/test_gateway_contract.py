@@ -58,6 +58,16 @@ class GatewayCapabilityContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("1", body["contract_version"])
         self.assertTrue(body["companion"]["features"]["device_auth"])
         self.assertTrue(body["companion"]["features"]["gateway_proxy"])
+        self.assertTrue(
+            body["companion"]["features"]["run_approval_proxy"]
+        )
+        self.assertEqual(
+            {
+                "method": "POST",
+                "path": "/v1/runs/{run_id}/approval",
+            },
+            body["companion"]["endpoints"]["run_approval"],
+        )
         self.assertEqual("ok", body["gateway"]["status"])
         self.assertEqual(
             "hermes.api_server.capabilities",
