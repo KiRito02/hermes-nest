@@ -1,5 +1,6 @@
 """App-facing Hermes Nest Companion HTTP interface."""
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import datetime, UTC
 import json
@@ -10,7 +11,12 @@ from hermex_companion import COMPANION_VERSION, CONTRACT_VERSION
 from hermex_companion.gateway import (
     GatewayDiscovery,
     GatewayProxyError,
+    GatewayRunHTTPError,
     SESSION_LIST_PATH,
+)
+from hermex_companion.run_proxy_contract import (
+    RUN_REQUEST_MAX_BODY_BYTES,
+    RUNS_PATH,
 )
 from hermex_companion.registry import (
     DeviceRegistry,
@@ -25,6 +31,7 @@ CAPABILITIES_PATH = "/companion/v1/capabilities"
 READINESS_PATH = "/companion/v1/readiness"
 REGISTRY_KEY = web.AppKey("registry", DeviceRegistry)
 GATEWAY_KEY = web.AppKey("gateway", GatewayDiscovery)
+DEFAULT_REQUEST_MAX_BODY_BYTES = 16 * 1024
 
 
 @web.middleware
@@ -39,8 +46,23 @@ async def _no_store(
         # not pass through `_json_response`.
         response.headers["Cache-Control"] = "no-store"
         raise
-    response.headers["Cache-Control"] = "no-store"
+    if response.content_type == "text/event-stream":
+        response.headers.setdefault("Cache-Control", "no-cache")
+    else:
+        response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@web.middleware
+async def _bounded_request_body(
+    request: web.Request,
+    handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
+) -> web.StreamResponse:
+    if request.method == "POST" and request.path == RUNS_PATH:
+        return await handler(request)
+    return await handler(
+        request.clone(client_max_size=DEFAULT_REQUEST_MAX_BODY_BYTES + 1)
+    )
 
 
 async def _health(_request: web.Request) -> web.Response:
@@ -270,6 +292,138 @@ async def _fork_session(request: web.Request) -> web.Response:
     return await _session_request(request, action="fork")
 
 
+async def _run_request(
+    request: web.Request,
+    *,
+    action: str | None = None,
+) -> web.Response:
+    try:
+        _authenticate(request)
+        if request.query:
+            raise GatewayProxyError(
+                400,
+                "invalid_query",
+                "Run resource requests do not accept query parameters.",
+            )
+
+        body: bytes | None = None
+        if request.match_info.get("run_id") is None:
+            if request.content_type != "application/json":
+                raise GatewayProxyError(
+                    415,
+                    "invalid_content_type",
+                    "Run request bodies must use application/json.",
+                )
+            body = await request.read()
+            if len(body) > RUN_REQUEST_MAX_BODY_BYTES:
+                raise GatewayProxyError(
+                    413,
+                    "request_too_large",
+                    "The run request exceeded the supported size.",
+                )
+            try:
+                payload = json.loads(body)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                raise GatewayProxyError(
+                    400,
+                    "invalid_json",
+                    "The run request body must be valid JSON.",
+                ) from None
+            if not isinstance(payload, dict):
+                raise GatewayProxyError(
+                    400,
+                    "invalid_json",
+                    "The run request body must be a JSON object.",
+                )
+        elif request.can_read_body:
+            raise GatewayProxyError(
+                400,
+                "invalid_request",
+                "This run resource does not accept a request body.",
+            )
+
+        response = await request.app[GATEWAY_KEY].run_request(
+            request.method,
+            run_id=request.match_info.get("run_id"),
+            action=action,
+            body=body,
+        )
+    except RegistryError as error:
+        return _error_response(error)
+    except GatewayProxyError as error:
+        return _proxy_error_response(error)
+
+    return web.Response(
+        body=response.body,
+        status=response.status,
+        content_type="application/json",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+async def _start_run(request: web.Request) -> web.Response:
+    return await _run_request(request)
+
+
+async def _run_status(request: web.Request) -> web.Response:
+    return await _run_request(request)
+
+
+async def _stop_run(request: web.Request) -> web.Response:
+    return await _run_request(request, action="stop")
+
+
+async def _run_events(request: web.Request) -> web.StreamResponse:
+    stream = None
+    try:
+        _authenticate(request)
+        if request.query:
+            raise GatewayProxyError(
+                400,
+                "invalid_query",
+                "Run event streams do not accept query parameters.",
+            )
+        if request.can_read_body:
+            raise GatewayProxyError(
+                400,
+                "invalid_request",
+                "Run event streams do not accept a request body.",
+            )
+        stream = await request.app[GATEWAY_KEY].open_run_events(
+            request.match_info["run_id"]
+        )
+    except RegistryError as error:
+        return _error_response(error)
+    except GatewayRunHTTPError as error:
+        return web.Response(
+            body=error.response.body,
+            status=error.response.status,
+            content_type="application/json",
+            headers={"Cache-Control": "no-store"},
+        )
+    except GatewayProxyError as error:
+        return _proxy_error_response(error)
+
+    response = web.StreamResponse(
+        status=200,
+        headers={
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+    try:
+        await response.prepare(request)
+        async for chunk in stream.response.content.iter_any():
+            await response.write(chunk)
+        await response.write_eof()
+    except (ConnectionResetError, asyncio.CancelledError):
+        pass
+    finally:
+        await stream.close()
+    return response
+
+
 def _authenticate(request: web.Request) -> RegisteredDevice:
     scheme, separator, credential = request.headers.get("Authorization", "").partition(
         " "
@@ -340,8 +494,8 @@ def create_app(
 ) -> web.Application:
     """Create the Companion module's aiohttp adapter."""
     app = web.Application(
-        client_max_size=16 * 1024,
-        middlewares=[_no_store],
+        client_max_size=RUN_REQUEST_MAX_BODY_BYTES + 1,
+        middlewares=[_no_store, _bounded_request_body],
     )
     app[REGISTRY_KEY] = registry or DeviceRegistry(":memory:")
     app[GATEWAY_KEY] = gateway or GatewayDiscovery("http://127.0.0.1:8642", "")
@@ -374,6 +528,21 @@ def create_app(
     app.router.add_post(
         f"{SESSION_LIST_PATH}/{{session_id}}/fork",
         _fork_session,
+    )
+    app.router.add_post(RUNS_PATH, _start_run)
+    app.router.add_get(
+        f"{RUNS_PATH}/{{run_id}}",
+        _run_status,
+        allow_head=False,
+    )
+    app.router.add_get(
+        f"{RUNS_PATH}/{{run_id}}/events",
+        _run_events,
+        allow_head=False,
+    )
+    app.router.add_post(
+        f"{RUNS_PATH}/{{run_id}}/stop",
+        _stop_run,
     )
     app.on_cleanup.append(_close_registry)
     return app

@@ -280,31 +280,114 @@ final class CompanionSessionListViewModel {
     }
 }
 
+struct ConversationRunDeltaBuffer: Equatable {
+    static let maximumPendingCharacters = 4_096
+
+    private(set) var pendingText = ""
+
+    var isEmpty: Bool {
+        pendingText.isEmpty
+    }
+
+    @discardableResult
+    mutating func append(_ text: String) -> String {
+        pendingText += text
+        let overflowCount =
+            pendingText.count - Self.maximumPendingCharacters
+        guard overflowCount > 0 else { return "" }
+        let overflowEnd = pendingText.index(
+            pendingText.startIndex,
+            offsetBy: overflowCount
+        )
+        let fastForwarded = String(pendingText[..<overflowEnd])
+        pendingText.removeSubrange(..<overflowEnd)
+        return fastForwarded
+    }
+
+    mutating func drain(maximumCharacters: Int?) -> String {
+        guard !pendingText.isEmpty else { return "" }
+        guard let maximumCharacters else {
+            defer { pendingText = "" }
+            return pendingText
+        }
+        let count = max(1, maximumCharacters)
+        let end = pendingText.index(
+            pendingText.startIndex,
+            offsetBy: count,
+            limitedBy: pendingText.endIndex
+        ) ?? pendingText.endIndex
+        let result = String(pendingText[..<end])
+        pendingText.removeSubrange(..<end)
+        return result
+    }
+
+    mutating func removeAll() {
+        pendingText = ""
+    }
+}
+
 @MainActor
 @Observable
 final class CompanionSessionHistoryViewModel {
+    enum RunPresentationState: Equatable {
+        case idle
+        case starting
+        case streaming
+        case transportDisconnected
+        case stopping
+        case completed
+        case failed(String?)
+        case cancelled
+    }
+
     private(set) var session: SessionSummary
     private(set) var allMessages: [ChatMessage] = []
     private(set) var isLoading = false
     private(set) var isViewingCachedData = false
     private(set) var errorMessage: String?
     private(set) var mutationErrorMessage: String?
+    private(set) var runState: RunPresentationState = .idle
+    private(set) var activeRunID: String?
+    private(set) var streamedAssistantText = ""
+    private(set) var reasoningText = ""
+    private(set) var liveToolCalls: [ToolCall] = []
+    private(set) var needsTerminalHistoryRetry = false
 
     private let repository: any SessionRepository
+    private let runService: any ConversationRunServing
     private let companionURL: URL
     private let pageSize: Int
+    private let reconciliationDelayNanoseconds: UInt64
     private var visibleStartIndex = 0
+    private var runTask: Task<Void, Never>?
+    private var reconciliationTask: Task<Void, Never>?
+    private var deltaFlushTask: Task<Void, Never>?
+    @ObservationIgnored private var deltaBuffer =
+        ConversationRunDeltaBuffer()
+    @ObservationIgnored private var fastForwardedDelta = ""
+    private var isStopRequestInFlight = false
+    private var hasRequestedStop = false
+    private var terminalOutputFallback: String?
+    private var nextToolOrdinal = 0
+    private var isTerminalRefreshPending = false
 
     init(
         session: SessionSummary,
         repository: any SessionRepository,
         companionURL: URL,
-        pageSize: Int = 50
+        pageSize: Int = 50,
+        runService: (any ConversationRunServing)? = nil,
+        reconciliationDelayNanoseconds: UInt64 = 1_000_000_000
     ) {
         self.session = session
         self.repository = repository
         self.companionURL = companionURL
         self.pageSize = max(1, pageSize)
+        self.runService = runService ?? ConversationRunService(
+            companionURL: companionURL
+        )
+        self.reconciliationDelayNanoseconds =
+            reconciliationDelayNanoseconds
     }
 
     var visibleMessages: [ChatMessage] {
@@ -316,8 +399,64 @@ final class CompanionSessionHistoryViewModel {
         visibleStartIndex > 0
     }
 
-    func load(modelContext: ModelContext? = nil) async {
-        guard let sessionID = session.sessionId, !isLoading else { return }
+    var isRunActive: Bool {
+        activeRunID != nil || runState == .starting
+    }
+
+    var canSend: Bool {
+        !isRunActive
+            && !isLoading
+            && !isViewingCachedData
+            && !isTerminalRefreshPending
+            && errorMessage == nil
+    }
+
+    var canRequestStop: Bool {
+        activeRunID != nil && !hasRequestedStop
+    }
+
+    var terminalHistoryRetryMessage: String {
+        errorMessage ?? String(
+            localized: "Could not refresh authoritative session history."
+        )
+    }
+
+    var runStatusText: String? {
+        switch runState {
+        case .idle:
+            return nil
+        case .starting:
+            return String(localized: "Starting...")
+        case .streaming:
+            return String(localized: "Hermes is responding")
+        case .transportDisconnected:
+            return String(localized: "Live response disconnected · checking run")
+        case .stopping:
+            return String(localized: "Stopping...")
+        case .completed:
+            return String(localized: "Completed")
+        case .failed(let message):
+            return message ?? String(localized: "Run failed")
+        case .cancelled:
+            return String(localized: "Cancelled")
+        }
+    }
+
+    var streamingMessage: ChatMessage? {
+        guard !streamedAssistantText.isEmpty else { return nil }
+        return ChatMessage(
+            role: "assistant",
+            content: streamedAssistantText,
+            timestamp: nil,
+            messageId: activeRunID.map { "stream-\($0)" }
+        )
+    }
+
+    @discardableResult
+    func load(modelContext: ModelContext? = nil) async -> Bool {
+        guard let sessionID = session.sessionId, !isLoading else {
+            return false
+        }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -342,8 +481,13 @@ final class CompanionSessionHistoryViewModel {
                 in: modelContext
             )
             cacheSession(resolvedSession, in: modelContext)
+            if needsTerminalHistoryRetry {
+                clearTerminalFallbackPresentation()
+                needsTerminalHistoryRetry = false
+            }
+            return true
         } catch {
-            guard !(error is CancellationError) else { return }
+            guard !(error is CancellationError) else { return false }
             if shouldUseCache(for: error), !cached.isEmpty {
                 apply(cached)
                 isViewingCachedData = true
@@ -353,11 +497,20 @@ final class CompanionSessionHistoryViewModel {
                 isViewingCachedData = false
                 errorMessage = error.localizedDescription
             }
+            return false
         }
     }
 
     func loadOlderMessages() {
         visibleStartIndex = max(0, visibleStartIndex - pageSize)
+    }
+
+    @discardableResult
+    func retryTerminalHistory(
+        modelContext: ModelContext? = nil
+    ) async -> Bool {
+        guard needsTerminalHistoryRetry else { return false }
+        return await load(modelContext: modelContext)
     }
 
     func rename(
@@ -416,6 +569,401 @@ final class CompanionSessionHistoryViewModel {
         mutationErrorMessage = nil
     }
 
+    @discardableResult
+    func send(
+        _ input: String,
+        modelContext: ModelContext? = nil
+    ) async -> Bool {
+        guard
+            canSend,
+            let sessionID = session.sessionId,
+            !sessionID.isEmpty
+        else {
+            return false
+        }
+        let trimmed = input.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !trimmed.isEmpty else { return false }
+
+        cancelRunTasks()
+        let authoritativeHistory = allMessages
+        let optimisticUser = ChatMessage(
+            role: "user",
+            content: trimmed,
+            timestamp: Date().timeIntervalSince1970,
+            messageId: "local-\(UUID().uuidString)"
+        )
+        apply(allMessages + [optimisticUser])
+        streamedAssistantText = ""
+        reasoningText = ""
+        liveToolCalls = []
+        deltaBuffer.removeAll()
+        fastForwardedDelta = ""
+        hasRequestedStop = false
+        terminalOutputFallback = nil
+        nextToolOrdinal = 0
+        runState = .starting
+        errorMessage = nil
+
+        let started: ConversationRunSnapshot
+        do {
+            started = try await runService.start(
+                ConversationRunStartRequest(
+                    input: trimmed,
+                    sessionID: sessionID,
+                    conversationHistory: authoritativeHistory
+                )
+            )
+        } catch {
+            apply(authoritativeHistory)
+            runState = .failed(error.localizedDescription)
+            return false
+        }
+
+        activeRunID = started.runID
+        runState = .streaming
+        runTask = Task { [weak self] in
+            await self?.consumeEvents(
+                runID: started.runID,
+                modelContext: modelContext
+            )
+        }
+        return true
+    }
+
+    func stopRun(modelContext: ModelContext? = nil) async {
+        guard
+            let runID = activeRunID,
+            !isStopRequestInFlight,
+            !hasRequestedStop
+        else {
+            return
+        }
+        isStopRequestInFlight = true
+        hasRequestedStop = true
+        runState = .stopping
+        defer { isStopRequestInFlight = false }
+
+        do {
+            let snapshot = try await runService.stop(runID: runID)
+            guard activeRunID == runID else { return }
+            terminalOutputFallback = snapshot.output
+            applyRunSnapshot(snapshot)
+            if snapshot.state.isTerminal {
+                await finishRun(
+                    runID: runID,
+                    modelContext: modelContext
+                )
+            } else {
+                beginReconciliation(
+                    runID: runID,
+                    modelContext: modelContext
+                )
+            }
+        } catch {
+            guard !(error is CancellationError) else { return }
+            guard activeRunID == runID else { return }
+            runState = .transportDisconnected
+            beginReconciliation(
+                runID: runID,
+                modelContext: modelContext
+            )
+        }
+    }
+
+    private func consumeEvents(
+        runID: String,
+        modelContext: ModelContext?
+    ) async {
+        var observedTerminal = false
+        do {
+            let events = try await runService.events(runID: runID)
+            for try await event in events {
+                guard activeRunID == runID else { return }
+                switch event {
+                case .comment:
+                    break
+                case .malformed:
+                    continue
+                case .data(let payload):
+                    guard payload.runID == nil || payload.runID == runID else {
+                        continue
+                    }
+                    let event = payload.semanticEvent
+                    if event == "message.delta",
+                       let delta = payload.delta {
+                        enqueue(delta)
+                    }
+                    if event == "reasoning.available",
+                       let text = payload.text {
+                        reasoningText = text
+                    }
+                    if event == "tool.started" {
+                        applyToolStarted(payload, runID: runID)
+                    }
+                    if event == "tool.completed" {
+                        applyToolCompleted(payload, runID: runID)
+                    }
+                    if let terminal = terminalState(
+                        for: event,
+                        error: payload.error
+                    ) {
+                        observedTerminal = true
+                        runState = terminal
+                        terminalOutputFallback = payload.output
+                        runTask = nil
+                        await finishRun(
+                            runID: runID,
+                            modelContext: modelContext
+                        )
+                        return
+                    }
+                }
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            guard activeRunID == runID else { return }
+        }
+
+        guard !observedTerminal, activeRunID == runID else { return }
+        runTask = nil
+        flushPendingDelta(forceAll: true)
+        runState = .transportDisconnected
+        beginReconciliation(
+            runID: runID,
+            modelContext: modelContext
+        )
+    }
+
+    private func enqueue(_ delta: String) {
+        fastForwardedDelta += deltaBuffer.append(delta)
+        guard deltaFlushTask == nil else { return }
+        scheduleDeltaFlush()
+    }
+
+    private func scheduleDeltaFlush() {
+        deltaFlushTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 33_000_000)
+            guard !Task.isCancelled else { return }
+            self?.flushPendingDelta()
+        }
+    }
+
+    private func flushPendingDelta(forceAll: Bool = false) {
+        deltaFlushTask?.cancel()
+        deltaFlushTask = nil
+        let drained = deltaBuffer.drain(
+            maximumCharacters: forceAll ? nil : 192
+        )
+        let published = fastForwardedDelta + drained
+        fastForwardedDelta = ""
+        guard !published.isEmpty else { return }
+        streamedAssistantText += published
+        if !deltaBuffer.isEmpty {
+            scheduleDeltaFlush()
+        }
+    }
+
+    private func beginReconciliation(
+        runID: String,
+        modelContext: ModelContext?
+    ) {
+        guard reconciliationTask == nil else { return }
+        reconciliationTask = Task { [weak self] in
+            guard let self else { return }
+            defer { reconciliationTask = nil }
+            while !Task.isCancelled, activeRunID == runID {
+                do {
+                    let snapshot = try await runService.status(runID: runID)
+                    guard activeRunID == runID else { return }
+                    terminalOutputFallback = snapshot.output
+                        ?? terminalOutputFallback
+                    applyRunSnapshot(snapshot)
+                    if snapshot.state.isTerminal {
+                        reconciliationTask = nil
+                        await finishRun(
+                            runID: runID,
+                            modelContext: modelContext
+                        )
+                        return
+                    }
+                } catch is CancellationError {
+                    return
+                } catch {
+                    guard activeRunID == runID else { return }
+                    runState = .transportDisconnected
+                }
+                try? await Task.sleep(
+                    nanoseconds: reconciliationDelayNanoseconds
+                )
+            }
+        }
+    }
+
+    private func applyRunSnapshot(_ snapshot: ConversationRunSnapshot) {
+        switch snapshot.state {
+        case .started, .queued, .running, .waitingForApproval:
+            if runState != .transportDisconnected,
+               runState != .stopping {
+                runState = .streaming
+            }
+        case .stopping:
+            runState = .stopping
+        case .completed:
+            runState = .completed
+        case .failed:
+            runState = .failed(snapshot.errorMessage)
+        case .cancelled:
+            runState = .cancelled
+        case .unknown:
+            runState = .transportDisconnected
+        }
+    }
+
+    private func terminalState(
+        for event: String?,
+        error: String?
+    ) -> RunPresentationState? {
+        switch event {
+        case "run.completed":
+            return .completed
+        case "run.failed":
+            return .failed(error)
+        case "run.cancelled":
+            return .cancelled
+        default:
+            return nil
+        }
+    }
+
+    private func finishRun(
+        runID: String,
+        modelContext: ModelContext?
+    ) async {
+        guard activeRunID == runID else { return }
+        flushPendingDelta(forceAll: true)
+        if let terminalOutputFallback,
+           !terminalOutputFallback.isEmpty {
+            streamedAssistantText = terminalOutputFallback
+        }
+        let messagesBeforeRefresh = allMessages
+        isTerminalRefreshPending = true
+        activeRunID = nil
+        runTask?.cancel()
+        runTask = nil
+        reconciliationTask?.cancel()
+        reconciliationTask = nil
+        let loadedAuthoritativeHistory = await refreshHistoryAfterTerminal(
+            modelContext: modelContext
+        )
+        if loadedAuthoritativeHistory {
+            clearTerminalFallbackPresentation()
+            needsTerminalHistoryRetry = false
+        } else {
+            apply(messagesBeforeRefresh)
+            needsTerminalHistoryRetry = true
+        }
+        hasRequestedStop = false
+        terminalOutputFallback = nil
+        isTerminalRefreshPending = false
+    }
+
+    private func refreshHistoryAfterTerminal(
+        modelContext: ModelContext?
+    ) async -> Bool {
+        while isLoading {
+            do {
+                try await Task.sleep(nanoseconds: 10_000_000)
+            } catch {
+                return false
+            }
+        }
+        return await load(modelContext: modelContext)
+    }
+
+    private func clearTerminalFallbackPresentation() {
+        streamedAssistantText = ""
+        reasoningText = ""
+        liveToolCalls = []
+    }
+
+    private func cancelRunTasks() {
+        runTask?.cancel()
+        runTask = nil
+        reconciliationTask?.cancel()
+        reconciliationTask = nil
+        deltaFlushTask?.cancel()
+        deltaFlushTask = nil
+    }
+
+    private func applyToolStarted(
+        _ payload: ConversationRunEventData,
+        runID: String
+    ) {
+        let id = payload.toolCallID?.nonEmptyRunValue
+            ?? "\(runID)-tool-\(nextToolOrdinal)"
+        nextToolOrdinal += 1
+        if let index = liveToolCalls.firstIndex(where: { $0.id == id }) {
+            liveToolCalls[index].name = payload.tool
+                ?? liveToolCalls[index].name
+            liveToolCalls[index].preview = payload.preview
+                ?? liveToolCalls[index].preview
+            return
+        }
+        liveToolCalls.append(
+            ToolCall(
+                id: id,
+                name: payload.tool,
+                preview: payload.preview,
+                args: nil,
+                startedAt: payload.timestamp
+                    ?? Date().timeIntervalSince1970
+            )
+        )
+    }
+
+    private func applyToolCompleted(
+        _ payload: ConversationRunEventData,
+        runID: String
+    ) {
+        let index: Int?
+        if let id = payload.toolCallID?.nonEmptyRunValue {
+            index = liveToolCalls.firstIndex(where: { $0.id == id })
+        } else {
+            index = liveToolCalls.lastIndex(where: {
+                !$0.isCompleted
+                    && (payload.tool == nil || $0.name == payload.tool)
+            })
+        }
+        if let index {
+            liveToolCalls[index].name = payload.tool
+                ?? liveToolCalls[index].name
+            liveToolCalls[index].duration = payload.duration
+            liveToolCalls[index].isError = payload.isError
+            liveToolCalls[index].isCompleted = true
+            return
+        }
+
+        let id = payload.toolCallID?.nonEmptyRunValue
+            ?? "\(runID)-tool-\(nextToolOrdinal)"
+        nextToolOrdinal += 1
+        liveToolCalls.append(
+            ToolCall(
+                id: id,
+                name: payload.tool,
+                preview: payload.preview,
+                args: nil,
+                duration: payload.duration,
+                isError: payload.isError,
+                isCompleted: true,
+                startedAt: payload.timestamp
+                    ?? Date().timeIntervalSince1970
+            )
+        )
+    }
+
     private func apply(_ messages: [ChatMessage]) {
         allMessages = messages
         visibleStartIndex = max(0, messages.count - pageSize)
@@ -469,5 +1017,12 @@ final class CompanionSessionHistoryViewModel {
         default:
             return false
         }
+    }
+}
+
+private extension String {
+    var nonEmptyRunValue: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }

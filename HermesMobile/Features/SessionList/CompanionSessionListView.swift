@@ -275,6 +275,8 @@ private struct CompanionSessionHistoryView: View {
     @State private var renameTitle = ""
     @State private var isConfirmingDelete = false
     @State private var forkedSession: SessionSummary?
+    @State private var draftMessage = ""
+    @FocusState private var composerIsFocused: Bool
 
     init(
         session: SessionSummary,
@@ -305,6 +307,36 @@ private struct CompanionSessionHistoryView: View {
                     OfflineCacheBanner()
                 }
 
+                if viewModel.needsTerminalHistoryRetry {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label(
+                            "Final response is shown from the run stream.",
+                            systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
+                        )
+                        .font(.footnote.weight(.semibold))
+
+                        Text(viewModel.terminalHistoryRetryMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                        Button("Retry History") {
+                            Task {
+                                await viewModel.retryTerminalHistory(
+                                    modelContext: modelContext
+                                )
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        .orange.opacity(0.12),
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+                    .accessibilityIdentifier("companion.run.history-retry")
+                }
+
                 if let mutationErrorMessage = viewModel.mutationErrorMessage {
                     Label(
                         mutationErrorMessage,
@@ -331,9 +363,39 @@ private struct CompanionSessionHistoryView: View {
                         transcriptMediaCacheNamespace: companionURL.absoluteString
                     )
                 }
+
+                if !viewModel.reasoningText.isEmpty {
+                    DisclosureGroup("Reasoning") {
+                        Text(viewModel.reasoningText)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
+                    }
+                    .accessibilityIdentifier("companion.run.reasoning")
+                }
+
+                ForEach(viewModel.liveToolCalls) { toolCall in
+                    ToolCallCardView(toolCall: toolCall)
+                }
+
+                if let streamingMessage = viewModel.streamingMessage {
+                    MessageBubbleView(
+                        message: streamingMessage,
+                        transcriptMediaCacheNamespace: companionURL.absoluteString
+                    )
+                    .accessibilityLabel("Streaming assistant response")
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+        }
+        .defaultScrollAnchor(.bottom)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            companionComposer
         }
         .overlay {
             if viewModel.isLoading && viewModel.allMessages.isEmpty {
@@ -411,6 +473,7 @@ private struct CompanionSessionHistoryView: View {
                     Image(systemName: "ellipsis.circle")
                 }
                 .accessibilityLabel("Session actions")
+                .disabled(viewModel.isRunActive)
             }
         }
         .task {
@@ -455,6 +518,96 @@ private struct CompanionSessionHistoryView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This removes the session from Hermes. Deletion cannot be undone.")
+        }
+    }
+
+    private var companionComposer: some View {
+        VStack(spacing: 8) {
+            if let status = viewModel.runStatusText {
+                Text(status)
+                    .font(.caption)
+                    .foregroundStyle(
+                        viewModel.runState == .transportDisconnected
+                            ? Color.orange
+                            : Color.secondary
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("companion.run.status")
+            }
+
+            HStack(alignment: .bottom, spacing: 10) {
+                TextField(
+                    "Message Hermes...",
+                    text: $draftMessage,
+                    axis: .vertical
+                )
+                .focused($composerIsFocused)
+                .lineLimit(1...6)
+                .textFieldStyle(.plain)
+                .disabled(!viewModel.canSend)
+                .submitLabel(.send)
+                .onSubmit {
+                    sendDraft()
+                }
+
+                if viewModel.isRunActive {
+                    Button {
+                        Task {
+                            await viewModel.stopRun(
+                                modelContext: modelContext
+                            )
+                        }
+                    } label: {
+                        Image(systemName: "stop.fill")
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .disabled(!viewModel.canRequestStop)
+                    .accessibilityLabel("Stop response")
+                    .accessibilityIdentifier("companion.run.stop")
+                } else {
+                    Button {
+                        sendDraft()
+                    } label: {
+                        Image(systemName: "arrow.up")
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(
+                        draftMessage.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ).isEmpty || !viewModel.canSend
+                    )
+                    .accessibilityLabel("Send message")
+                    .accessibilityIdentifier("companion.run.send")
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                Color(.secondarySystemBackground),
+                in: RoundedRectangle(cornerRadius: 20)
+            )
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+        .frame(maxWidth: 760)
+        .frame(maxWidth: .infinity)
+        .background(.ultraThinMaterial)
+    }
+
+    private func sendDraft() {
+        let draft = draftMessage
+        Task {
+            if await viewModel.send(
+                draft,
+                modelContext: modelContext
+            ) {
+                draftMessage = ""
+                composerIsFocused = false
+            }
         }
     }
 }

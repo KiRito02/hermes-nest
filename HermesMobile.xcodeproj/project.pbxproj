@@ -45,6 +45,8 @@
 		E00600000000000000000003 /* CompanionSessionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00600000000000000000013 /* CompanionSessionListView.swift */; };
 		E00600000000000000000004 /* SessionRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00600000000000000000014 /* SessionRepositoryTests.swift */; };
 		E00700000000000000000001 /* SessionRepository+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00700000000000000000011 /* SessionRepository+Lifecycle.swift */; };
+		E00800000000000000000001 /* ConversationRunService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00800000000000000000011 /* ConversationRunService.swift */; };
+		E00800000000000000000002 /* ConversationRunServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00800000000000000000012 /* ConversationRunServiceTests.swift */; };
 		C04000000000000000000001 /* APIClient+Sessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04000000000000000000011 /* APIClient+Sessions.swift */; };
 		C04000000000000000000002 /* APIClient+Projects.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04000000000000000000012 /* APIClient+Projects.swift */; };
 		C04000000000000000000003 /* APIClient+Chat.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04000000000000000000013 /* APIClient+Chat.swift */; };
@@ -392,6 +394,8 @@
 		E00600000000000000000013 /* CompanionSessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionSessionListView.swift; sourceTree = "<group>"; };
 		E00600000000000000000014 /* SessionRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRepositoryTests.swift; sourceTree = "<group>"; };
 		E00700000000000000000011 /* SessionRepository+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionRepository+Lifecycle.swift"; sourceTree = "<group>"; };
+		E00800000000000000000011 /* ConversationRunService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationRunService.swift; sourceTree = "<group>"; };
+		E00800000000000000000012 /* ConversationRunServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationRunServiceTests.swift; sourceTree = "<group>"; };
 		C04000000000000000000011 /* APIClient+Sessions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+Sessions.swift"; sourceTree = "<group>"; };
 		C04000000000000000000012 /* APIClient+Projects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+Projects.swift"; sourceTree = "<group>"; };
 		C04000000000000000000013 /* APIClient+Chat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+Chat.swift"; sourceTree = "<group>"; };
@@ -776,6 +780,7 @@
 				1A2B3C4D5E6F7000000000BC /* APIClientTests.swift */,
 				C00100000000000000000013 /* CompanionConnectionServiceTests.swift */,
 				E00600000000000000000014 /* SessionRepositoryTests.swift */,
+				E00800000000000000000012 /* ConversationRunServiceTests.swift */,
 				B5A1000000000000000000A1 /* ServerRegistryTests.swift */,
 				C0FF000000000000000000C2 /* CustomHeaderInjectionTests.swift */,
 				C03900000000000000000001 /* APIClientSessionListTests.swift */,
@@ -887,6 +892,7 @@
 				C00100000000000000000011 /* CompanionConnectionService.swift */,
 				E00600000000000000000011 /* SessionRepository.swift */,
 				E00700000000000000000011 /* SessionRepository+Lifecycle.swift */,
+				E00800000000000000000011 /* ConversationRunService.swift */,
 				C04000000000000000000011 /* APIClient+Sessions.swift */,
 				C04000000000000000000012 /* APIClient+Projects.swift */,
 				C04000000000000000000013 /* APIClient+Chat.swift */,
@@ -1460,6 +1466,7 @@
 				C00100000000000000000001 /* CompanionConnectionService.swift in Sources */,
 				E00600000000000000000001 /* SessionRepository.swift in Sources */,
 				E00700000000000000000001 /* SessionRepository+Lifecycle.swift in Sources */,
+				E00800000000000000000001 /* ConversationRunService.swift in Sources */,
 				C04000000000000000000001 /* APIClient+Sessions.swift in Sources */,
 				C04000000000000000000002 /* APIClient+Projects.swift in Sources */,
 				C04000000000000000000003 /* APIClient+Chat.swift in Sources */,
@@ -1655,6 +1662,7 @@
 				1A2B3C4D5E6F7000000000AC /* APIClientTests.swift in Sources */,
 				C00100000000000000000003 /* CompanionConnectionServiceTests.swift in Sources */,
 				E00600000000000000000004 /* SessionRepositoryTests.swift in Sources */,
+				E00800000000000000000002 /* ConversationRunServiceTests.swift in Sources */,
 				B5A1000000000000000000A0 /* ServerRegistryTests.swift in Sources */,
 				C0FF000000000000000000C1 /* CustomHeaderInjectionTests.swift in Sources */,
 				C03910000000000000000001 /* APIClientSessionListTests.swift in Sources */,

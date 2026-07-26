@@ -13,7 +13,8 @@ without moving into this namespace.
   tolerate additive fields.
 - Credentials are carried only in the `Authorization` header. They never
   appear in URLs, query strings, or error bodies.
-- Companion responses use `Cache-Control: no-store`.
+- JSON and framework responses use `Cache-Control: no-store`. Successful SSE
+  responses use `Cache-Control: no-cache` and `X-Accel-Buffering: no`.
 
 ## Liveness
 
@@ -325,6 +326,107 @@ Hermes Agent 0.19.0 returns message history as
 queries. Companion therefore forwards the complete bounded message response.
 The App presents it in stable local pages without claiming upstream pagination,
 reordering rows, or creating a Companion-owned transcript.
+
+## Gateway-compatible Runs
+
+Every route below requires device authentication and accepts no query
+parameters. Companion replaces the App device bearer with its NAS-local
+Gateway bearer, strips all other App headers, and does not follow redirects.
+Run IDs are single bounded path segments. Unsupported methods, suffixes,
+implicit HEAD, and invalid IDs never reach Gateway.
+
+This contract was verified against Hermes Agent `0.19.0`, upstream commit
+`07e97d2f5dc3d2092cfe693ef07b2527a36cd2d8`, its Runs tests and source, the
+official API Server documentation, and disposable runs on the owner's loopback
+Gateway.
+
+The exact allowlist is:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/v1/runs` | Start a run |
+| GET | `/v1/runs/{run_id}` | Read authoritative status |
+| GET | `/v1/runs/{run_id}/events` | Consume ordered SSE |
+| POST | `/v1/runs/{run_id}/stop` | Request interruption |
+
+Start requires a JSON object and permits up to and including 2 MiB so an
+existing server-authoritative conversation can be supplied:
+
+```json
+{
+  "input": "Continue",
+  "session_id": "<session-id>",
+  "conversation_history": [
+    {"role": "user", "content": "Earlier question"},
+    {"role": "assistant", "content": "Earlier answer"}
+  ]
+}
+```
+
+Optional verified Gateway fields such as `instructions`, `model`, and
+`previous_response_id` pass through unchanged. Companion does not synthesize
+history, run IDs, or session IDs. Hermes Agent 0.19.0 uses explicit
+`conversation_history` as turn context; `session_id` alone correlates and
+persists the run but does not load the existing SessionDB transcript. The App
+therefore reads current history before start and sends it explicitly.
+
+Start success is `202 application/json`:
+
+```json
+{"run_id":"<run-id>","status":"started"}
+```
+
+Status success is `200 application/json` and retains terminal runs:
+
+```json
+{
+  "object": "hermes.run",
+  "run_id": "<run-id>",
+  "status": "completed",
+  "session_id": "<session-id>",
+  "created_at": 1721000000.0,
+  "updated_at": 1721000010.0,
+  "last_event": "run.completed",
+  "output": "Final response"
+}
+```
+
+Core states are `queued`, `running`, `waiting_for_approval`, `stopping`,
+`completed`, `failed`, and `cancelled`. Clients tolerate additive fields and
+unknown future states without collapsing them into a terminal success.
+
+Stop success is `200 application/json` with
+`{"run_id":"<run-id>","status":"stopping"}`. `stopping` remains distinct from
+`cancelled`; the App reconciles through status or a later terminal event.
+Repeated UI stop actions are coalesced and never create another run. If the
+stop response is lost, the App retains the stop latch and reconciles the same
+`run_id` rather than sending an ambiguous second stop request.
+
+Events success is `200 text/event-stream`. Companion forwards each upstream
+byte chunk as it arrives without JSON decoding, re-encoding, buffering, event
+reordering, or automatic stop. This preserves `data:` records, future
+transport `event:` fields, comments such as `: keepalive` and
+`: stream closed`, and upstream event/run IDs. Current semantic event names
+include `message.delta`, `reasoning.available`, `tool.started`,
+`tool.completed`, `run.completed`, `run.failed`, and `run.cancelled`;
+additional approval and future event families remain additive. The App parses
+transport `event:` and JSON `data.event` independently, uses the JSON semantic
+event when both are present, coalesces deltas behind a bounded progressive
+presentation queue, and preserves a stable Tool Card when upstream supplies a
+tool-call ID. Hermes Agent 0.19.0 Runs events omit that ID; current cards use
+observed name/order as a best-effort fallback, so simultaneous same-name tools
+cannot be correlated exactly until Gateway emits an identity.
+
+If SSE disconnects after subscription, the Gateway may release that transport
+queue while retaining authoritative run status. Recovery polls the same
+`run_id` and refreshes session history after terminal state. Neither Companion
+nor App automatically resubmits the prompt.
+
+Safe Gateway client failures (`400`, `404`, `409`, and `429`) preserve their
+status and only the bounded `error.code` / `error.message` envelope. JSON
+responses are capped at 2 MiB. The SSE connection has a bounded connect
+timeout but no total/read timeout; Gateway keepalives and run completion own
+its lifetime.
 
 Gateway failures use the common bounded error envelope:
 
