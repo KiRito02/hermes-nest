@@ -368,7 +368,10 @@ struct LongChatLabView: View {
             ),
             transcriptBlockSpacing: 10,
             showsThinkingAndToolCards: true,
-            reasoningGroups: [],
+            reasoningGroups: benchmarkReasoningGroups(
+                after: index,
+                rendersAsStreaming: rendersAsStreaming
+            ),
             toolCallGroups: benchmarkToolCallGroups(
                 after: index,
                 rendersAsStreaming: rendersAsStreaming
@@ -421,6 +424,18 @@ struct LongChatLabView: View {
             return []
         }
         return [LongChatLabFixture.toolGroup(after: index)]
+    }
+
+    private func benchmarkReasoningGroups(
+        after index: Int,
+        rendersAsStreaming: Bool
+    ) -> [ReasoningGroup] {
+        guard !rendersAsStreaming,
+              fixture == .longMixed,
+              LongChatLabFixture.includesReasoning(after: index) else {
+            return []
+        }
+        return [LongChatLabFixture.reasoningGroup(after: index)]
     }
 
     private func replayStreamingTail() async {

@@ -47,6 +47,22 @@ enum AppTheme: String, CaseIterable, Identifiable {
 /// vendor-branded skin. Keeping the palette semantic lets the same shell work
 /// in light/dark mode and across iPhone and iPad without per-screen colors.
 enum HermesNestDesign {
+    enum Spacing {
+        static let xSmall: CGFloat = 4
+        static let small: CGFloat = 8
+        static let medium: CGFloat = 12
+        static let large: CGFloat = 16
+        static let xLarge: CGFloat = 24
+    }
+
+    enum Typography {
+        static let screenTitle = Font.title2.weight(.bold)
+        static let sectionTitle = Font.headline
+        static let body = Font.body
+        static let control = Font.caption.weight(.semibold)
+        static let metadata = Font.caption
+    }
+
     static let transcriptMaximumWidth: CGFloat = 760
     static let sidebarIdealWidth: CGFloat = 320
     static let compactCornerRadius: CGFloat = 12

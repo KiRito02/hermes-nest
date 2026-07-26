@@ -404,18 +404,24 @@ private struct CompanionSessionHistoryView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14) {
+            LazyVStack(
+                alignment: .leading,
+                spacing: HermesNestDesign.Spacing.medium
+            ) {
                 if viewModel.isViewingCachedData {
                     OfflineCacheBanner()
                 }
 
                 if viewModel.needsTerminalHistoryRetry {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: HermesNestDesign.Spacing.small
+                    ) {
                         Label(
                             "Final response is shown from the run stream.",
                             systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
                         )
-                        .font(.footnote.weight(.semibold))
+                        .font(HermesNestDesign.Typography.control)
 
                         Text(viewModel.terminalHistoryRetryMessage)
                             .font(.footnote)
@@ -464,6 +470,7 @@ private struct CompanionSessionHistoryView: View {
                         message: message,
                         transcriptMediaCacheNamespace: companionURL.absoluteString
                     )
+                    .equatable()
                 }
 
                 if !viewModel.reasoningText.isEmpty {
@@ -680,10 +687,10 @@ private struct CompanionSessionHistoryView: View {
     }
 
     private var companionComposer: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: HermesNestDesign.Spacing.small) {
             if let status = viewModel.runStatusText {
                 Text(status)
-                    .font(.caption)
+                    .font(HermesNestDesign.Typography.metadata)
                     .foregroundStyle(
                         viewModel.runState == .transportDisconnected
                             ? Color.orange
@@ -768,8 +775,8 @@ private struct CompanionSessionHistoryView: View {
                     .accessibilityIdentifier("companion.run.send")
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.horizontal, HermesNestDesign.Spacing.large)
+            .padding(.vertical, HermesNestDesign.Spacing.medium)
             .background(
                 HermesNestDesign.sidebar,
                 in: RoundedRectangle(
@@ -790,9 +797,9 @@ private struct CompanionSessionHistoryView: View {
                 y: 4
             )
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 6)
+        .padding(.horizontal, HermesNestDesign.Spacing.large)
+        .padding(.top, HermesNestDesign.Spacing.small)
+        .padding(.bottom, HermesNestDesign.Spacing.xSmall)
         .frame(maxWidth: HermesNestDesign.transcriptMaximumWidth)
         .frame(maxWidth: .infinity)
         .background(.regularMaterial)
@@ -814,7 +821,7 @@ private struct CompanionSessionHistoryView: View {
                                 await viewModel.loadModelOptions(refresh: true)
                             }
                         }
-                        .font(.caption.weight(.semibold))
+                        .font(HermesNestDesign.Typography.control)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -839,7 +846,7 @@ private struct CompanionSessionHistoryView: View {
                             Image(systemName: "chevron.down")
                                 .font(.caption2.weight(.semibold))
                         }
-                        .font(.caption.weight(.semibold))
+                        .font(HermesNestDesign.Typography.control)
                         .frame(minHeight: 32)
                     }
                     .buttonStyle(.bordered)
@@ -877,7 +884,7 @@ private struct CompanionSessionHistoryView: View {
                                 viewModel.selectedReasoningDisplayName,
                                 systemImage: "brain"
                             )
-                            .font(.caption.weight(.semibold))
+                            .font(HermesNestDesign.Typography.control)
                             .frame(minHeight: 32)
                         }
                         .buttonStyle(.bordered)
@@ -894,7 +901,7 @@ private struct CompanionSessionHistoryView: View {
                         usageControlLabel,
                         systemImage: "chart.bar.xaxis"
                     )
-                    .font(.caption.weight(.semibold))
+                    .font(HermesNestDesign.Typography.control)
                     .frame(minHeight: 32)
                 }
                 .buttonStyle(.bordered)
@@ -948,9 +955,18 @@ private struct CompanionSessionHistoryView: View {
 }
 
 @MainActor
-private struct CompanionMessageRow: View {
+private struct CompanionMessageRow: View, Equatable {
     let message: ChatMessage
     let transcriptMediaCacheNamespace: String
+
+    static func == (
+        lhs: CompanionMessageRow,
+        rhs: CompanionMessageRow
+    ) -> Bool {
+        lhs.message == rhs.message
+            && lhs.transcriptMediaCacheNamespace
+                == rhs.transcriptMediaCacheNamespace
+    }
 
     var body: some View {
         VStack(alignment: actionAlignment, spacing: 2) {
@@ -1008,14 +1024,17 @@ private struct CompanionUsageView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(
+                    alignment: .leading,
+                    spacing: HermesNestDesign.Spacing.large
+                ) {
                     modelCard
                     runUsageCard
                     sessionUsageCard
                     contextCard
                 }
                 .frame(maxWidth: 640, alignment: .leading)
-                .padding(20)
+                .padding(HermesNestDesign.Spacing.xLarge)
                 .frame(maxWidth: .infinity)
             }
             .background(HermesNestDesign.canvas)
@@ -1128,9 +1147,12 @@ private struct CompanionUsageView: View {
         title: LocalizedStringKey,
         value: String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(
+            alignment: .leading,
+            spacing: HermesNestDesign.Spacing.xSmall
+        ) {
             Text(title)
-                .font(.caption)
+                .font(HermesNestDesign.Typography.metadata)
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.subheadline.weight(.semibold))
@@ -1154,13 +1176,16 @@ private struct CompanionUsageView: View {
         systemImage: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(
+            alignment: .leading,
+            spacing: HermesNestDesign.Spacing.medium
+        ) {
             Label(title, systemImage: systemImage)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             content()
         }
-        .padding(16)
+        .padding(HermesNestDesign.Spacing.large)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             HermesNestDesign.sidebar,

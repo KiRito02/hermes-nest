@@ -375,6 +375,8 @@ final class CompanionSessionHistoryViewModel {
     private var visibleStartIndex = 0
     private var runTask: Task<Void, Never>?
     private var reconciliationTask: Task<Void, Never>?
+    private var terminalUsageRefreshTask: Task<Void, Never>?
+    private var terminalUsageRefreshRunID: String?
     private var deltaFlushTask: Task<Void, Never>?
     @ObservationIgnored private var deltaBuffer =
         ConversationRunDeltaBuffer()
@@ -1089,9 +1091,14 @@ final class CompanionSessionHistoryViewModel {
                         error: payload.error
                     ) {
                         observedTerminal = true
-                        latestRunUsage = payload.usage
+                        if let usage = payload.usage {
+                            latestRunUsage = usage
+                        }
                         runState = terminal
                         terminalOutputFallback = payload.output
+                        if payload.usage == nil {
+                            beginTerminalUsageRefresh(runID: runID)
+                        }
                         runTask = nil
                         await finishRun(
                             runID: runID,
@@ -1122,6 +1129,24 @@ final class CompanionSessionHistoryViewModel {
             runID: runID,
             modelContext: modelContext
         )
+    }
+
+    private func beginTerminalUsageRefresh(runID: String) {
+        terminalUsageRefreshTask?.cancel()
+        terminalUsageRefreshRunID = runID
+        terminalUsageRefreshTask = Task { [weak self] in
+            guard let self else { return }
+            let snapshot = try? await runService.status(runID: runID)
+            guard !Task.isCancelled,
+                  terminalUsageRefreshRunID == runID else {
+                return
+            }
+            if let usage = snapshot?.usage {
+                latestRunUsage = usage
+            }
+            terminalUsageRefreshRunID = nil
+            terminalUsageRefreshTask = nil
+        }
     }
 
     private func enqueue(_ delta: String) {
@@ -1319,6 +1344,9 @@ final class CompanionSessionHistoryViewModel {
         runTask = nil
         reconciliationTask?.cancel()
         reconciliationTask = nil
+        terminalUsageRefreshTask?.cancel()
+        terminalUsageRefreshTask = nil
+        terminalUsageRefreshRunID = nil
         deltaFlushTask?.cancel()
         deltaFlushTask = nil
     }

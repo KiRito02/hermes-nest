@@ -569,13 +569,22 @@ Status success is `200 application/json` and retains terminal runs:
   "created_at": 1721000000.0,
   "updated_at": 1721000010.0,
   "last_event": "run.completed",
-  "output": "Final response"
+  "output": "Final response",
+  "usage": {
+    "input_tokens": 144,
+    "output_tokens": 34,
+    "total_tokens": 178
+  }
 }
 ```
 
 Core states are `queued`, `running`, `waiting_for_approval`, `stopping`,
 `completed`, `failed`, and `cancelled`. Clients tolerate additive fields and
-unknown future states without collapsing them into a terminal success.
+unknown future states without collapsing them into a terminal success. When
+Gateway supplies terminal token accounting, `usage` is an optional object with
+optional, non-negative integer `input_tokens`, `output_tokens`, and
+`total_tokens`. Companion forwards it unchanged; it does not estimate missing
+values.
 
 Stop success is `200 application/json` with
 `{"run_id":"<run-id>","status":"stopping"}`. `stopping` remains distinct from
@@ -627,6 +636,11 @@ presentation queue, and preserves a stable Tool Card when upstream supplies a
 tool-call ID. Hermes Agent 0.19.0 Runs events omit that ID; current cards use
 observed name/order as a best-effort fallback, so simultaneous same-name tools
 cannot be correlated exactly until Gateway emits an identity.
+
+Terminal SSE data may carry the same optional `usage` object as status. Because
+some terminal events omit it, the App reads the authoritative status once after
+such an event. A failed usage refresh never changes an already-observed terminal
+result.
 
 If SSE disconnects after subscription, the Gateway may release that transport
 queue while retaining authoritative run status. Recovery polls the same

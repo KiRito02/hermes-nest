@@ -1191,7 +1191,7 @@ final class ConversationRunServiceTests: APIClientTestCase {
                     errorMessage: nil
                 )
             ],
-            statusDelayNanoseconds: 300_000_000
+            statusDelayNanoseconds: 2_000_000_000
         )
         let viewModel = CompanionSessionHistoryViewModel(
             session: session,
@@ -1656,6 +1656,74 @@ final class ConversationRunServiceTests: APIClientTestCase {
             ),
             viewModel.latestRunUsage
         )
+    }
+
+    @MainActor
+    func testTerminalEventWithoutUsageRefreshesAuthoritativeStatusOnce() async throws {
+        let session = try makeSessionSummary()
+        let repository = RunHistoryRepositoryStub(session: session)
+        let terminal = ConversationRunEvent.data(
+            ConversationRunEventData(
+                transportEvent: nil,
+                event: "run.completed",
+                runID: "run-1",
+                delta: nil,
+                output: "Done",
+                error: nil,
+                timestamp: 2
+            )
+        )
+        let runService = RunServiceStub(
+            eventResult: .eventsAfterDelay([terminal], 20_000_000),
+            statuses: [
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .completed,
+                    sessionID: "session-1",
+                    lastEvent: "run.completed",
+                    output: "Done",
+                    errorMessage: nil,
+                    usage: ConversationRunUsage(
+                        inputTokens: 200,
+                        outputTokens: 50,
+                        totalTokens: 250
+                    )
+                )
+            ],
+            statusDelayNanoseconds: 300_000_000
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: runService,
+            reconciliationDelayNanoseconds: 0
+        )
+        await viewModel.load()
+
+        let didSend = await viewModel.send("Measure")
+        XCTAssertTrue(didSend)
+        await waitUntil {
+            viewModel.activeRunID == nil
+        }
+        XCTAssertNil(viewModel.latestRunUsage)
+        await waitUntil(timeoutNanoseconds: 3_000_000_000) {
+            viewModel.latestRunUsage != nil
+        }
+
+        let statusRunIDs = await runService.statusRunIDs
+        XCTAssertEqual(["run-1"], statusRunIDs)
+        XCTAssertEqual(
+            ConversationRunUsage(
+                inputTokens: 200,
+                outputTokens: 50,
+                totalTokens: 250
+            ),
+            viewModel.latestRunUsage
+        )
+        XCTAssertEqual(.completed, viewModel.runState)
     }
 
     @MainActor

@@ -171,10 +171,13 @@ final class StreamingLabReplayTests: XCTestCase {
         })
     }
 
-    func testLongChatFixtureCoversMarkdownCodeTableMathAndToolActivity() {
+    func testLongChatFixtureCoversMarkdownCodeTableMathReasoningAndTools() {
         let content = LongChatLabFixture.messages.compactMap(\.content).joined(separator: "\n")
         let toolIndexes = LongChatLabFixture.messages.indices.filter {
             LongChatLabFixture.includesToolActivity(after: $0)
+        }
+        let reasoningIndexes = LongChatLabFixture.messages.indices.filter {
+            LongChatLabFixture.includesReasoning(after: $0)
         }
 
         XCTAssertTrue(content.contains("### Summary"))
@@ -182,8 +185,14 @@ final class StreamingLabReplayTests: XCTestCase {
         XCTAssertTrue(content.contains("| Metric | Sample |"))
         XCTAssertTrue(content.contains("T_{render}"))
         XCTAssertGreaterThanOrEqual(toolIndexes.count, 9)
+        XCTAssertGreaterThanOrEqual(reasoningIndexes.count, 7)
         XCTAssertTrue(toolIndexes.allSatisfy {
             LongChatLabFixture.messages[$0].role == "assistant"
+        })
+        XCTAssertTrue(reasoningIndexes.allSatisfy {
+            LongChatLabFixture.messages[$0].role == "assistant"
+                && LongChatLabFixture.reasoningGroup(after: $0)
+                    .anchorMessageID == LongChatLabFixture.messages[$0].id
         })
     }
 
