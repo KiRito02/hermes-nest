@@ -7,8 +7,8 @@ import json
 import os
 from pathlib import Path
 import stat
-import tempfile
 from typing import Iterator
+from uuid import uuid4
 
 from hermex_companion.memory_threats import first_threat
 
@@ -60,6 +60,7 @@ class MemoryAccess:
         user_char_limit: int = DEFAULT_USER_CHAR_LIMIT,
     ) -> None:
         self._directory: Path | None = None
+        self._directory_identity: tuple[int, int] | None = None
         if directory is not None:
             if not directory.is_absolute():
                 raise ValueError("memory directory must be absolute")
@@ -67,6 +68,8 @@ class MemoryAccess:
             if not canonical.is_dir():
                 raise ValueError("memory directory must be an existing directory")
             self._directory = canonical
+            metadata = canonical.stat()
+            self._directory_identity = (metadata.st_dev, metadata.st_ino)
         for name, value in (
             ("memory_char_limit", memory_char_limit),
             ("user_char_limit", user_char_limit),
@@ -110,9 +113,9 @@ class MemoryAccess:
         return self._directory is not None
 
     def read(self, target: str) -> MemorySnapshot:
-        path = self._path(target)
-        with self._file_lock(path):
-            raw = self._read_raw(path)
+        filename = self._filename(target)
+        with self._file_lock(filename) as directory_fd:
+            raw = self._read_raw(directory_fd, filename)
             return self._snapshot(target, raw)
 
     def apply_operations(
@@ -137,9 +140,9 @@ class MemoryAccess:
                 "invalid_memory_operations",
                 f"operations must contain 1 to {MAX_MEMORY_OPERATIONS} items.",
             )
-        path = self._path(target)
-        with self._file_lock(path):
-            raw = self._read_raw(path)
+        filename = self._filename(target)
+        with self._file_lock(filename) as directory_fd:
+            raw = self._read_raw(directory_fd, filename)
             snapshot = self._snapshot(target, raw)
             self._require_revision(snapshot, revision)
             entries = list(dict.fromkeys(snapshot.entries))
@@ -176,7 +179,7 @@ class MemoryAccess:
                     "memory_limit_exceeded",
                     "The requested changes exceed the configured Memory limit.",
                 )
-            self._atomic_write(path, serialized)
+            self._atomic_write(directory_fd, filename, serialized)
             return self._snapshot(target, serialized)
 
     def reset(
@@ -199,14 +202,17 @@ class MemoryAccess:
                 "invalid_memory_revision",
                 "A current Memory revision is required.",
             )
-        path = self._path(target)
-        with self._file_lock(path):
-            snapshot = self._snapshot(target, self._read_raw(path))
+        filename = self._filename(target)
+        with self._file_lock(filename) as directory_fd:
+            snapshot = self._snapshot(
+                target,
+                self._read_raw(directory_fd, filename),
+            )
             self._require_revision(snapshot, revision)
-            self._atomic_write(path, "")
+            self._atomic_write(directory_fd, filename, "")
             return self._snapshot(target, "")
 
-    def _path(self, target: str) -> Path:
+    def _filename(self, target: str) -> str:
         if self._directory is None:
             raise MemoryError(
                 409,
@@ -214,20 +220,53 @@ class MemoryAccess:
                 "The Hermes Agent host has not enabled built-in Memory access.",
             )
         if target == "memory":
-            return self._directory / "MEMORY.md"
+            return "MEMORY.md"
         if target == "user":
-            return self._directory / "USER.md"
+            return "USER.md"
         raise MemoryError(
             404,
             "memory_target_not_found",
             "Only built-in MEMORY.md and USER.md are available.",
         )
 
+    def _validated_directory_fd(self) -> int:
+        if self._directory is None or self._directory_identity is None:
+            raise MemoryError(
+                409,
+                "memory_not_configured",
+                "The Hermes Agent host has not enabled built-in Memory access.",
+            )
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        descriptor: int | None = None
+        try:
+            descriptor = os.open(self._directory, flags)
+            metadata = os.fstat(descriptor)
+        except OSError as error:
+            if descriptor is not None:
+                os.close(descriptor)
+            raise MemoryError(
+                409,
+                "memory_directory_changed",
+                "The built-in Memory directory is no longer available safely.",
+            ) from error
+        if (metadata.st_dev, metadata.st_ino) != self._directory_identity:
+            os.close(descriptor)
+            raise MemoryError(
+                409,
+                "memory_directory_changed",
+                "The built-in Memory directory changed after Companion started.",
+            )
+        return descriptor
+
     @staticmethod
-    def _read_raw(path: Path) -> str:
+    def _read_raw(directory_fd: int, filename: str) -> str:
         flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
         try:
-            descriptor = os.open(path, flags)
+            descriptor = os.open(filename, flags, dir_fd=directory_fd)
         except FileNotFoundError:
             return ""
         except OSError as error:
@@ -346,52 +385,72 @@ class MemoryAccess:
             raise self._operation_error(index, "matched multiple entries")
         return matches[0]
 
-    @staticmethod
     @contextmanager
-    def _file_lock(path: Path) -> Iterator[None]:
-        lock_path = path.with_suffix(path.suffix + ".lock")
+    def _file_lock(self, filename: str) -> Iterator[int]:
+        directory_fd = self._validated_directory_fd()
+        lock_name = f"{filename}.lock"
         flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+        descriptor: int | None = None
         try:
-            descriptor = os.open(lock_path, flags, 0o600)
+            descriptor = os.open(
+                lock_name,
+                flags,
+                0o600,
+                dir_fd=directory_fd,
+            )
             if not stat.S_ISREG(os.fstat(descriptor).st_mode):
                 raise OSError("Memory lock is not a regular file")
         except OSError as error:
+            if descriptor is not None:
+                os.close(descriptor)
+            os.close(directory_fd)
             raise MemoryError(
                 409,
                 "memory_lock_unsafe",
                 "The built-in Memory lock could not be opened safely.",
             ) from error
         with os.fdopen(descriptor, "a+", encoding="utf-8") as handle:
-            if fcntl is not None:
-                fcntl.flock(handle, fcntl.LOCK_EX)
+            locked = False
             try:
-                yield
-            finally:
                 if fcntl is not None:
+                    fcntl.flock(handle, fcntl.LOCK_EX)
+                    locked = True
+                yield directory_fd
+            finally:
+                if fcntl is not None and locked:
                     fcntl.flock(handle, fcntl.LOCK_UN)
+                os.close(directory_fd)
 
     @staticmethod
-    def _atomic_write(path: Path, content: str) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        descriptor, temporary = tempfile.mkstemp(
-            dir=path.parent,
-            prefix=".hermes-nest-memory-",
-            suffix=".tmp",
+    def _atomic_write(
+        directory_fd: int,
+        filename: str,
+        content: str,
+    ) -> None:
+        temporary = f".hermes-nest-memory-{uuid4().hex}.tmp"
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(
+            temporary,
+            flags,
+            0o600,
+            dir_fd=directory_fd,
         )
         try:
             with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
                 handle.write(content)
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary, path)
-            directory_fd = os.open(path.parent, os.O_RDONLY)
-            try:
-                os.fsync(directory_fd)
-            finally:
-                os.close(directory_fd)
+            os.replace(
+                temporary,
+                filename,
+                src_dir_fd=directory_fd,
+                dst_dir_fd=directory_fd,
+            )
+            os.fsync(directory_fd)
         except BaseException:
             try:
-                os.unlink(temporary)
+                os.unlink(temporary, dir_fd=directory_fd)
             except FileNotFoundError:
                 pass
             raise

@@ -361,17 +361,27 @@ field. Companion resolves Agent-working-directory-relative paths server-side
 and removes `attachment_ids` before forwarding to Gateway. Absolute paths
 and randomized internal storage paths never reach the App or user-visible
 history. A pending attachment is claimed before Gateway start, so concurrent
-Runs cannot submit the same attachment twice. If the single Companion process
-stops after claiming but before completing a Run, its startup recovery releases
-that interrupted claim so the ready attachment is usable again.
+Runs cannot submit the same attachment twice. A claim left behind by a process
+stop stays unavailable after restart: the Gateway does not provide an
+idempotency key that would let Companion distinguish “never submitted” from
+“accepted but response not persisted,” so restart recovery fails closed rather
+than risking duplicate submission.
 
 `GET /companion/v1/uploads?session_id=...` restores the device's pending
 queue. `DELETE /companion/v1/uploads/{attachment_id}` removes only an
 unconsumed file whose device/inode identity still matches the file Companion
-published. If the file was already removed directly on the host, deletion
-clears the stale pending record without touching another path.
+published. Removal first atomically moves the directory entry to a private
+random quarantine name, verifies that entry against the already-open file
+descriptor, and only then unlinks it. If the file was already removed directly
+on the host, deletion clears the stale pending record without touching another
+path.
 Consumed attachment metadata added to authoritative session history includes
 only the display metadata and an opaque authenticated `download_path`.
+For newly consumed turns, Companion records a monotonic per-session turn order,
+binds it to the real Gateway user-message `id` on the first authoritative
+history read, and uses that ID thereafter. This keeps repeated identical
+prompts associated with the correct attachments without inventing a Gateway
+`run_id` message field.
 `GET /companion/v1/uploads/{attachment_id}/content` serves that consumed file
 only while its published device/inode identity still matches; randomized
 storage paths remain private. This supplies historical image/audio previews
@@ -396,10 +406,12 @@ publish through fsync plus atomic replacement. A stale revision returns
 `POST /companion/v1/memory/{target}/reset` requires the current revision and
 the exact confirmation `RESET MEMORY` or `RESET USER`.
 Memory files and their sibling lock files are opened without following
-symbolic links and must remain regular files. Reads are rejected before loading
-content when a built-in Memory file exceeds the 4,000,000-byte safety bound;
-the profile's configured character limit remains the user-visible content
-limit.
+symbolic links and must remain regular files. Every lock/read/atomic-write
+sequence stays anchored to a directory descriptor whose device/inode identity
+must match the directory configured at Companion startup. Reads are rejected
+before loading content when a built-in Memory file exceeds the 4,000,000-byte
+safety bound; the profile's configured character limit remains the user-visible
+content limit.
 
 ## Gateway-compatible sessions
 
@@ -412,6 +424,13 @@ followed. `HEAD` is not an alias for either supported GET resource and returns
 This contract was verified against Hermes Agent `0.19.0`, upstream commit
 `07e97d2f5dc3d2092cfe693ef07b2527a36cd2d8`, its session API tests, the
 official API Server documentation, and the owner's running loopback Gateway.
+
+The verified Runs attachment handoff remains path-based because Gateway accepts
+no file descriptor or file ID. Companion revalidates the randomized private
+file immediately before Run submission, and its mode-0700 storage prevents
+remote devices or other host users from replacing it. A hostile process running
+as the same Companion service identity is outside this remote-client boundary
+and must not be granted access to that identity.
 
 The supported query fields are:
 

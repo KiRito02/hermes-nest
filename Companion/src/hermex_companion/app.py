@@ -1139,9 +1139,9 @@ async def _session_messages(request: web.Request) -> web.Response:
     if not isinstance(messages, list):
         return response
 
-    batches: list[tuple[str, str, list[object]]] = []
+    exact_attachments: dict[str, list[object]] = {}
+    unbound_batches: list[dict[str, object]] = []
     for record in records:
-        key = (record.run_id, record.prompt_fingerprint)
         attachment = {
             "name": record.name,
             "download_path": (
@@ -1151,40 +1151,71 @@ async def _session_messages(request: web.Request) -> web.Response:
             "size": record.size,
             "is_image": record.content_type.casefold().startswith("image/"),
         }
-        if batches and batches[-1][0:2] == key:
-            batches[-1][2].append(attachment)
+        if record.message_id is not None:
+            exact_attachments.setdefault(record.message_id, []).append(
+                attachment
+            )
+            continue
+        batch_key: object = (
+            ("order", record.consumption_order)
+            if record.consumption_order is not None
+            else ("legacy", record.run_id, record.prompt_fingerprint)
+        )
+        if unbound_batches and unbound_batches[-1]["key"] == batch_key:
+            unbound_batches[-1]["attachments"].append(attachment)
+            unbound_batches[-1]["attachment_ids"].append(record.id)
         else:
-            batches.append((key[0], key[1], [attachment]))
+            unbound_batches.append(
+                {
+                    "key": batch_key,
+                    "fingerprint": record.prompt_fingerprint,
+                    "attachments": [attachment],
+                    "attachment_ids": [record.id],
+                }
+            )
 
     for message in messages:
         if not isinstance(message, dict) or message.get("role") != "user":
             continue
+        raw_message_id = message.get("id")
+        message_id = (
+            str(raw_message_id)
+            if isinstance(raw_message_id, (int, str))
+            and not isinstance(raw_message_id, bool)
+            else None
+        )
+        attachments = (
+            exact_attachments.pop(message_id, None)
+            if message_id is not None
+            else None
+        )
+        if attachments is not None:
+            existing = message.get("attachments")
+            message["attachments"] = (
+                list(existing) + attachments
+                if isinstance(existing, list)
+                else attachments
+            )
+            continue
         fingerprint = attachment_prompt_fingerprint(message.get("content"))
-        metadata = message.get("metadata")
-        message_run_id = message.get("run_id") or message.get("runId")
-        if not isinstance(message_run_id, str) and isinstance(metadata, dict):
-            message_run_id = metadata.get("run_id") or metadata.get("runId")
-        if not isinstance(message_run_id, str):
-            message_run_id = None
         matching_index = next(
             (
                 index
-                for index, (
-                    batch_run_id,
-                    batch_fingerprint,
-                    _,
-                ) in enumerate(batches)
-                if batch_fingerprint == fingerprint
-                and (
-                    message_run_id is None
-                    or batch_run_id == message_run_id
-                )
+                for index, batch in enumerate(unbound_batches)
+                if batch["fingerprint"] == fingerprint
             ),
             None,
         )
         if matching_index is None:
             continue
-        _, _, attachments = batches.pop(matching_index)
+        batch = unbound_batches.pop(matching_index)
+        attachments = batch["attachments"]
+        if message_id is not None:
+            request.app[REGISTRY_KEY].bind_consumed_attachments_to_message(
+                session_id=request.match_info["session_id"],
+                attachment_ids=batch["attachment_ids"],
+                message_id=message_id,
+            )
         existing = message.get("attachments")
         message["attachments"] = (
             list(existing) + attachments

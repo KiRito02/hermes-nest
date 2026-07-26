@@ -549,14 +549,19 @@ final class CompanionSessionHistoryViewModel {
 
     func retryAttachmentUpload() async {
         guard let failedAttachmentUpload else { return }
-        _ = await uploadAttachment(
+        let succeeded = await uploadAttachment(
             fileURL: failedAttachmentUpload.fileURL,
             filename: failedAttachmentUpload.filename,
             contentType: failedAttachmentUpload.contentType,
             destination: failedAttachmentUpload.destination,
-            rememberFailure: false
+            rememberFailure: true
         )
-        self.failedAttachmentUpload = nil
+        if succeeded
+            || !FileManager.default.fileExists(
+                atPath: failedAttachmentUpload.fileURL.path
+            ) {
+            self.failedAttachmentUpload = nil
+        }
     }
 
     func prepareAttachmentSelection() {

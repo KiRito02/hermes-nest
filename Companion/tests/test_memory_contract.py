@@ -305,6 +305,32 @@ class MemoryContractTests(unittest.IsolatedAsyncioTestCase):
                 memory.read("memory")
             self.assertEqual("secret", outside.read_text(encoding="utf-8"))
 
+    def test_memory_directory_cannot_be_retargeted_after_startup(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            configured = root / "memories"
+            configured.mkdir()
+            (configured / "MEMORY.md").write_text(
+                "original",
+                encoding="utf-8",
+            )
+            outside = root / "outside"
+            outside.mkdir()
+            outside_memory = outside / "MEMORY.md"
+            outside_memory.write_text("secret", encoding="utf-8")
+            memory = MemoryAccess(configured)
+            original = root / "original"
+            configured.rename(original)
+            configured.symlink_to(outside, target_is_directory=True)
+
+            with self.assertRaisesRegex(MemoryError, "directory"):
+                memory.read("memory")
+
+            self.assertEqual(
+                "secret",
+                outside_memory.read_text(encoding="utf-8"),
+            )
+
     def test_memory_read_rejects_file_over_bounded_byte_limit(self) -> None:
         with TemporaryDirectory() as directory:
             memory_directory = Path(directory)

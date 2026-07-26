@@ -731,11 +731,36 @@ class WorkspaceAccess:
             if error.code == "attachment_file_not_found":
                 return
             raise
-        os.close(file_fd)
+        quarantine_name = f".hermes-nest-delete-{uuid4().hex}"
         try:
-            os.unlink(name, dir_fd=parent_fd)
+            try:
+                os.rename(
+                    name,
+                    quarantine_name,
+                    src_dir_fd=parent_fd,
+                    dst_dir_fd=parent_fd,
+                )
+            except FileNotFoundError:
+                return
+            quarantined = os.stat(
+                quarantine_name,
+                dir_fd=parent_fd,
+                follow_symlinks=False,
+            )
+            opened = os.fstat(file_fd)
+            if (
+                quarantined.st_dev != opened.st_dev
+                or quarantined.st_ino != opened.st_ino
+            ):
+                raise WorkspaceError(
+                    409,
+                    "attachment_file_changed",
+                    "The uploaded file changed during removal and was not deleted.",
+                )
+            os.unlink(quarantine_name, dir_fd=parent_fd)
             os.fsync(parent_fd)
         finally:
+            os.close(file_fd)
             os.close(parent_fd)
 
     def uploaded_file(

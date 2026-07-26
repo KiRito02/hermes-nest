@@ -1,8 +1,10 @@
 import unittest
 import asyncio
 import json
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from aiohttp.test_utils import TestClient, TestServer
 from aiohttp import FormData
@@ -1417,7 +1419,7 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual([201] * 10 + [409], statuses)
 
-    def test_interrupted_run_claim_recovers_when_registry_reopens(self) -> None:
+    def test_interrupted_run_claim_fails_closed_when_registry_reopens(self) -> None:
         with TemporaryDirectory() as directory:
             database = Path(directory) / "registry.sqlite3"
             registry = DeviceRegistry(database)
@@ -1452,13 +1454,12 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
 
             reopened = DeviceRegistry(database)
             try:
-                recovered = reopened.list_ready_attachments(
-                    device_id=device.id,
-                    session_id="session-restart",
-                )
                 self.assertEqual(
-                    [attachment_id],
-                    [item.id for item in recovered],
+                    [],
+                    reopened.list_ready_attachments(
+                        device_id=device.id,
+                        session_id="session-restart",
+                    ),
                 )
             finally:
                 reopened.close()
@@ -1580,3 +1581,63 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
                 headers=headers,
             )
             self.assertEqual(1, len((await pending.json())["uploads"]))
+
+    def test_pending_attachment_removal_never_unlinks_a_racing_replacement(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace = WorkspaceAccess(
+                [
+                    WorkspaceRoot(
+                        id="projects",
+                        name="Projects",
+                        path=root,
+                        writable=True,
+                    )
+                ]
+            )
+            upload = workspace.begin_upload("projects", "", "notes.txt")
+            upload.write(b"original")
+            upload.commit()
+            stored = root / upload.relative_path
+            moved_original = root / "original-safe"
+            real_rename = os.rename
+
+            def race_before_quarantine(
+                source: str,
+                destination: str,
+                *,
+                src_dir_fd: int,
+                dst_dir_fd: int,
+            ) -> None:
+                os.replace(stored, moved_original)
+                stored.write_bytes(b"replacement")
+                real_rename(
+                    source,
+                    destination,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
+
+            with patch(
+                "hermex_companion.workspace.os.rename",
+                side_effect=race_before_quarantine,
+            ):
+                with self.assertRaisesRegex(
+                    WorkspaceError,
+                    "changed during removal",
+                ):
+                    workspace.remove_uploaded_file(
+                        "projects",
+                        upload.relative_path,
+                        expected_device=upload.published_device,
+                        expected_inode=upload.published_inode,
+                    )
+
+            self.assertEqual(b"original", moved_original.read_bytes())
+            quarantined = list(
+                stored.parent.glob(".hermes-nest-delete-*")
+            )
+            self.assertEqual(1, len(quarantined))
+            self.assertEqual(b"replacement", quarantined[0].read_bytes())

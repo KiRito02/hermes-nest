@@ -239,6 +239,71 @@ class SessionLifecycleProxyContractTests(unittest.IsolatedAsyncioTestCase):
             messages[0]["attachments"],
         )
         self.assertNotIn("attachments", messages[1])
+        stored = self.registry.list_consumed_attachments(
+            session_id="session-1",
+        )
+        self.assertEqual("40", stored[0].message_id)
+
+    async def test_duplicate_prompts_bind_attachments_by_turn_order_then_id(
+        self,
+    ) -> None:
+        self.gateway_mode = "duplicate_attachment_history"
+        device = self.registry.authenticate(self.device_credential)
+        attachment_ids = []
+        for name, run_id in (
+            ("first.txt", "run-z"),
+            ("second.txt", "run-a"),
+        ):
+            attachment_id = self.registry.reserve_attachment(
+                device_id=device.id,
+                session_id="session-1",
+                root_id="projects",
+                relative_path=f"incoming/{name}",
+                name=name,
+                content_type="text/plain",
+            )
+            self.registry.complete_attachment(attachment_id)
+            self.registry.consume_attachments(
+                device_id=device.id,
+                session_id="session-1",
+                attachment_ids=[attachment_id],
+                run_id=run_id,
+                prompt_fingerprint=attachment_prompt_fingerprint("Repeat"),
+            )
+            attachment_ids.append(attachment_id)
+
+        first_response = await self.client.get(
+            "/api/sessions/session-1/messages",
+            headers={
+                "Authorization": f"Bearer {self.device_credential}",
+            },
+        )
+        second_response = await self.client.get(
+            "/api/sessions/session-1/messages",
+            headers={
+                "Authorization": f"Bearer {self.device_credential}",
+            },
+        )
+
+        self.assertEqual(200, first_response.status)
+        self.assertEqual(200, second_response.status)
+        for response in (first_response, second_response):
+            user_messages = [
+                message
+                for message in (await response.json())["data"]
+                if message["role"] == "user"
+            ]
+            self.assertEqual(
+                ["first.txt", "second.txt"],
+                [
+                    message["attachments"][0]["name"]
+                    for message in user_messages
+                ],
+            )
+        stored = self.registry.list_consumed_attachments(
+            session_id="session-1",
+        )
+        self.assertEqual(["40", "42"], [item.message_id for item in stored])
 
     async def test_gateway_client_error_is_preserved_but_bad_success_is_bounded(
         self,
@@ -349,7 +414,11 @@ class SessionLifecycleProxyContractTests(unittest.IsolatedAsyncioTestCase):
 
     async def _gateway_messages(self, request: web.Request) -> web.Response:
         await self._record(request)
-        if self.gateway_mode == "attachment_history":
+        if self.gateway_mode in {
+            "attachment_history",
+            "duplicate_attachment_history",
+        }:
+            duplicate = self.gateway_mode == "duplicate_attachment_history"
             return web.json_response(
                 {
                     "object": "list",
@@ -359,8 +428,7 @@ class SessionLifecycleProxyContractTests(unittest.IsolatedAsyncioTestCase):
                             "id": 40,
                             "session_id": request.match_info["session_id"],
                             "role": "user",
-                            "content": "Review it",
-                            "run_id": "run-attachment",
+                            "content": "Repeat" if duplicate else "Review it",
                             "timestamp": 100.0,
                         },
                         {
@@ -370,7 +438,26 @@ class SessionLifecycleProxyContractTests(unittest.IsolatedAsyncioTestCase):
                             "content": "Done",
                             "timestamp": 101.0,
                         },
-                    ],
+                    ] + (
+                        [
+                            {
+                                "id": 42,
+                                "session_id": request.match_info["session_id"],
+                                "role": "user",
+                                "content": "Repeat",
+                                "timestamp": 102.0,
+                            },
+                            {
+                                "id": 43,
+                                "session_id": request.match_info["session_id"],
+                                "role": "assistant",
+                                "content": "Done again",
+                                "timestamp": 103.0,
+                            },
+                        ]
+                        if duplicate
+                        else []
+                    ),
                 }
             )
         return web.json_response(

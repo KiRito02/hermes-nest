@@ -450,8 +450,11 @@ The Companion-only
 `attachment_ids` field is resolved to Agent-working-directory-relative paths
 server-side and stripped before Gateway forwarding. Roots outside the
 configured Agent working directory are browse/download-only.
-Interrupted pre-Run attachment claims are released when the single Companion
-process restarts.
+An attachment claim left by a Companion process stop fails closed after
+restart. Gateway Runs have no verified idempotency key, so automatically
+releasing an ambiguous claim could submit the same attachment twice.
+Authoritative history binds consumed attachment batches to Gateway
+user-message IDs in per-session turn order, including when prompts repeat.
 
 ### 4.8 Companion built-in Memory management
 
@@ -467,7 +470,8 @@ The Companion first release supports controlled management of Hermes built-in
 Raw filesystem overwrite is not the Memory interface. External Memory providers
 are not implied by built-in Memory support and require separate capability
 adapters. The Companion rejects a built-in Memory file larger than 4,000,000
-bytes before loading its content.
+bytes before loading its content. Locks, reads, and atomic replacement remain
+anchored to the startup-validated Memory directory identity.
 
 ### 4.9 Explicitly unsupported in Companion v1
 
@@ -560,6 +564,10 @@ selected private/TLS transport.
   keys, or Gateway logs through workspace browsing.
 - Destructive Memory reset requires an explicit App confirmation and a
   Companion request designed to resist accidental replay.
+- Gateway's verified attachment handoff is path-based. Revalidate the private
+  randomized file immediately before submission and keep its storage
+  owner-only; do not claim protection from a hostile local process running as
+  the Companion service identity.
 
 ---
 

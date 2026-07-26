@@ -62,6 +62,8 @@ class ConsumedAttachmentRecord:
     size: int
     run_id: str
     prompt_fingerprint: str
+    consumption_order: int | None
+    message_id: str | None
 
 
 def attachment_prompt_fingerprint(content: object) -> str:
@@ -93,7 +95,6 @@ class DeviceRegistry:
         if path != ":memory:":
             self._connection.execute("PRAGMA journal_mode = WAL")
         self._initialize_schema()
-        self._recover_interrupted_attachment_claims()
 
     def close(self) -> None:
         self._connection.close()
@@ -622,17 +623,35 @@ class DeviceRegistry:
             return
         self._connection.execute("BEGIN IMMEDIATE")
         try:
+            claimed = self._connection.execute(
+                """
+                SELECT DISTINCT session_id
+                FROM attachments
+                WHERE run_claim = ? AND state = 'ready'
+                """,
+                (claim,),
+            ).fetchall()
+            if len(claimed) != 1:
+                raise RegistryError(
+                    409,
+                    "attachment_not_ready",
+                    "The claimed attachments are no longer ready.",
+                )
+            session_id = claimed[0]["session_id"]
+            consumption_order = self._next_consumption_order(session_id)
             cursor = self._connection.execute(
                 """
                 UPDATE attachments
                 SET state = 'consumed', consumed_at = ?, run_id = ?,
-                    prompt_fingerprint = ?, run_claim = NULL
+                    prompt_fingerprint = ?, consumption_order = ?,
+                    run_claim = NULL
                 WHERE run_claim = ? AND state = 'ready'
                 """,
                 (
                     int(self._clock()),
                     run_id,
                     prompt_fingerprint,
+                    consumption_order,
                     claim,
                 ),
             )
@@ -661,11 +680,12 @@ class DeviceRegistry:
         placeholders = ",".join("?" for _ in attachment_ids)
         self._connection.execute("BEGIN IMMEDIATE")
         try:
+            consumption_order = self._next_consumption_order(session_id)
             cursor = self._connection.execute(
                 f"""
                 UPDATE attachments
                 SET state = 'consumed', consumed_at = ?, run_id = ?,
-                    prompt_fingerprint = ?
+                    prompt_fingerprint = ?, consumption_order = ?
                 WHERE device_id = ?
                   AND session_id = ?
                   AND state = 'ready'
@@ -675,6 +695,7 @@ class DeviceRegistry:
                     int(self._clock()),
                     run_id,
                     prompt_fingerprint,
+                    consumption_order,
                     device_id,
                     session_id,
                     *attachment_ids,
@@ -699,13 +720,17 @@ class DeviceRegistry:
         rows = self._connection.execute(
             """
             SELECT id, root_id, relative_path, name, content_type, size,
-                   run_id, prompt_fingerprint
+                   run_id, prompt_fingerprint, consumption_order, message_id
             FROM attachments
             WHERE session_id = ?
               AND state = 'consumed'
               AND run_id IS NOT NULL
               AND prompt_fingerprint IS NOT NULL
-            ORDER BY consumed_at, run_id, id
+            ORDER BY
+                CASE WHEN consumption_order IS NULL THEN 1 ELSE 0 END,
+                consumption_order,
+                consumed_at,
+                rowid
             """,
             (session_id,),
         ).fetchall()
@@ -719,9 +744,34 @@ class DeviceRegistry:
                 size=row["size"],
                 run_id=row["run_id"],
                 prompt_fingerprint=row["prompt_fingerprint"],
+                consumption_order=row["consumption_order"],
+                message_id=row["message_id"],
             )
             for row in rows
         ]
+
+    def bind_consumed_attachments_to_message(
+        self,
+        *,
+        session_id: str,
+        attachment_ids: list[str],
+        message_id: str,
+    ) -> None:
+        if not attachment_ids or not message_id or len(message_id) > 128:
+            return
+        placeholders = ",".join("?" for _ in attachment_ids)
+        self._connection.execute(
+            f"""
+            UPDATE attachments
+            SET message_id = ?
+            WHERE session_id = ?
+              AND state = 'consumed'
+              AND message_id IS NULL
+              AND id IN ({placeholders})
+            """,
+            (message_id, session_id, *attachment_ids),
+        )
+        self._connection.commit()
 
     def consumed_attachment_for_download(
         self,
@@ -755,15 +805,16 @@ class DeviceRegistry:
             file_inode=row["file_inode"],
         )
 
-    def _recover_interrupted_attachment_claims(self) -> None:
-        self._connection.execute(
+    def _next_consumption_order(self, session_id: str) -> int:
+        row = self._connection.execute(
             """
-            UPDATE attachments
-            SET run_claim = NULL
-            WHERE state = 'ready' AND run_claim IS NOT NULL
-            """
-        )
-        self._connection.commit()
+            SELECT COALESCE(MAX(consumption_order), 0) + 1 AS next_order
+            FROM attachments
+            WHERE session_id = ?
+            """,
+            (session_id,),
+        ).fetchone()
+        return int(row["next_order"])
 
     def _initialize_schema(self) -> None:
         self._connection.executescript(
@@ -802,6 +853,8 @@ class DeviceRegistry:
                 consumed_at INTEGER,
                 run_id TEXT,
                 prompt_fingerprint TEXT,
+                consumption_order INTEGER,
+                message_id TEXT,
                 file_device INTEGER,
                 file_inode INTEGER
             );
@@ -809,7 +862,7 @@ class DeviceRegistry:
             CREATE INDEX IF NOT EXISTS attachments_pending
             ON attachments (device_id, session_id, state);
 
-            PRAGMA user_version = 6;
+            PRAGMA user_version = 7;
             """
         )
         attachment_columns = {
@@ -837,6 +890,14 @@ class DeviceRegistry:
         if "run_claim" not in attachment_columns:
             self._connection.execute(
                 "ALTER TABLE attachments ADD COLUMN run_claim TEXT"
+            )
+        if "consumption_order" not in attachment_columns:
+            self._connection.execute(
+                "ALTER TABLE attachments ADD COLUMN consumption_order INTEGER"
+            )
+        if "message_id" not in attachment_columns:
+            self._connection.execute(
+                "ALTER TABLE attachments ADD COLUMN message_id TEXT"
             )
         self._connection.commit()
 
