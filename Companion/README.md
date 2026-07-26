@@ -93,9 +93,12 @@ the App may see. The paths are chosen on the Hermes Agent host, not in the App:
 ```
 
 All configured directories must already exist. The App can browse aliases and
-choose subdirectories, but cannot add roots. Only writable roots inside
-`agent_working_directory` can supply chat attachments. The `memory` block is
-optional and enables only built-in `MEMORY.md` and `USER.md`.
+choose subdirectories and remember the last valid root, but cannot add roots.
+Local iPhone/iPad files stream from a file-backed request, while an existing
+authorized host file can be staged server-side without downloading it first.
+Only writable roots inside `agent_working_directory` can receive chat
+attachments. The `memory` block is optional and enables only built-in
+`MEMORY.md` and `USER.md`.
 
 Render the unit with the real service identity and XDG paths:
 

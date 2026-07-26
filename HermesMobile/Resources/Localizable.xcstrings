@@ -12632,6 +12632,36 @@
         }
       }
     },
+    "Load more": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加载更多"
+          }
+        }
+      }
+    },
+    "Server Files": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器文件"
+          }
+        }
+      }
+    },
+    "Server files unavailable": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器文件不可用"
+          }
+        }
+      }
+    },
     "Download failed": {
       "localizations": {
         "zh-Hans": {

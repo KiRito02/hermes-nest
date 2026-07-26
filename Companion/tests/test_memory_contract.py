@@ -1,12 +1,14 @@
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from concurrent.futures import ThreadPoolExecutor
+import threading
 import unittest
 
 from aiohttp.test_utils import TestClient, TestServer
 
 from hermex_companion.app import create_app
-from hermex_companion.memory import MemoryAccess
+from hermex_companion.memory import MemoryAccess, MemoryError
 from hermex_companion.registry import DeviceRegistry
 
 
@@ -277,3 +279,73 @@ class MemoryContractTests(unittest.IsolatedAsyncioTestCase):
 
             with self.assertRaisesRegex(ValueError, "absolute"):
                 MemoryAccess.from_config_file(config_path)
+
+    async def test_memory_files_and_locks_must_not_be_symbolic_links(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            memories = root / "memories"
+            memories.mkdir()
+            outside = root / "outside.txt"
+            outside.write_text("secret", encoding="utf-8")
+            (memories / "MEMORY.md").symlink_to(outside)
+            memory = MemoryAccess(memories)
+
+            with self.assertRaisesRegex(MemoryError, "read safely"):
+                memory.read("memory")
+
+            (memories / "MEMORY.md").unlink()
+            (memories / "MEMORY.md").write_text("", encoding="utf-8")
+            (memories / "MEMORY.md.lock").unlink()
+            (memories / "MEMORY.md.lock").symlink_to(outside)
+            with self.assertRaisesRegex(MemoryError, "lock"):
+                memory.read("memory")
+            self.assertEqual("secret", outside.read_text(encoding="utf-8"))
+
+    def test_concurrent_writers_serialize_and_one_rejects_stale_revision(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as directory:
+            memory_directory = Path(directory)
+            path = memory_directory / "MEMORY.md"
+            path.write_text("initial", encoding="utf-8")
+            first = MemoryAccess(memory_directory)
+            second = MemoryAccess(memory_directory)
+            revision = first.read("memory").revision
+            barrier = threading.Barrier(2)
+
+            def write(access: MemoryAccess, content: str) -> str:
+                barrier.wait(timeout=5)
+                try:
+                    access.apply_operations(
+                        "memory",
+                        revision=revision,
+                        operations=[{"action": "add", "content": content}],
+                    )
+                except MemoryError as error:
+                    return error.code
+                return "ok"
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                first_future = executor.submit(
+                    write,
+                    first,
+                    "first writer",
+                )
+                second_future = executor.submit(
+                    write,
+                    second,
+                    "second writer",
+                )
+                results = sorted(
+                    (
+                        first_future.result(),
+                        second_future.result(),
+                    )
+                )
+
+            self.assertEqual(["memory_revision_conflict", "ok"], results)
+            final = path.read_text(encoding="utf-8")
+            self.assertIn(final, {
+                "initial\n§\nfirst writer",
+                "initial\n§\nsecond writer",
+            })

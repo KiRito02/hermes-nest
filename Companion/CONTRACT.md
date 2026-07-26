@@ -166,6 +166,7 @@ capability snapshot when Gateway is reachable, authorized, and compatible.
       "toolsets_proxy": true,
       "files": true,
       "uploads": true,
+      "upload_from_file": true,
       "memory": true
     },
     "endpoints": {
@@ -216,6 +217,14 @@ capability snapshot when Gateway is reachable, authorized, and compatible.
       "uploads": {
         "method": "POST",
         "path": "/companion/v1/uploads"
+      },
+      "upload_from_file": {
+        "method": "POST",
+        "path": "/companion/v1/uploads/from-file"
+      },
+      "upload_content": {
+        "method": "GET",
+        "path": "/companion/v1/uploads/{attachment_id}/content"
       },
       "memory": {
         "method": "GET",
@@ -330,19 +339,39 @@ second and final part is `file`. Companion streams into a mode-0600 sibling
 temporary file and publishes only after fsync through an atomic no-overwrite
 filesystem operation. Display MIME metadata is derived from the sanitized
 filename; the untrusted multipart `Content-Type` header is not authoritative.
+Published attachment storage uses a Companion-generated random name inside a
+hidden mode-0700 directory; the original display name remains metadata and the
+internal path is never returned to the App or file browser.
+
+`POST /companion/v1/uploads/from-file` stages an existing regular file from an
+authorized source alias directly on the host. Its exact JSON fields are
+`source_root_id`, `source_path`, `destination_root_id`,
+`destination_directory`, and `session_id`. The source still passes the same
+root, traversal, symlink, sensitive-path, regular-file, and 50 MiB checks, and
+the destination must be writable. The App offers only attachable destinations
+for chat. This avoids a host file
+making a round trip through the iPhone.
 
 Limits are 50 MiB per file, 10 pending files per device/session, and 200 MiB
 pending bytes per device/session. A successful `201` returns an opaque upload
 `id`; Runs accept those IDs only through the Companion-only `attachment_ids`
 field. Companion resolves Agent-working-directory-relative paths server-side
 and removes `attachment_ids` before forwarding to Gateway. Absolute paths
-never reach the App or user-visible history.
+and randomized internal storage paths never reach the App or user-visible
+history. A pending attachment is claimed before Gateway start, so concurrent
+Runs cannot submit the same attachment twice.
 
 `GET /companion/v1/uploads?session_id=...` restores the device's pending
 queue. `DELETE /companion/v1/uploads/{attachment_id}` removes only an
 unconsumed file whose device/inode identity still matches the file Companion
 published. If the file was already removed directly on the host, deletion
 clears the stale pending record without touching another path.
+Consumed attachment metadata added to authoritative session history includes
+only the display metadata and an opaque authenticated `download_path`.
+`GET /companion/v1/uploads/{attachment_id}/content` serves that consumed file
+only while its published device/inode identity still matches; randomized
+storage paths remain private. This supplies historical image/audio previews
+without exposing host paths.
 
 ## Built-in Memory
 
@@ -362,6 +391,8 @@ publish through fsync plus atomic replacement. A stale revision returns
 
 `POST /companion/v1/memory/{target}/reset` requires the current revision and
 the exact confirmation `RESET MEMORY` or `RESET USER`.
+Memory files and their sibling lock files are opened without following
+symbolic links and must remain regular files.
 
 ## Gateway-compatible sessions
 

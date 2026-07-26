@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import stat
 import tempfile
 from typing import Iterator
 
@@ -223,16 +224,33 @@ class MemoryAccess:
 
     @staticmethod
     def _read_raw(path: Path) -> str:
-        if not path.exists():
-            return ""
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
         try:
-            return path.read_text(encoding="utf-8")
+            descriptor = os.open(path, flags)
+        except FileNotFoundError:
+            return ""
+        except OSError as error:
+            raise MemoryError(
+                409,
+                "memory_unreadable",
+                "The built-in Memory file could not be read safely.",
+            ) from error
+        try:
+            metadata = os.fstat(descriptor)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise OSError("Memory target is not a regular file")
+            with os.fdopen(descriptor, "r", encoding="utf-8") as handle:
+                descriptor = -1
+                return handle.read()
         except (OSError, UnicodeDecodeError) as error:
             raise MemoryError(
                 409,
                 "memory_unreadable",
                 "The built-in Memory file could not be read safely.",
             ) from error
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
 
     def _snapshot(self, target: str, raw: str) -> MemorySnapshot:
         entries = tuple(
@@ -316,8 +334,18 @@ class MemoryAccess:
     @contextmanager
     def _file_lock(path: Path) -> Iterator[None]:
         lock_path = path.with_suffix(path.suffix + ".lock")
-        lock_path.parent.mkdir(parents=True, exist_ok=True)
-        with lock_path.open("a+", encoding="utf-8") as handle:
+        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            descriptor = os.open(lock_path, flags, 0o600)
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise OSError("Memory lock is not a regular file")
+        except OSError as error:
+            raise MemoryError(
+                409,
+                "memory_lock_unsafe",
+                "The built-in Memory lock could not be opened safely.",
+            ) from error
+        with os.fdopen(descriptor, "a+", encoding="utf-8") as handle:
             if fcntl is not None:
                 fcntl.flock(handle, fcntl.LOCK_EX)
             try:

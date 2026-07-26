@@ -429,6 +429,7 @@ The Companion first release supports:
 - paged directory browsing under those roots;
 - bounded text/binary metadata preview and authenticated download;
 - streaming upload to a selected allowed destination;
+- server-side staging of an existing file from an allowed root;
 - upload progress, cancellation, collision handling, and stable metadata;
 - making a completed upload available to a subsequent Hermes turn without
   pretending the Gateway supports `file`, `input_file`, or `file_id`.
@@ -441,6 +442,8 @@ mutation, shell access, or Git mutation.
 Uploads stream into a sibling temporary file, enforce 50 MiB per file,
 10 pending files per device/session, and 200 MiB pending bytes per
 device/session, then atomically publish without overwriting only after success.
+Published attachments use randomized internal storage names that are never
+returned to the App or normal file browser.
 The Companion-only
 `attachment_ids` field is resolved to Agent-working-directory-relative paths
 server-side and stripped before Gateway forwarding. Roots outside the

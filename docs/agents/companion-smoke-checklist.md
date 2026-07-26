@@ -96,6 +96,8 @@ Green:
 - upload streams with progress and cancellation;
 - failure/cancel leaves no published partial file;
 - success is atomic and collision behavior matches the contract;
+- an existing authorized host file stages server-side without a phone
+  download/upload round trip;
 - the verified upload-to-turn strategy makes the file available to Hermes.
 
 ## Step 6 — built-in Memory

@@ -480,6 +480,7 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
                     "features": {
                       "files": true,
                       "uploads": true,
+                      "upload_from_file": true,
                       "memory": true
                     },
                     "endpoints": {
@@ -490,6 +491,10 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
                       "uploads": {
                         "method": "POST",
                         "path": "/companion/v1/uploads"
+                      },
+                      "upload_from_file": {
+                        "method": "POST",
+                        "path": "/companion/v1/uploads/from-file"
                       },
                       "memory": {
                         "method": "GET",
@@ -512,6 +517,7 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
 
         XCTAssertTrue(capabilities.supportsFiles)
         XCTAssertTrue(capabilities.supportsUploads)
+        XCTAssertTrue(capabilities.supportsServerFileAttachments)
         XCTAssertTrue(capabilities.supportsBuiltInMemory)
     }
 
@@ -913,6 +919,10 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
             keychain: keychain,
             session: session
         )
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try Data("hello".utf8).write(to: fileURL)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
 
         let upload = try await service.upload(
             sessionID: "session-1",
@@ -922,10 +932,105 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
             ),
             filename: "notes.txt",
             contentType: "text/plain",
-            data: Data("hello".utf8)
+            fileURL: fileURL
         )
 
         XCTAssertEqual("attachment-1", upload.id)
+    }
+
+    func testWorkspaceStagesAuthorizedServerFileWithoutDownloadingIt() async throws {
+        let keychain = InMemoryKeychainStore()
+        try keychain.save(
+            "device-credential",
+            forKey: .companionDeviceCredential
+        )
+        let session = makeSession { request in
+            XCTAssertEqual(
+                "/companion/v1/uploads/from-file",
+                request.url?.path
+            )
+            XCTAssertEqual("POST", request.httpMethod)
+            let body = try JSONSerialization.jsonObject(
+                with: try XCTUnwrap(apiTestBodyData(from: request))
+            ) as? [String: String]
+            XCTAssertEqual("projects", body?["source_root_id"])
+            XCTAssertEqual("reports/summary.txt", body?["source_path"])
+            XCTAssertEqual("incoming", body?["destination_directory"])
+            XCTAssertEqual("session-1", body?["session_id"])
+            return (
+                self.httpResponse(for: request, status: 201),
+                Data(
+                    """
+                    {
+                      "upload": {
+                        "id": "attachment-server-1",
+                        "root_id": "projects",
+                        "name": "summary.txt",
+                        "size": 5,
+                        "content_type": "text/plain",
+                        "state": "ready"
+                      }
+                    }
+                    """.utf8
+                )
+            )
+        }
+        let service = CompanionWorkspaceService(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            keychain: keychain,
+            session: session
+        )
+
+        let upload = try await service.stageServerFile(
+            sessionID: "session-1",
+            sourceRootID: "projects",
+            sourcePath: "reports/summary.txt",
+            destination: CompanionUploadDestination(
+                rootID: "projects",
+                directory: "incoming"
+            )
+        )
+
+        XCTAssertEqual("attachment-server-1", upload.id)
+        XCTAssertNil(upload.path)
+    }
+
+    func testWorkspaceDownloadsConsumedAttachmentFromOpaqueContractPath() async throws {
+        let keychain = InMemoryKeychainStore()
+        try keychain.save(
+            "device-credential",
+            forKey: .companionDeviceCredential
+        )
+        let session = makeSession { request in
+            XCTAssertEqual(
+                "/companion/v1/uploads/attachment-1/content",
+                request.url?.path
+            )
+            XCTAssertEqual("GET", request.httpMethod)
+            XCTAssertEqual(
+                "Bearer device-credential",
+                request.value(forHTTPHeaderField: "Authorization")
+            )
+            return (
+                self.httpResponse(for: request, status: 200),
+                Data("image bytes".utf8)
+            )
+        }
+        let service = CompanionWorkspaceService(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            keychain: keychain,
+            session: session
+        )
+
+        let data = try await service.downloadAttachment(
+            path: "/companion/v1/uploads/attachment-1/content"
+        )
+
+        XCTAssertEqual(Data("image bytes".utf8), data)
     }
 
     func testWorkspacePendingUploadsUseAuthenticatedSessionQuery() async throws {

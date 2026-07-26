@@ -105,6 +105,14 @@ struct CompanionCapabilities: Codable, Equatable, Sendable {
                 == "/companion/v1/uploads"
     }
 
+    var supportsServerFileAttachments: Bool {
+        supportsUploads
+            && companion?.features?["upload_from_file"] == .bool(true)
+            && companion?.endpoints?["upload_from_file"]?.method == "POST"
+            && companion?.endpoints?["upload_from_file"]?.path
+                == "/companion/v1/uploads/from-file"
+    }
+
     var supportsBuiltInMemory: Bool {
         companion?.features?["memory"] == .bool(true)
             && companion?.endpoints?["memory"]?.method == "GET"

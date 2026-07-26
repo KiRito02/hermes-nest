@@ -3,6 +3,7 @@ import Foundation
 struct MessageAttachment: Codable, Equatable, Sendable {
     let name: String?
     let path: String?
+    let downloadPath: String?
     let mime: String?
     let size: Int?
     let isImage: Bool?
@@ -10,12 +11,14 @@ struct MessageAttachment: Codable, Equatable, Sendable {
     init(
         name: String? = nil,
         path: String? = nil,
+        downloadPath: String? = nil,
         mime: String? = nil,
         size: Int? = nil,
         isImage: Bool? = nil
     ) {
         self.name = name
         self.path = path
+        self.downloadPath = downloadPath
         self.mime = mime
         self.size = size
         self.isImage = isImage
@@ -30,6 +33,7 @@ struct MessageAttachment: Codable, Equatable, Sendable {
         if let bareName = try? decoder.singleValueContainer().decode(String.self) {
             self.name = bareName
             self.path = nil
+            self.downloadPath = nil
             self.mime = nil
             self.size = nil
             self.isImage = nil
@@ -40,6 +44,9 @@ struct MessageAttachment: Codable, Equatable, Sendable {
         self.name = container.decodeLossyStringIfPresent(forKey: .name)
             ?? container.decodeLossyStringIfPresent(forKey: .filename)
         self.path = container.decodeLossyStringIfPresent(forKey: .path)
+        self.downloadPath = container.decodeLossyStringIfPresent(
+            forKey: .downloadPath
+        )
         self.mime = container.decodeLossyStringIfPresent(forKey: .mime)
         self.size = container.decodeLossyIntIfPresent(forKey: .size)
         self.isImage = container.decodeLossyBoolIfPresent(forKey: .isImage)
@@ -49,6 +56,7 @@ struct MessageAttachment: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(name, forKey: .name)
         try container.encodeIfPresent(path, forKey: .path)
+        try container.encodeIfPresent(downloadPath, forKey: .downloadPath)
         try container.encodeIfPresent(mime, forKey: .mime)
         try container.encodeIfPresent(size, forKey: .size)
         try container.encodeIfPresent(isImage, forKey: .isImage)
@@ -58,6 +66,7 @@ struct MessageAttachment: Codable, Equatable, Sendable {
         case name
         case filename
         case path
+        case downloadPath
         case mime
         case size
         case isImage

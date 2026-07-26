@@ -29,6 +29,7 @@ _SENSITIVE_ENTRY_NAMES = frozenset(
 )
 _SENSITIVE_DIRECTORY_NAMES = frozenset(
     {
+        ".hermes-nest-attachments",
         ".aws",
         ".gnupg",
         ".hermes",
@@ -41,6 +42,7 @@ MAX_DIRECTORY_PAGE_SIZE = 200
 MAX_PREVIEW_BYTES = 256 * 1024
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 _UPLOAD_TEMP_PREFIX = ".hermes-nest-upload-"
+_ATTACHMENT_DIRECTORY_NAME = ".hermes-nest-attachments"
 
 
 def content_type_for_filename(filename: str) -> str:
@@ -55,6 +57,22 @@ def _is_sensitive_entry(path: Path) -> bool:
         or
         lowered in _SENSITIVE_ENTRY_NAMES
         or lowered in _SENSITIVE_DIRECTORY_NAMES
+    )
+
+
+def _has_sensitive_component(
+    path: Path,
+    *,
+    allow_attachment_storage: bool = False,
+) -> bool:
+    return any(
+        _is_sensitive_entry(Path(part))
+        and not (
+            allow_attachment_storage
+            and part.casefold() == _ATTACHMENT_DIRECTORY_NAME
+        )
+        for part in path.parts
+        if part not in {"", "."}
     )
 
 
@@ -78,13 +96,49 @@ class WorkspaceUpload:
         self.root_id = root_id
         self.name = filename
         relative_directory = directory.relative_to(root_path)
+        safe_suffix = Path(filename).suffix
+        if (
+            len(safe_suffix) > 16
+            or re.fullmatch(r"\.[A-Za-z0-9]+", safe_suffix) is None
+        ):
+            safe_suffix = ""
+        self._storage_name = f"{uuid4().hex}{safe_suffix.lower()}"
         self.relative_path = (
-            relative_directory / filename
+            relative_directory
+            / _ATTACHMENT_DIRECTORY_NAME
+            / self._storage_name
         ).as_posix()
         flags = os.O_RDONLY
         flags |= getattr(os, "O_DIRECTORY", 0)
         flags |= getattr(os, "O_NOFOLLOW", 0)
-        self._directory_fd = os.open(directory, flags)
+        selected_directory_fd = os.open(directory, flags)
+        try:
+            try:
+                os.mkdir(
+                    _ATTACHMENT_DIRECTORY_NAME,
+                    0o700,
+                    dir_fd=selected_directory_fd,
+                )
+            except FileExistsError:
+                pass
+            attachment_metadata = os.stat(
+                _ATTACHMENT_DIRECTORY_NAME,
+                dir_fd=selected_directory_fd,
+                follow_symlinks=False,
+            )
+            if not stat.S_ISDIR(attachment_metadata.st_mode):
+                raise WorkspaceError(
+                    409,
+                    "attachment_storage_unsafe",
+                    "The attachment storage directory is not safe.",
+                )
+            self._directory_fd = os.open(
+                _ATTACHMENT_DIRECTORY_NAME,
+                flags,
+                dir_fd=selected_directory_fd,
+            )
+        finally:
+            os.close(selected_directory_fd)
         self._temp_name = f"{_UPLOAD_TEMP_PREFIX}{uuid4().hex}.part"
         self._file: BinaryIO | None = None
         self._published = False
@@ -92,7 +146,11 @@ class WorkspaceUpload:
         self.published_inode: int | None = None
         try:
             try:
-                os.stat(filename, dir_fd=self._directory_fd, follow_symlinks=False)
+                os.stat(
+                    self._storage_name,
+                    dir_fd=self._directory_fd,
+                    follow_symlinks=False,
+                )
             except FileNotFoundError:
                 pass
             else:
@@ -129,7 +187,7 @@ class WorkspaceUpload:
         try:
             os.link(
                 self._temp_name,
-                self.name,
+                self._storage_name,
                 src_dir_fd=self._directory_fd,
                 dst_dir_fd=self._directory_fd,
                 follow_symlinks=False,
@@ -142,7 +200,7 @@ class WorkspaceUpload:
             ) from None
         os.unlink(self._temp_name, dir_fd=self._directory_fd)
         metadata = os.stat(
-            self.name,
+            self._storage_name,
             dir_fd=self._directory_fd,
             follow_symlinks=False,
         )
@@ -200,6 +258,8 @@ class WorkspaceAccess:
                 f"at most {MAX_WORKSPACE_ROOTS} workspace roots may be configured"
             )
         seen_ids: set[str] = set()
+        canonical_roots: list[WorkspaceRoot] = []
+        root_identities: dict[str, tuple[int, int]] = {}
         for root in configured_roots:
             if not _ROOT_ID_PATTERN.fullmatch(root.id):
                 raise ValueError("workspace root IDs must be safe lowercase aliases")
@@ -217,7 +277,18 @@ class WorkspaceAccess:
             canonical_root = root.path.resolve(strict=True)
             if not canonical_root.is_dir():
                 raise ValueError("workspace root paths must be existing directories")
-        self._roots = configured_roots
+            metadata = canonical_root.stat()
+            canonical_roots.append(
+                WorkspaceRoot(
+                    id=root.id,
+                    name=root.name,
+                    path=canonical_root,
+                    writable=root.writable,
+                )
+            )
+            root_identities[root.id] = (metadata.st_dev, metadata.st_ino)
+        self._roots = tuple(canonical_roots)
+        self._root_identities = root_identities
         self._agent_working_directory = (
             agent_working_directory.resolve(strict=True)
             if agent_working_directory is not None
@@ -284,7 +355,7 @@ class WorkspaceAccess:
     def public_roots(self) -> list[dict[str, object]]:
         payloads = []
         for root in self._roots:
-            root_path = root.path.resolve(strict=True)
+            root_path = self._validated_root_path(root)
             attachable = False
             if self._agent_working_directory is not None:
                 attachable = (
@@ -293,6 +364,24 @@ class WorkspaceAccess:
                 )
             payloads.append(root.public_payload(attachable=attachable))
         return payloads
+
+    def _validated_root_path(self, root: WorkspaceRoot) -> Path:
+        try:
+            root_path = root.path.resolve(strict=True)
+            metadata = root_path.stat()
+        except OSError as error:
+            raise WorkspaceError(
+                409,
+                "workspace_root_changed",
+                "The authorized workspace root is no longer available.",
+            ) from error
+        if (metadata.st_dev, metadata.st_ino) != self._root_identities[root.id]:
+            raise WorkspaceError(
+                409,
+                "workspace_root_changed",
+                "The authorized workspace root changed after Companion started.",
+            )
+        return root_path
 
     def agent_reference(self, root_id: str, relative_path: str) -> str:
         if self._agent_working_directory is None:
@@ -308,15 +397,14 @@ class WorkspaceAccess:
                 "workspace_root_not_found",
                 "The requested workspace root is not authorized.",
             )
-        root_path = root.path.resolve(strict=True)
+        root_path = self._validated_root_path(root)
         requested = Path(relative_path)
         if (
             not relative_path
             or requested.is_absolute()
-            or any(
-                _is_sensitive_entry(Path(part))
-                for part in requested.parts
-                if part not in {"", "."}
+            or _has_sensitive_component(
+                requested,
+                allow_attachment_storage=True,
             )
         ):
             raise WorkspaceError(
@@ -359,16 +447,12 @@ class WorkspaceAccess:
                 "workspace_root_not_found",
                 "The requested workspace root is not authorized.",
             )
-        root_path = root.path.resolve(strict=True)
+        root_path = self._validated_root_path(root)
         requested = Path(relative_path)
         if (
             not relative_path
             or requested.is_absolute()
-            or any(
-                _is_sensitive_entry(Path(part))
-                for part in requested.parts
-                if part not in {"", "."}
-            )
+            or _has_sensitive_component(requested)
         ):
             raise WorkspaceError(
                 403,
@@ -417,16 +501,12 @@ class WorkspaceAccess:
                 "workspace_root_not_found",
                 "The requested workspace root is not authorized.",
             )
-        root_path = root.path.resolve(strict=True)
+        root_path = self._validated_root_path(root)
         requested = Path(relative_path)
         if (
             not relative_path
             or requested.is_absolute()
-            or any(
-                _is_sensitive_entry(Path(part))
-                for part in requested.parts
-                if part not in {"", "."}
-            )
+            or _has_sensitive_component(requested)
         ):
             raise WorkspaceError(
                 403,
@@ -481,7 +561,7 @@ class WorkspaceAccess:
                 "invalid_upload_filename",
                 "The upload filename is not allowed.",
             )
-        root_path = root.path.resolve(strict=True)
+        root_path = self._validated_root_path(root)
         requested = Path(relative_directory)
         if requested.is_absolute() or any(
             _is_sensitive_entry(Path(part))
@@ -528,15 +608,14 @@ class WorkspaceAccess:
                 "workspace_path_forbidden",
                 "The pending attachment path is no longer authorized.",
             )
-        root_path = root.path.resolve(strict=True)
+        root_path = self._validated_root_path(root)
         requested = Path(relative_path)
         if (
             not relative_path
             or requested.is_absolute()
-            or any(
-                _is_sensitive_entry(Path(part))
-                for part in requested.parts
-                if part not in {"", "."}
+            or _has_sensitive_component(
+                requested,
+                allow_attachment_storage=True,
             )
         ):
             raise WorkspaceError(
@@ -570,6 +649,64 @@ class WorkspaceAccess:
             )
         path.unlink()
 
+    def uploaded_file(
+        self,
+        root_id: str,
+        relative_path: str,
+        *,
+        expected_device: int | None,
+        expected_inode: int | None,
+    ) -> Path:
+        root = next((root for root in self._roots if root.id == root_id), None)
+        if root is None:
+            raise WorkspaceError(
+                404,
+                "workspace_root_not_found",
+                "The attachment root is no longer authorized.",
+            )
+        root_path = self._validated_root_path(root)
+        requested = Path(relative_path)
+        if (
+            not relative_path
+            or requested.is_absolute()
+            or _has_sensitive_component(
+                requested,
+                allow_attachment_storage=True,
+            )
+        ):
+            raise WorkspaceError(
+                403,
+                "workspace_path_forbidden",
+                "The attachment path is no longer authorized.",
+            )
+        try:
+            path = (root_path / requested).resolve(strict=True)
+        except FileNotFoundError:
+            raise WorkspaceError(
+                404,
+                "attachment_file_not_found",
+                "The attachment file is no longer available.",
+            ) from None
+        metadata = path.stat()
+        if root_path not in path.parents or not stat.S_ISREG(metadata.st_mode):
+            raise WorkspaceError(
+                403,
+                "workspace_path_forbidden",
+                "The attachment path is no longer authorized.",
+            )
+        if (
+            expected_device is None
+            or expected_inode is None
+            or metadata.st_dev != expected_device
+            or metadata.st_ino != expected_inode
+        ):
+            raise WorkspaceError(
+                409,
+                "attachment_file_changed",
+                "The attachment file changed after publication.",
+            )
+        return path
+
     def list_directory(
         self,
         root_id: str,
@@ -585,7 +722,7 @@ class WorkspaceAccess:
                 "workspace_root_not_found",
                 "The requested workspace root is not authorized.",
             )
-        root_path = root.path.resolve(strict=True)
+        root_path = self._validated_root_path(root)
         requested = Path(relative_path)
         if requested.is_absolute() or any(
             _is_sensitive_entry(Path(part))

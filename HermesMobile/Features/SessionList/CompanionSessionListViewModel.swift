@@ -327,7 +327,7 @@ struct ConversationRunDeltaBuffer: Equatable {
 }
 
 private struct FailedAttachmentUpload: Sendable {
-    let data: Data
+    let fileURL: URL
     let filename: String
     let contentType: String
     let destination: CompanionUploadDestination
@@ -477,7 +477,7 @@ final class CompanionSessionHistoryViewModel {
     }
 
     func uploadAttachment(
-        data: Data,
+        fileURL: URL,
         filename: String,
         contentType: String,
         destination: CompanionUploadDestination,
@@ -506,7 +506,7 @@ final class CompanionSessionHistoryViewModel {
                 destination: destination,
                 filename: filename,
                 contentType: contentType,
-                data: data,
+                fileURL: fileURL,
                 progress: { [weak self] progress in
                     Task { @MainActor in
                         self?.attachmentUploadProgress = progress
@@ -514,16 +514,29 @@ final class CompanionSessionHistoryViewModel {
                 }
             )
             pendingUploads.append(upload)
+            try? FileManager.default.removeItem(at: fileURL)
             return true
         } catch {
-            guard !(error is CancellationError) else { return false }
+            guard !(error is CancellationError) else {
+                try? FileManager.default.removeItem(at: fileURL)
+                return false
+            }
             if rememberFailure {
+                if let previous = failedAttachmentUpload,
+                   previous.fileURL != fileURL {
+                    try? FileManager.default.removeItem(
+                        at: previous.fileURL
+                    )
+                }
                 failedAttachmentUpload = FailedAttachmentUpload(
-                    data: data,
+                    fileURL: fileURL,
                     filename: filename,
                     contentType: contentType,
                     destination: destination
                 )
+            }
+            if !rememberFailure {
+                try? FileManager.default.removeItem(at: fileURL)
             }
             attachmentErrorMessage = error.localizedDescription
             return false
@@ -537,7 +550,7 @@ final class CompanionSessionHistoryViewModel {
     func retryAttachmentUpload() async {
         guard let failedAttachmentUpload else { return }
         let succeeded = await uploadAttachment(
-            data: failedAttachmentUpload.data,
+            fileURL: failedAttachmentUpload.fileURL,
             filename: failedAttachmentUpload.filename,
             contentType: failedAttachmentUpload.contentType,
             destination: failedAttachmentUpload.destination,
@@ -549,8 +562,48 @@ final class CompanionSessionHistoryViewModel {
     }
 
     func prepareAttachmentSelection() {
+        if let failedAttachmentUpload {
+            try? FileManager.default.removeItem(
+                at: failedAttachmentUpload.fileURL
+            )
+        }
         failedAttachmentUpload = nil
         attachmentErrorMessage = nil
+    }
+
+    func stageServerFile(
+        sourceRootID: String,
+        sourcePath: String,
+        destination: CompanionUploadDestination
+    ) async -> Bool {
+        guard
+            let sessionID = session.sessionId,
+            pendingUploads.count < 10,
+            !isUploadingAttachment
+        else {
+            attachmentErrorMessage = String(
+                localized: "A turn can include at most 10 attachments."
+            )
+            return false
+        }
+        isUploadingAttachment = true
+        attachmentUploadProgress = nil
+        attachmentErrorMessage = nil
+        defer { isUploadingAttachment = false }
+        do {
+            let upload = try await workspaceService.stageServerFile(
+                sessionID: sessionID,
+                sourceRootID: sourceRootID,
+                sourcePath: sourcePath,
+                destination: destination
+            )
+            pendingUploads.append(upload)
+            return true
+        } catch {
+            guard !(error is CancellationError) else { return false }
+            attachmentErrorMessage = error.localizedDescription
+            return false
+        }
     }
 
     func restorePendingUploads() async {

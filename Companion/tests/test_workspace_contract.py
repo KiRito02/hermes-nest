@@ -315,6 +315,39 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(200, response.status)
             self.assertEqual([], (await response.json())["entries"])
 
+    async def test_configured_root_symlink_cannot_be_retargeted_after_startup(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as directory:
+            container = Path(directory)
+            first = container / "first"
+            second = container / "second"
+            first.mkdir()
+            second.mkdir()
+            (first / "allowed.txt").write_text("allowed", encoding="utf-8")
+            (second / "secret.txt").write_text("secret", encoding="utf-8")
+            configured = container / "configured"
+            configured.symlink_to(first, target_is_directory=True)
+            workspace = WorkspaceAccess(
+                [
+                    WorkspaceRoot(
+                        id="projects",
+                        name="Projects",
+                        path=configured,
+                    )
+                ]
+            )
+            configured.unlink()
+            configured.symlink_to(second, target_is_directory=True)
+
+            listing = workspace.list_directory("projects")
+
+            self.assertEqual(
+                ["allowed.txt"],
+                [entry["name"] for entry in listing["entries"]],
+            )
+            self.assertNotIn("secret", repr(listing))
+
     async def test_sensitive_directory_cannot_be_opened_by_known_path(self) -> None:
         await self.client.close()
         with TemporaryDirectory() as directory:
@@ -724,7 +757,6 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 {
                     "root_id": "projects",
-                    "path": "incoming/notes.txt",
                     "name": "notes.txt",
                     "size": 13,
                     "content_type": "text/plain",
@@ -734,7 +766,6 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
                     key: body["upload"][key]
                     for key in (
                         "root_id",
-                        "path",
                         "name",
                         "size",
                         "content_type",
@@ -743,9 +774,19 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
                 },
             )
             self.assertTrue(body["upload"]["id"])
-            self.assertEqual(b"hello upload\n", (destination / "notes.txt").read_bytes())
+            self.assertNotIn("path", body["upload"])
+            device_id = self.registry.authenticate(
+                self.credential
+            ).id
+            record = self.registry.list_ready_attachments(
+                device_id=device_id,
+                session_id="session-upload",
+            )[0]
+            stored = host_path / record.relative_path
+            self.assertEqual(b"hello upload\n", stored.read_bytes())
+            self.assertNotEqual("notes.txt", stored.name)
             self.assertEqual(
-                ["notes.txt"],
+                [".hermes-nest-attachments"],
                 [path.name for path in destination.iterdir()],
             )
 
@@ -764,13 +805,171 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
                 headers={"Authorization": f"Bearer {self.credential}"},
             )
             self.assertEqual(204, removed.status)
-            self.assertFalse((destination / "notes.txt").exists())
+            self.assertFalse(stored.exists())
             empty = await self.client.get(
                 "/companion/v1/uploads",
                 params={"session_id": "session-upload"},
                 headers={"Authorization": f"Bearer {self.credential}"},
             )
             self.assertEqual([], (await empty.json())["uploads"])
+
+    async def test_authorized_server_file_can_be_staged_for_a_turn(self) -> None:
+        await self.client.close()
+        with TemporaryDirectory() as directory:
+            self.registry = DeviceRegistry(":memory:")
+            secret = self.registry.create_pairing_secret(300)
+            self.credential = self.registry.claim_pairing_secret(
+                secret,
+                "Workspace Test Device",
+            ).credential
+            host_path = Path(directory) / "agent"
+            source_directory = host_path / "reports"
+            destination = host_path / "incoming"
+            source_directory.mkdir(parents=True)
+            destination.mkdir()
+            (source_directory / "summary.txt").write_text(
+                "server-side report",
+                encoding="utf-8",
+            )
+            workspace = WorkspaceAccess(
+                [
+                    WorkspaceRoot(
+                        id="agent",
+                        name="Agent files",
+                        path=host_path,
+                        writable=True,
+                    )
+                ],
+                agent_working_directory=host_path,
+            )
+            self.client = TestClient(
+                TestServer(create_app(self.registry, workspace=workspace))
+            )
+            await self.client.start_server()
+
+            response = await self.client.post(
+                "/companion/v1/uploads/from-file",
+                json={
+                    "source_root_id": "agent",
+                    "source_path": "reports/summary.txt",
+                    "destination_root_id": "agent",
+                    "destination_directory": "incoming",
+                    "session_id": "session-server-file",
+                },
+                headers={"Authorization": f"Bearer {self.credential}"},
+            )
+
+            self.assertEqual(201, response.status)
+            body = await response.json()
+            self.assertEqual("summary.txt", body["upload"]["name"])
+            self.assertEqual(18, body["upload"]["size"])
+            self.assertEqual("ready", body["upload"]["state"])
+            self.assertNotIn("path", body["upload"])
+            device_id = self.registry.authenticate(self.credential).id
+            record = self.registry.list_ready_attachments(
+                device_id=device_id,
+                session_id="session-server-file",
+            )[0]
+            staged = host_path / record.relative_path
+            self.assertEqual(b"server-side report", staged.read_bytes())
+            self.assertNotEqual("summary.txt", staged.name)
+
+    async def test_server_file_staging_requires_an_authorized_regular_file(
+        self,
+    ) -> None:
+        response = await self.client.post(
+            "/companion/v1/uploads/from-file",
+            json={
+                "source_root_id": "missing",
+                "source_path": "../secret.txt",
+                "destination_root_id": "missing",
+                "destination_directory": "",
+                "session_id": "session-server-file",
+            },
+            headers={"Authorization": f"Bearer {self.credential}"},
+        )
+
+        self.assertEqual(404, response.status)
+        self.assertEqual(
+            "workspace_root_not_found",
+            (await response.json())["error"]["code"],
+        )
+
+    async def test_server_file_staging_accepts_50_mib_and_rejects_one_more_byte(
+        self,
+    ) -> None:
+        await self.client.close()
+        with TemporaryDirectory() as directory:
+            self.registry = DeviceRegistry(":memory:")
+            secret = self.registry.create_pairing_secret(300)
+            self.credential = self.registry.claim_pairing_secret(
+                secret,
+                "Workspace Test Device",
+            ).credential
+            host_path = Path(directory)
+            exact = host_path / "exact.bin"
+            with exact.open("wb") as handle:
+                handle.truncate(50 * 1024 * 1024)
+            workspace = WorkspaceAccess(
+                [
+                    WorkspaceRoot(
+                        id="agent",
+                        name="Agent files",
+                        path=host_path,
+                        writable=True,
+                    )
+                ],
+                agent_working_directory=host_path,
+            )
+            self.client = TestClient(
+                TestServer(create_app(self.registry, workspace=workspace))
+            )
+            await self.client.start_server()
+
+            exact_response = await self.client.post(
+                "/companion/v1/uploads/from-file",
+                json={
+                    "source_root_id": "agent",
+                    "source_path": "exact.bin",
+                    "destination_root_id": "agent",
+                    "destination_directory": "",
+                    "session_id": "session-server-file",
+                },
+                headers={"Authorization": f"Bearer {self.credential}"},
+            )
+
+            self.assertEqual(201, exact_response.status)
+            self.assertEqual(
+                50 * 1024 * 1024,
+                (await exact_response.json())["upload"]["size"],
+            )
+            oversized = host_path / "oversized.bin"
+            with oversized.open("wb") as handle:
+                handle.truncate(50 * 1024 * 1024 + 1)
+            response = await self.client.post(
+                "/companion/v1/uploads/from-file",
+                json={
+                    "source_root_id": "agent",
+                    "source_path": "oversized.bin",
+                    "destination_root_id": "agent",
+                    "destination_directory": "",
+                    "session_id": "session-server-file-overflow",
+                },
+                headers={"Authorization": f"Bearer {self.credential}"},
+            )
+
+            self.assertEqual(413, response.status)
+            self.assertEqual(
+                "upload_too_large",
+                (await response.json())["error"]["code"],
+            )
+            self.assertEqual(
+                [],
+                self.registry.list_ready_attachments(
+                    device_id=self.registry.authenticate(self.credential).id,
+                    session_id="session-server-file-overflow",
+                ),
+            )
 
     async def test_upload_content_type_is_derived_from_filename_not_client_header(
         self,
@@ -880,7 +1079,14 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
                 headers=headers,
             )
             upload_id = (await uploaded.json())["upload"]["id"]
-            (host_path / "notes.txt").unlink()
+            device_id = self.registry.authenticate(
+                self.credential
+            ).id
+            record = self.registry.ready_attachment_for_device(
+                device_id=device_id,
+                attachment_id=upload_id,
+            )
+            (host_path / record.relative_path).unlink()
 
             removed = await self.client.delete(
                 f"/companion/v1/uploads/{upload_id}",
@@ -917,7 +1123,8 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
             )
             try:
                 upload.write(b"uploaded")
-                (root_path / "notes.txt").write_bytes(b"existing")
+                stored = root_path / upload.relative_path
+                stored.write_bytes(b"existing")
 
                 with self.assertRaisesRegex(
                     WorkspaceError,
@@ -929,11 +1136,11 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(
                 b"existing",
-                (root_path / "notes.txt").read_bytes(),
+                stored.read_bytes(),
             )
             self.assertEqual(
-                ["notes.txt"],
-                [path.name for path in root_path.iterdir()],
+                [stored.name],
+                [path.name for path in stored.parent.iterdir()],
             )
 
     async def test_interrupted_upload_removes_partial_file_and_temp_entry(
@@ -960,7 +1167,9 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
             upload.write(b"partial bytes")
             upload.abort()
 
-            self.assertEqual([], list(root_path.iterdir()))
+            staging = root_path / ".hermes-nest-attachments"
+            self.assertTrue(staging.is_dir())
+            self.assertEqual([], list(staging.iterdir()))
 
     async def test_pending_attachment_queue_is_limited_to_ten_files_per_session(
         self,
@@ -1114,9 +1323,17 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
                 headers=headers,
             )
             upload_id = (await uploaded.json())["upload"]["id"]
+            device_id = self.registry.authenticate(
+                self.credential
+            ).id
+            record = self.registry.ready_attachment_for_device(
+                device_id=device_id,
+                attachment_id=upload_id,
+            )
+            stored = host_path / record.relative_path
             replacement = host_path / "replacement.tmp"
             replacement.write_bytes(b"replacement")
-            replacement.replace(host_path / "notes.txt")
+            replacement.replace(stored)
 
             removed = await self.client.delete(
                 f"/companion/v1/uploads/{upload_id}",
@@ -1128,7 +1345,7 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
                 "attachment_file_changed",
                 (await removed.json())["error"]["code"],
             )
-            self.assertEqual(b"replacement", (host_path / "notes.txt").read_bytes())
+            self.assertEqual(b"replacement", stored.read_bytes())
             pending = await self.client.get(
                 "/companion/v1/uploads",
                 params={"session_id": "session-replaced"},

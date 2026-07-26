@@ -228,7 +228,9 @@ class SessionLifecycleProxyContractTests(unittest.IsolatedAsyncioTestCase):
             [
                 {
                     "name": "notes.txt",
-                    "path": "incoming/notes.txt",
+                    "download_path": (
+                        f"/companion/v1/uploads/{attachment_id}/content"
+                    ),
                     "mime": "text/plain",
                     "size": 12,
                     "is_image": False,

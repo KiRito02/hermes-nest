@@ -405,6 +405,7 @@ class DeviceRegistry:
                    file_device, file_inode
             FROM attachments
             WHERE device_id = ? AND session_id = ? AND state = 'ready'
+              AND run_claim IS NULL
             ORDER BY created_at, id
             LIMIT ?
             """,
@@ -437,6 +438,7 @@ class DeviceRegistry:
                    file_device, file_inode
             FROM attachments
             WHERE id = ? AND device_id = ? AND state = 'ready'
+              AND run_claim IS NULL
             """,
             (attachment_id, device_id),
         ).fetchone()
@@ -468,6 +470,7 @@ class DeviceRegistry:
             """
             DELETE FROM attachments
             WHERE id = ? AND device_id = ? AND state = 'ready'
+              AND run_claim IS NULL
             """,
             (attachment_id, device_id),
         )
@@ -497,6 +500,7 @@ class DeviceRegistry:
             WHERE device_id = ?
               AND session_id = ?
               AND state = 'ready'
+              AND run_claim IS NULL
               AND id IN ({placeholders})
             """,
             (device_id, session_id, *attachment_ids),
@@ -522,6 +526,125 @@ class DeviceRegistry:
                 "One or more attachments are missing, consumed, or owned by another device.",
             )
         return [records[attachment_id] for attachment_id in attachment_ids]
+
+    def claim_ready_attachments(
+        self,
+        *,
+        device_id: str,
+        session_id: str,
+        attachment_ids: list[str],
+    ) -> tuple[str, list[AttachmentRecord]]:
+        if not attachment_ids:
+            return "", []
+        claim = str(uuid4())
+        placeholders = ",".join("?" for _ in attachment_ids)
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            rows = self._connection.execute(
+                f"""
+                SELECT id, root_id, relative_path, name, content_type, size,
+                       state, file_device, file_inode
+                FROM attachments
+                WHERE device_id = ?
+                  AND session_id = ?
+                  AND state = 'ready'
+                  AND run_claim IS NULL
+                  AND id IN ({placeholders})
+                """,
+                (device_id, session_id, *attachment_ids),
+            ).fetchall()
+            records = {
+                row["id"]: AttachmentRecord(
+                    id=row["id"],
+                    root_id=row["root_id"],
+                    relative_path=row["relative_path"],
+                    name=row["name"],
+                    content_type=row["content_type"],
+                    size=row["size"],
+                    state=row["state"],
+                    file_device=row["file_device"],
+                    file_inode=row["file_inode"],
+                )
+                for row in rows
+            }
+            if len(records) != len(attachment_ids):
+                raise RegistryError(
+                    409,
+                    "attachment_not_ready",
+                    "One or more attachments are missing, consumed, claimed, or owned by another device.",
+                )
+            cursor = self._connection.execute(
+                f"""
+                UPDATE attachments
+                SET run_claim = ?
+                WHERE device_id = ?
+                  AND session_id = ?
+                  AND state = 'ready'
+                  AND run_claim IS NULL
+                  AND id IN ({placeholders})
+                """,
+                (claim, device_id, session_id, *attachment_ids),
+            )
+            if cursor.rowcount != len(attachment_ids):
+                raise RegistryError(
+                    409,
+                    "attachment_not_ready",
+                    "One or more attachments are no longer ready.",
+                )
+            self._connection.commit()
+            return claim, [records[value] for value in attachment_ids]
+        except Exception:
+            self._connection.rollback()
+            raise
+
+    def release_attachment_claim(self, claim: str) -> None:
+        if not claim:
+            return
+        self._connection.execute(
+            """
+            UPDATE attachments
+            SET run_claim = NULL
+            WHERE run_claim = ? AND state = 'ready'
+            """,
+            (claim,),
+        )
+        self._connection.commit()
+
+    def consume_attachment_claim(
+        self,
+        *,
+        claim: str,
+        run_id: str,
+        prompt_fingerprint: str,
+    ) -> None:
+        if not claim:
+            return
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            cursor = self._connection.execute(
+                """
+                UPDATE attachments
+                SET state = 'consumed', consumed_at = ?, run_id = ?,
+                    prompt_fingerprint = ?, run_claim = NULL
+                WHERE run_claim = ? AND state = 'ready'
+                """,
+                (
+                    int(self._clock()),
+                    run_id,
+                    prompt_fingerprint,
+                    claim,
+                ),
+            )
+            if cursor.rowcount == 0:
+                raise RegistryError(
+                    409,
+                    "attachment_not_ready",
+                    "The claimed attachments are no longer ready.",
+                )
+            self._connection.commit()
+        except Exception:
+            self._connection.rollback()
+            raise
 
     def consume_attachments(
         self,
@@ -599,6 +722,38 @@ class DeviceRegistry:
             for row in rows
         ]
 
+    def consumed_attachment_for_download(
+        self,
+        *,
+        attachment_id: str,
+    ) -> AttachmentRecord:
+        row = self._connection.execute(
+            """
+            SELECT id, root_id, relative_path, name, content_type, size, state,
+                   file_device, file_inode
+            FROM attachments
+            WHERE id = ? AND state = 'consumed'
+            """,
+            (attachment_id,),
+        ).fetchone()
+        if row is None:
+            raise RegistryError(
+                404,
+                "attachment_not_found",
+                "The consumed attachment was not found.",
+            )
+        return AttachmentRecord(
+            id=row["id"],
+            root_id=row["root_id"],
+            relative_path=row["relative_path"],
+            name=row["name"],
+            content_type=row["content_type"],
+            size=row["size"],
+            state=row["state"],
+            file_device=row["file_device"],
+            file_inode=row["file_inode"],
+        )
+
     def _initialize_schema(self) -> None:
         self._connection.executescript(
             """
@@ -631,6 +786,7 @@ class DeviceRegistry:
                 state TEXT NOT NULL CHECK (
                     state IN ('receiving', 'ready', 'consumed')
                 ),
+                run_claim TEXT,
                 created_at INTEGER NOT NULL,
                 consumed_at INTEGER,
                 run_id TEXT,
@@ -642,7 +798,7 @@ class DeviceRegistry:
             CREATE INDEX IF NOT EXISTS attachments_pending
             ON attachments (device_id, session_id, state);
 
-            PRAGMA user_version = 5;
+            PRAGMA user_version = 6;
             """
         )
         attachment_columns = {
@@ -666,6 +822,10 @@ class DeviceRegistry:
         if "file_inode" not in attachment_columns:
             self._connection.execute(
                 "ALTER TABLE attachments ADD COLUMN file_inode INTEGER"
+            )
+        if "run_claim" not in attachment_columns:
+            self._connection.execute(
+                "ALTER TABLE attachments ADD COLUMN run_claim TEXT"
             )
         self._connection.commit()
 

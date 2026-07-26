@@ -293,6 +293,8 @@ struct CompanionSessionListView: View {
             supportsModelSelection:
                 connection.capabilities.supportsModelSelection,
             supportsUploads: connection.capabilities.supportsUploads,
+            supportsServerFileAttachments:
+                connection.capabilities.supportsServerFileAttachments,
             onUpdated: { session in
                 selectedSessionID = session.id
                 viewModel.updateSessionSnapshot(
@@ -386,6 +388,7 @@ struct CompanionSessionHistoryView: View {
     let supportsRunApprovals: Bool
     let supportsModelSelection: Bool
     let supportsUploads: Bool
+    let supportsServerFileAttachments: Bool
     let runService: (any ConversationRunServing)?
     let modelService: (any CompanionModelServing)?
     let workspaceService: any CompanionWorkspaceServing
@@ -408,6 +411,7 @@ struct CompanionSessionHistoryView: View {
     @State private var showsFileImporter = false
     @State private var showsAttachmentSourcePicker = false
     @State private var showsPhotoPicker = false
+    @State private var showsServerFilePicker = false
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var uploadDestination: CompanionUploadDestination?
     @State private var attachmentUploadTask: Task<Void, Never>?
@@ -422,6 +426,7 @@ struct CompanionSessionHistoryView: View {
         supportsRunApprovals: Bool,
         supportsModelSelection: Bool,
         supportsUploads: Bool = false,
+        supportsServerFileAttachments: Bool = false,
         runService: (any ConversationRunServing)? = nil,
         modelService: (any CompanionModelServing)? = nil,
         workspaceService: (any CompanionWorkspaceServing)? = nil,
@@ -434,6 +439,7 @@ struct CompanionSessionHistoryView: View {
         self.supportsRunApprovals = supportsRunApprovals
         self.supportsModelSelection = supportsModelSelection
         self.supportsUploads = supportsUploads
+        self.supportsServerFileAttachments = supportsServerFileAttachments
         self.runService = runService
         self.modelService = modelService
         let resolvedWorkspaceService = workspaceService
@@ -528,7 +534,9 @@ struct CompanionSessionHistoryView: View {
                         toolCallGroups: viewModel.durableToolActivity(
                             anchoredTo: message
                         ),
-                        transcriptMediaCacheNamespace: companionURL.absoluteString
+                        transcriptMediaCacheNamespace:
+                            companionURL.absoluteString,
+                        workspaceService: workspaceService
                     )
                     .equatable()
                 }
@@ -648,6 +656,8 @@ struct CompanionSessionHistoryView: View {
                 supportsRunApprovals: supportsRunApprovals,
                 supportsModelSelection: supportsModelSelection,
                 supportsUploads: supportsUploads,
+                supportsServerFileAttachments:
+                    supportsServerFileAttachments,
                 runService: runService,
                 modelService: modelService,
                 workspaceService: workspaceService,
@@ -756,6 +766,7 @@ struct CompanionSessionHistoryView: View {
         }
         .sheet(isPresented: $showsUploadDestination) {
             CompanionUploadDestinationPicker(
+                companionURL: companionURL,
                 service: workspaceService
             ) { destination in
                 uploadDestination = destination
@@ -777,7 +788,28 @@ struct CompanionSessionHistoryView: View {
             Button("Photos") {
                 showsPhotoPicker = true
             }
+            if supportsServerFileAttachments {
+                Button("Server Files") {
+                    showsServerFilePicker = true
+                }
+            }
             Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $showsServerFilePicker) {
+            if let destination = uploadDestination {
+                CompanionServerFilePicker(
+                    service: workspaceService
+                ) { rootID, path in
+                    showsServerFilePicker = false
+                    Task {
+                        _ = await viewModel.stageServerFile(
+                            sourceRootID: rootID,
+                            sourcePath: path,
+                            destination: destination
+                        )
+                    }
+                }
+            }
         }
         .fileImporter(
             isPresented: $showsFileImporter,
@@ -1199,17 +1231,15 @@ struct CompanionSessionHistoryView: View {
                             )
                             continue
                         }
-                        let data = try await Task.detached(
-                            priority: .userInitiated
-                        ) {
-                            try Data(
-                                contentsOf: url,
-                                options: [.mappedIfSafe]
-                            )
-                        }.value
-                        guard !Task.isCancelled else { return }
+                        let stagedURL = try await stageAttachmentFile(
+                            from: url
+                        )
+                        guard !Task.isCancelled else {
+                            try? FileManager.default.removeItem(at: stagedURL)
+                            return
+                        }
                         _ = await viewModel.uploadAttachment(
-                            data: data,
+                            fileURL: stagedURL,
                             filename: url.lastPathComponent,
                             contentType:
                                 values.contentType?.preferredMIMEType
@@ -1261,8 +1291,18 @@ struct CompanionSessionHistoryView: View {
                         ?? UTType.image
                     let fileExtension =
                         type.preferredFilenameExtension ?? "jpg"
+                    let stagedURL = FileManager.default.temporaryDirectory
+                        .appendingPathComponent(
+                            "hermes-nest-attachment-\(UUID().uuidString)",
+                            isDirectory: false
+                        )
+                    try await Task.detached(
+                        priority: .userInitiated
+                    ) {
+                        try data.write(to: stagedURL, options: [.atomic])
+                    }.value
                     _ = await viewModel.uploadAttachment(
-                        data: data,
+                        fileURL: stagedURL,
                         filename:
                             "photo-\(UUID().uuidString).\(fileExtension)",
                         contentType:
@@ -1277,6 +1317,26 @@ struct CompanionSessionHistoryView: View {
                 }
             }
         }
+    }
+
+    private func stageAttachmentFile(from sourceURL: URL) async throws -> URL {
+        let stagedURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "hermes-nest-attachment-\(UUID().uuidString)",
+                isDirectory: false
+            )
+        return try await Task.detached(priority: .userInitiated) {
+            do {
+                try FileManager.default.copyItem(
+                    at: sourceURL,
+                    to: stagedURL
+                )
+                return stagedURL
+            } catch {
+                try? FileManager.default.removeItem(at: stagedURL)
+                throw error
+            }
+        }.value
     }
 }
 
@@ -1310,6 +1370,7 @@ private struct CompanionMessageRow: View, Equatable {
     let reasoningGroups: [ReasoningGroup]
     let toolCallGroups: [ToolCallGroup]
     let transcriptMediaCacheNamespace: String
+    let workspaceService: any CompanionWorkspaceServing
 
     static func == (
         lhs: CompanionMessageRow,
@@ -1336,6 +1397,8 @@ private struct CompanionMessageRow: View, Equatable {
 
             MessageBubbleView(
                 message: message,
+                loadAttachmentImage: loadAttachment,
+                loadAttachmentData: loadAttachment,
                 transcriptMediaCacheNamespace:
                     transcriptMediaCacheNamespace
             )
@@ -1367,6 +1430,10 @@ private struct CompanionMessageRow: View, Equatable {
 
     private var actionAlignment: HorizontalAlignment {
         message.role == "user" ? .trailing : .leading
+    }
+
+    private func loadAttachment(_ path: String) async -> Data? {
+        try? await workspaceService.downloadAttachment(path: path)
     }
 
     private var copyText: String? {

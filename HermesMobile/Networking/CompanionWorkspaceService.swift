@@ -73,6 +73,26 @@ actor CompanionWorkspaceService: CompanionWorkspaceServing {
         return try await send(url: url, method: "GET")
     }
 
+    func downloadAttachment(path: String) async throws -> Data {
+        let components = path.split(separator: "/", omittingEmptySubsequences: true)
+        guard
+            components.count == 5,
+            components[0] == "companion",
+            components[1] == "v1",
+            components[2] == "uploads",
+            components[4] == "content"
+        else {
+            throw CompanionWorkspaceServiceError.invalidRequest
+        }
+        let attachmentID = try Self.validatedPathComponent(
+            String(components[3])
+        )
+        return try await send(
+            path: "/companion/v1/uploads/\(attachmentID)/content",
+            method: "GET"
+        )
+    }
+
     func preview(
         rootID: String,
         path: String
@@ -97,17 +117,21 @@ actor CompanionWorkspaceService: CompanionWorkspaceServing {
         destination: CompanionUploadDestination,
         filename: String,
         contentType: String,
-        data: Data,
+        fileURL: URL,
         progress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> CompanionUpload {
+        let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey])
+        let fileSize = values?.fileSize
         guard
             !sessionID.isEmpty,
             sessionID.count <= 256,
             !destination.rootID.isEmpty,
             !filename.isEmpty,
-            data.count <= Self.maximumUploadBytes
+            let fileSize,
+            fileSize >= 0,
+            fileSize <= Self.maximumUploadBytes
         else {
-            throw data.count > Self.maximumUploadBytes
+            throw (fileSize ?? 0) > Self.maximumUploadBytes
                 ? CompanionWorkspaceServiceError.requestTooLarge
                 : CompanionWorkspaceServiceError.invalidRequest
         }
@@ -120,31 +144,21 @@ actor CompanionWorkspaceService: CompanionWorkspaceServing {
             options: [.sortedKeys]
         )
         let boundary = "HermesNest-\(UUID().uuidString)"
-        var body = Data()
-        body.append(Data("--\(boundary)\r\n".utf8))
-        body.append(
-            Data(
-                "Content-Disposition: form-data; name=\"metadata\"\r\n".utf8
-            )
-        )
-        body.append(Data("Content-Type: application/json\r\n\r\n".utf8))
-        body.append(metadata)
-        body.append(Data("\r\n--\(boundary)\r\n".utf8))
         let safeFilename = filename
             .replacingOccurrences(of: "\"", with: "_")
             .replacingOccurrences(of: "\r", with: "_")
             .replacingOccurrences(of: "\n", with: "_")
-        body.append(
-            Data(
-                "Content-Disposition: form-data; name=\"file\"; filename=\"\(safeFilename)\"\r\n".utf8
-            )
+        let multipartURL = try await Self.makeMultipartFile(
+            sourceURL: fileURL,
+            metadata: metadata,
+            boundary: boundary,
+            filename: safeFilename,
+            contentType: contentType
         )
-        body.append(Data("Content-Type: \(contentType)\r\n\r\n".utf8))
-        body.append(data)
-        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+        defer { try? FileManager.default.removeItem(at: multipartURL) }
 
         let response = try await sendUpload(
-            body: body,
+            bodyURL: multipartURL,
             contentType: "multipart/form-data; boundary=\(boundary)",
             progress: progress
         )
@@ -162,8 +176,54 @@ actor CompanionWorkspaceService: CompanionWorkspaceServing {
         return upload
     }
 
+    func stageServerFile(
+        sessionID: String,
+        sourceRootID: String,
+        sourcePath: String,
+        destination: CompanionUploadDestination
+    ) async throws -> CompanionUpload {
+        guard
+            !sessionID.isEmpty,
+            sessionID.count <= 256,
+            !sourceRootID.isEmpty,
+            !sourcePath.isEmpty,
+            !destination.rootID.isEmpty
+        else {
+            throw CompanionWorkspaceServiceError.invalidRequest
+        }
+        let body = try JSONSerialization.data(
+            withJSONObject: [
+                "source_root_id": sourceRootID,
+                "source_path": sourcePath,
+                "destination_root_id": destination.rootID,
+                "destination_directory": destination.directory,
+                "session_id": sessionID,
+            ],
+            options: [.sortedKeys]
+        )
+        let data = try await send(
+            path: "/companion/v1/uploads/from-file",
+            method: "POST",
+            body: body,
+            contentType: "application/json",
+            expectedStatus: 201
+        )
+        let envelope = try decode(
+            CompanionUploadEnvelope.self,
+            from: data
+        )
+        guard
+            let upload = envelope.upload,
+            upload.id?.nilIfEmpty != nil,
+            upload.state == "ready"
+        else {
+            throw CompanionWorkspaceServiceError.unexpectedResponse
+        }
+        return upload
+    }
+
     private func sendUpload(
-        body: Data,
+        bodyURL: URL,
         contentType: String,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> Data {
@@ -181,7 +241,7 @@ actor CompanionWorkspaceService: CompanionWorkspaceServing {
         do {
             (data, response) = try await session.upload(
                 for: request,
-                from: body,
+                fromFile: bodyURL,
                 delegate: delegate
             )
         } catch is CancellationError {
@@ -202,6 +262,74 @@ actor CompanionWorkspaceService: CompanionWorkspaceServing {
         }
         progress(1)
         return data
+    }
+
+    private static func makeMultipartFile(
+        sourceURL: URL,
+        metadata: Data,
+        boundary: String,
+        filename: String,
+        contentType: String
+    ) async throws -> URL {
+        try await Task.detached(priority: .userInitiated) {
+            let outputURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(
+                    "hermes-nest-multipart-\(UUID().uuidString)",
+                    isDirectory: false
+                )
+            guard FileManager.default.createFile(
+                atPath: outputURL.path,
+                contents: nil
+            ) else {
+                throw CompanionWorkspaceServiceError.invalidRequest
+            }
+            do {
+                let output = try FileHandle(forWritingTo: outputURL)
+                defer { try? output.close() }
+                try output.write(
+                    contentsOf: Data("--\(boundary)\r\n".utf8)
+                )
+                try output.write(
+                    contentsOf: Data(
+                        "Content-Disposition: form-data; name=\"metadata\"\r\n".utf8
+                    )
+                )
+                try output.write(
+                    contentsOf: Data(
+                        "Content-Type: application/json\r\n\r\n".utf8
+                    )
+                )
+                try output.write(contentsOf: metadata)
+                try output.write(
+                    contentsOf: Data("\r\n--\(boundary)\r\n".utf8)
+                )
+                try output.write(
+                    contentsOf: Data(
+                        "Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".utf8
+                    )
+                )
+                try output.write(
+                    contentsOf: Data(
+                        "Content-Type: \(contentType)\r\n\r\n".utf8
+                    )
+                )
+                let input = try FileHandle(forReadingFrom: sourceURL)
+                defer { try? input.close() }
+                while let chunk = try input.read(upToCount: 256 * 1_024),
+                      !chunk.isEmpty {
+                    try Task.checkCancellation()
+                    try output.write(contentsOf: chunk)
+                }
+                try output.write(
+                    contentsOf: Data("\r\n--\(boundary)--\r\n".utf8)
+                )
+                try output.synchronize()
+                return outputURL
+            } catch {
+                try? FileManager.default.removeItem(at: outputURL)
+                throw error
+            }
+        }.value
     }
 
     func deleteUpload(id: String) async throws {

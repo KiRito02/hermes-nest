@@ -4,7 +4,9 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import datetime, UTC
 import json
+import os
 import re
+import stat
 from urllib.parse import quote
 
 from aiohttp import web
@@ -51,6 +53,7 @@ CAPABILITIES_PATH = "/companion/v1/capabilities"
 READINESS_PATH = "/companion/v1/readiness"
 WORKSPACE_ROOTS_PATH = "/companion/v1/files/roots"
 UPLOADS_PATH = "/companion/v1/uploads"
+UPLOAD_FROM_FILE_PATH = f"{UPLOADS_PATH}/from-file"
 MEMORY_PATH = "/companion/v1/memory"
 REGISTRY_KEY = web.AppKey("registry", DeviceRegistry)
 GATEWAY_KEY = web.AppKey("gateway", GatewayDiscovery)
@@ -184,6 +187,7 @@ async def _capabilities(request: web.Request) -> web.Response:
                     "toolsets_proxy": True,
                     "files": True,
                     "uploads": True,
+                    "upload_from_file": True,
                     "memory": request.app[MEMORY_KEY].configured,
                 },
                 "endpoints": {
@@ -218,6 +222,14 @@ async def _capabilities(request: web.Request) -> web.Response:
                         "path": WORKSPACE_ROOTS_PATH,
                     },
                     "uploads": {"method": "POST", "path": UPLOADS_PATH},
+                    "upload_from_file": {
+                        "method": "POST",
+                        "path": UPLOAD_FROM_FILE_PATH,
+                    },
+                    "upload_content": {
+                        "method": "GET",
+                        "path": f"{UPLOADS_PATH}/{{attachment_id}}/content",
+                    },
                     "memory": {
                         "method": "GET",
                         "path": f"{MEMORY_PATH}/{{target}}",
@@ -580,7 +592,6 @@ async def _upload_file(request: web.Request) -> web.Response:
                 "upload": {
                     "id": attachment_id,
                     "root_id": upload.root_id,
-                    "path": upload.relative_path,
                     "name": upload.name,
                     "size": size,
                     "content_type": content_type,
@@ -602,6 +613,158 @@ async def _upload_file(request: web.Request) -> web.Response:
             status=error.status,
         )
     finally:
+        if upload is not None:
+            upload.abort()
+        if attachment_id is not None and not attachment_ready:
+            request.app[REGISTRY_KEY].discard_attachment(attachment_id)
+
+
+async def _upload_from_file(request: web.Request) -> web.Response:
+    upload = None
+    attachment_id = None
+    attachment_ready = False
+    source_handle = None
+    try:
+        device = _authenticate(request)
+        if request.query:
+            raise WorkspaceError(
+                400,
+                "invalid_query",
+                "Server-file attachment requests do not accept query parameters.",
+            )
+        if request.content_type != "application/json":
+            raise WorkspaceError(
+                415,
+                "invalid_content_type",
+                "Server-file attachment requests must use application/json.",
+            )
+        try:
+            payload = await request.json()
+        except (TypeError, ValueError):
+            raise WorkspaceError(
+                400,
+                "invalid_upload_metadata",
+                "Server-file attachment metadata must be a JSON object.",
+            ) from None
+        expected_keys = {
+            "source_root_id",
+            "source_path",
+            "destination_root_id",
+            "destination_directory",
+            "session_id",
+        }
+        if (
+            not isinstance(payload, dict)
+            or set(payload) != expected_keys
+            or not all(isinstance(payload.get(key), str) for key in expected_keys)
+            or not payload["source_root_id"]
+            or not payload["source_path"]
+            or not payload["destination_root_id"]
+            or not payload["session_id"]
+            or len(payload["session_id"]) > 256
+        ):
+            raise WorkspaceError(
+                400,
+                "invalid_upload_metadata",
+                "Server-file attachment metadata fields are invalid.",
+            )
+
+        source_path = request.app[WORKSPACE_KEY].download_file(
+            payload["source_root_id"],
+            payload["source_path"],
+        )
+        source_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        source_fd = os.open(source_path, source_flags)
+        source_metadata = os.fstat(source_fd)
+        if not stat.S_ISREG(source_metadata.st_mode):
+            os.close(source_fd)
+            raise WorkspaceError(
+                400,
+                "workspace_file_required",
+                "Attachments require a regular file.",
+            )
+        if source_metadata.st_size > MAX_UPLOAD_BYTES:
+            os.close(source_fd)
+            raise WorkspaceError(
+                413,
+                "upload_too_large",
+                f"Files may not exceed {MAX_UPLOAD_BYTES} bytes.",
+            )
+        source_handle = os.fdopen(source_fd, "rb", buffering=0)
+        upload = request.app[WORKSPACE_KEY].begin_upload(
+            payload["destination_root_id"],
+            payload["destination_directory"],
+            source_path.name,
+        )
+        content_type = content_type_for_filename(upload.name)
+        attachment_id = request.app[REGISTRY_KEY].reserve_attachment(
+            device_id=device.id,
+            session_id=payload["session_id"],
+            root_id=upload.root_id,
+            relative_path=upload.relative_path,
+            name=upload.name,
+            content_type=content_type,
+        )
+        size = 0
+        while True:
+            chunk = await asyncio.to_thread(source_handle.read, 256 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > MAX_UPLOAD_BYTES:
+                raise WorkspaceError(
+                    413,
+                    "upload_too_large",
+                    f"Files may not exceed {MAX_UPLOAD_BYTES} bytes.",
+                )
+            request.app[REGISTRY_KEY].add_attachment_bytes(
+                attachment_id,
+                len(chunk),
+            )
+            await asyncio.to_thread(upload.write, chunk)
+        await asyncio.to_thread(upload.commit)
+        request.app[REGISTRY_KEY].complete_attachment(
+            attachment_id,
+            file_device=upload.published_device,
+            file_inode=upload.published_inode,
+        )
+        attachment_ready = True
+        return _json_response(
+            {
+                "upload": {
+                    "id": attachment_id,
+                    "root_id": upload.root_id,
+                    "name": upload.name,
+                    "size": size,
+                    "content_type": content_type,
+                    "state": "ready",
+                }
+            },
+            status=201,
+        )
+    except RegistryError as error:
+        return _error_response(error)
+    except (OSError, WorkspaceError) as error:
+        if isinstance(error, WorkspaceError):
+            workspace_error = error
+        else:
+            workspace_error = WorkspaceError(
+                409,
+                "workspace_file_changed",
+                "The selected server file changed before it could be attached.",
+            )
+        return _json_response(
+            {
+                "error": {
+                    "code": workspace_error.code,
+                    "message": workspace_error.message,
+                }
+            },
+            status=workspace_error.status,
+        )
+    finally:
+        if source_handle is not None:
+            source_handle.close()
         if upload is not None:
             upload.abort()
         if attachment_id is not None and not attachment_ready:
@@ -636,7 +799,6 @@ async def _list_uploads(request: web.Request) -> web.Response:
                 {
                     "id": record.id,
                     "root_id": record.root_id,
-                    "path": record.relative_path,
                     "name": record.name,
                     "size": record.size,
                     "content_type": record.content_type,
@@ -696,6 +858,62 @@ async def _delete_upload(request: web.Request) -> web.Response:
             status=error.status,
         )
     return web.Response(status=204, headers={"Cache-Control": "no-store"})
+
+
+async def _download_consumed_upload(
+    request: web.Request,
+) -> web.StreamResponse:
+    try:
+        _authenticate(request)
+        if request.query:
+            raise RegistryError(
+                400,
+                "invalid_query",
+                "Attachment download does not accept query parameters.",
+            )
+        attachment_id = request.match_info["attachment_id"]
+        if (
+            not attachment_id
+            or len(attachment_id) > 128
+            or "/" in attachment_id
+            or "\\" in attachment_id
+        ):
+            raise RegistryError(
+                400,
+                "invalid_attachment_id",
+                "The attachment ID is invalid.",
+            )
+        record = request.app[
+            REGISTRY_KEY
+        ].consumed_attachment_for_download(
+            attachment_id=attachment_id,
+        )
+        path = request.app[WORKSPACE_KEY].uploaded_file(
+            record.root_id,
+            record.relative_path,
+            expected_device=record.file_device,
+            expected_inode=record.file_inode,
+        )
+    except RegistryError as error:
+        return _error_response(error)
+    except WorkspaceError as error:
+        return _json_response(
+            {
+                "error": {
+                    "code": error.code,
+                    "message": error.message,
+                }
+            },
+            status=error.status,
+        )
+    fallback_name = re.sub(r"[^A-Za-z0-9._-]", "_", record.name) or "download"
+    response = web.FileResponse(path)
+    response.content_type = record.content_type
+    response.headers["Content-Disposition"] = (
+        f'attachment; filename="{fallback_name}"; '
+        f"filename*=UTF-8''{quote(record.name, safe='')}"
+    )
+    return response
 
 
 async def _list_sessions(request: web.Request) -> web.Response:
@@ -908,7 +1126,9 @@ async def _session_messages(request: web.Request) -> web.Response:
         key = (record.run_id, record.prompt_fingerprint)
         attachment = {
             "name": record.name,
-            "path": record.relative_path,
+            "download_path": (
+                f"{UPLOADS_PATH}/{record.id}/content"
+            ),
             "mime": record.content_type,
             "size": record.size,
             "is_image": record.content_type.casefold().startswith("image/"),
@@ -964,6 +1184,8 @@ async def _run_request(
     attachment_ids: list[str] = []
     attachment_device: RegisteredDevice | None = None
     attachment_session_id = ""
+    attachment_claim = ""
+    attachment_claim_consumed = False
     try:
         attachment_device = _authenticate(request)
         if request.query:
@@ -1045,7 +1267,10 @@ async def _run_request(
                 prompt_fingerprint = attachment_prompt_fingerprint(
                     payload.get("input")
                 )
-                records = request.app[REGISTRY_KEY].get_ready_attachments(
+                (
+                    attachment_claim,
+                    records,
+                ) = request.app[REGISTRY_KEY].claim_ready_attachments(
                     device_id=attachment_device.id,
                     session_id=attachment_session_id,
                     attachment_ids=attachment_ids,
@@ -1126,13 +1351,12 @@ async def _run_request(
         )
         if attachment_ids:
             started_payload = json.loads(response.body)
-            request.app[REGISTRY_KEY].consume_attachments(
-                device_id=attachment_device.id,
-                session_id=attachment_session_id,
-                attachment_ids=attachment_ids,
+            request.app[REGISTRY_KEY].consume_attachment_claim(
+                claim=attachment_claim,
                 run_id=started_payload["run_id"],
                 prompt_fingerprint=prompt_fingerprint,
             )
+            attachment_claim_consumed = True
     except RegistryError as error:
         return _error_response(error)
     except WorkspaceError as error:
@@ -1147,6 +1371,11 @@ async def _run_request(
         )
     except GatewayProxyError as error:
         return _proxy_error_response(error)
+    finally:
+        if attachment_claim and not attachment_claim_consumed:
+            request.app[REGISTRY_KEY].release_attachment_claim(
+                attachment_claim
+            )
 
     return web.Response(
         body=response.body,
@@ -1341,7 +1570,13 @@ def create_app(
         allow_head=False,
     )
     app.router.add_get(UPLOADS_PATH, _list_uploads, allow_head=False)
+    app.router.add_post(UPLOAD_FROM_FILE_PATH, _upload_from_file)
     app.router.add_post(UPLOADS_PATH, _upload_file)
+    app.router.add_get(
+        f"{UPLOADS_PATH}/{{attachment_id}}/content",
+        _download_consumed_upload,
+        allow_head=False,
+    )
     app.router.add_delete(
         f"{UPLOADS_PATH}/{{attachment_id}}",
         _delete_upload,

@@ -129,13 +129,20 @@ protocol CompanionWorkspaceServing: Sendable {
         path: String
     ) async throws -> CompanionWorkspacePreview
     func download(rootID: String, path: String) async throws -> Data
+    func downloadAttachment(path: String) async throws -> Data
     func upload(
         sessionID: String,
         destination: CompanionUploadDestination,
         filename: String,
         contentType: String,
-        data: Data,
+        fileURL: URL,
         progress: @escaping @Sendable (Double) -> Void
+    ) async throws -> CompanionUpload
+    func stageServerFile(
+        sessionID: String,
+        sourceRootID: String,
+        sourcePath: String,
+        destination: CompanionUploadDestination
     ) async throws -> CompanionUpload
     func uploads(sessionID: String) async throws -> [CompanionUpload]
     func deleteUpload(id: String) async throws

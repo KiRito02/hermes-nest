@@ -19,6 +19,8 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.gateway_requests: list[dict[str, object]] = []
         self.gateway_mode = "ok"
+        self.gateway_start_entered = asyncio.Event()
+        self.release_gateway_start = asyncio.Event()
         self.release_stream = asyncio.Event()
         self.first_stream_chunk = (
             b": keepalive\n\n"
@@ -202,6 +204,15 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
                 headers=headers,
             )
             upload_id = (await uploaded.json())["upload"]["id"]
+            device_id = self.registry.authenticate(
+                self.device_credential
+            ).id
+            stored_relative_path = (
+                self.registry.ready_attachment_for_device(
+                    device_id=device_id,
+                    attachment_id=upload_id,
+                ).relative_path
+            )
 
             started = await self.client.post(
                 "/v1/runs",
@@ -216,7 +227,8 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(202, started.status)
             forwarded = self.gateway_requests[-1]["body"]
             self.assertNotIn("attachment_ids", forwarded)
-            self.assertIn("incoming/notes.txt", forwarded["instructions"])
+            self.assertIn(stored_relative_path, forwarded["instructions"])
+            self.assertNotIn('"path":"incoming/notes.txt"', forwarded["instructions"])
             self.assertNotIn(str(host_path), forwarded["instructions"])
             pending = await self.client.get(
                 "/companion/v1/uploads",
@@ -224,6 +236,115 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
                 headers=headers,
             )
             self.assertEqual([], (await pending.json())["uploads"])
+            downloaded = await self.client.get(
+                f"/companion/v1/uploads/{upload_id}/content",
+                headers=headers,
+            )
+            self.assertEqual(200, downloaded.status)
+            self.assertEqual(b"attachment body", await downloaded.read())
+            self.assertIn(
+                'filename="notes.txt"',
+                downloaded.headers["Content-Disposition"],
+            )
+
+    async def test_attachment_is_claimed_before_concurrent_gateway_start(
+        self,
+    ) -> None:
+        await self.client.close()
+        with TemporaryDirectory() as directory:
+            self.registry = DeviceRegistry(":memory:")
+            host_path = Path(directory) / "agent-workspace"
+            host_path.mkdir()
+            workspace = WorkspaceAccess(
+                [
+                    WorkspaceRoot(
+                        id="projects",
+                        name="Projects",
+                        path=host_path,
+                        writable=True,
+                    )
+                ],
+                agent_working_directory=host_path,
+            )
+            self.client = TestClient(
+                TestServer(
+                    create_app(
+                        self.registry,
+                        GatewayDiscovery(
+                            str(self.gateway_server.make_url("")).rstrip("/"),
+                            "gateway-run-key",
+                        ),
+                        workspace=workspace,
+                    )
+                )
+            )
+            await self.client.start_server()
+            self.device_credential = await self._pair_device()
+            headers = {
+                "Authorization": f"Bearer {self.device_credential}",
+            }
+            form = FormData()
+            form.add_field(
+                "metadata",
+                json.dumps(
+                    {
+                        "root_id": "projects",
+                        "directory": "",
+                        "session_id": "session-concurrent",
+                    }
+                ),
+                content_type="application/json",
+            )
+            form.add_field(
+                "file",
+                b"attachment body",
+                filename="notes.txt",
+                content_type="text/plain",
+            )
+            uploaded = await self.client.post(
+                "/companion/v1/uploads",
+                data=form,
+                headers=headers,
+            )
+            upload_id = (await uploaded.json())["upload"]["id"]
+            body = {
+                "input": "Read this.",
+                "session_id": "session-concurrent",
+                "attachment_ids": [upload_id],
+            }
+            self.gateway_mode = "block_start"
+
+            first_task = asyncio.create_task(
+                self.client.post("/v1/runs", json=body, headers=headers)
+            )
+            await asyncio.wait_for(
+                self.gateway_start_entered.wait(),
+                timeout=1,
+            )
+            second = await self.client.post(
+                "/v1/runs",
+                json=body,
+                headers=headers,
+            )
+            self.release_gateway_start.set()
+            first = await first_task
+
+            self.assertEqual(202, first.status)
+            self.assertEqual(409, second.status)
+            self.assertEqual(
+                "attachment_not_ready",
+                (await second.json())["error"]["code"],
+            )
+            self.assertEqual(
+                1,
+                len(
+                    [
+                        request
+                        for request in self.gateway_requests
+                        if request["path"] == "/v1/runs"
+                    ]
+                ),
+            )
 
     async def test_attachment_outside_agent_working_directory_is_rejected(
         self,
@@ -587,6 +708,9 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
 
     async def _gateway_start(self, request: web.Request) -> web.Response:
         await self._record(request)
+        if self.gateway_mode == "block_start":
+            self.gateway_start_entered.set()
+            await self.release_gateway_start.wait()
         if self.gateway_mode == "incompatible_success":
             return web.json_response({"status": "started"}, status=202)
         return web.json_response(

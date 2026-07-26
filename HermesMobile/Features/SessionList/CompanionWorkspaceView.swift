@@ -107,47 +107,64 @@ private struct CompanionWorkspaceDirectoryView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var preview: CompanionFilePreview?
+    @State private var nextCursor: String?
 
     var body: some View {
-        List(Array(entries.enumerated()), id: \.offset) { _, entry in
-            if entry.isDirectory, let childPath = entry.path?.nilIfEmpty {
-                NavigationLink {
-                    CompanionWorkspaceDirectoryView(
-                        service: service,
-                        rootID: rootID,
-                        rootName: entry.name ?? rootName,
-                        path: childPath
-                    )
-                } label: {
-                    Label(entry.name ?? childPath, systemImage: "folder")
-                }
-            } else {
-                Button {
-                    guard let filePath = entry.path?.nilIfEmpty else { return }
-                    Task {
-                        await loadPreview(
-                            path: filePath,
-                            name: entry.name ?? filePath
+        List {
+            ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
+                if entry.isDirectory, let childPath = entry.path?.nilIfEmpty {
+                    NavigationLink {
+                        CompanionWorkspaceDirectoryView(
+                            service: service,
+                            rootID: rootID,
+                            rootName: entry.name ?? rootName,
+                            path: childPath
                         )
+                    } label: {
+                        Label(entry.name ?? childPath, systemImage: "folder")
                     }
-                } label: {
-                    HStack {
-                        Label(
-                            entry.name ?? entry.path ?? "File",
-                            systemImage: "doc"
-                        )
-                        Spacer()
-                        if let size = entry.size {
-                            Text(ByteCountFormatter.string(
-                                fromByteCount: Int64(size),
-                                countStyle: .file
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                } else {
+                    Button {
+                        guard let filePath = entry.path?.nilIfEmpty else {
+                            return
+                        }
+                        Task {
+                            await loadPreview(
+                                path: filePath,
+                                name: entry.name ?? filePath
+                            )
+                        }
+                    } label: {
+                        HStack {
+                            Label(
+                                entry.name ?? entry.path ?? "File",
+                                systemImage: "doc"
+                            )
+                            Spacer()
+                            if let size = entry.size {
+                                Text(ByteCountFormatter.string(
+                                    fromByteCount: Int64(size),
+                                    countStyle: .file
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
                         }
                     }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+            }
+            if nextCursor != nil {
+                Button {
+                    Task { await loadNextPage() }
+                } label: {
+                    if isLoading {
+                        ProgressView()
+                    } else {
+                        Label("Load more", systemImage: "arrow.down.circle")
+                    }
+                }
+                .disabled(isLoading)
             }
         }
         .overlay {
@@ -189,18 +206,32 @@ private struct CompanionWorkspaceDirectoryView: View {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            var loaded: [CompanionWorkspaceEntry] = []
-            var cursor: String?
-            repeat {
-                let page = try await service.entries(
-                    rootID: rootID,
-                    path: path,
-                    cursor: cursor
-                )
-                loaded.append(contentsOf: page.entries ?? [])
-                cursor = page.nextCursor?.nilIfEmpty
-            } while cursor != nil && loaded.count < 2_000
-            entries = loaded
+            let page = try await service.entries(
+                rootID: rootID,
+                path: path,
+                cursor: nil
+            )
+            entries = page.entries ?? []
+            nextCursor = page.nextCursor?.nilIfEmpty
+        } catch {
+            guard !(error is CancellationError) else { return }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func loadNextPage() async {
+        guard !isLoading, let cursor = nextCursor else { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let page = try await service.entries(
+                rootID: rootID,
+                path: path,
+                cursor: cursor
+            )
+            entries.append(contentsOf: page.entries ?? [])
+            nextCursor = page.nextCursor?.nilIfEmpty
         } catch {
             guard !(error is CancellationError) else { return }
             errorMessage = error.localizedDescription
@@ -347,8 +378,22 @@ struct CompanionUploadDestinationPicker: View {
     let onSelect: (CompanionUploadDestination) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage private var preferredRootID: String
     @State private var roots: [CompanionWorkspaceRoot] = []
     @State private var errorMessage: String?
+
+    init(
+        companionURL: URL,
+        service: any CompanionWorkspaceServing,
+        onSelect: @escaping (CompanionUploadDestination) -> Void
+    ) {
+        self.service = service
+        self.onSelect = onSelect
+        _preferredRootID = AppStorage(
+            wrappedValue: "",
+            "companion.upload.preferredRoot|\(companionURL.absoluteString)"
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -360,7 +405,10 @@ struct CompanionUploadDestinationPicker: View {
                             rootID: rootID,
                             title: root.name ?? rootID,
                             path: "",
-                            onSelect: onSelect
+                            onSelect: { destination in
+                                preferredRootID = destination.rootID
+                                onSelect(destination)
+                            }
                         )
                     } label: {
                         Label(root.name ?? rootID, systemImage: "folder")
@@ -406,7 +454,18 @@ struct CompanionUploadDestinationPicker: View {
     }
 
     private var uploadRoots: [CompanionWorkspaceRoot] {
-        roots.filter { $0.writable == true && $0.attachable == true }
+        let available = roots.filter {
+            $0.writable == true && $0.attachable == true
+        }
+        guard let preferredIndex = available.firstIndex(where: {
+            $0.id == preferredRootID
+        }) else {
+            return available
+        }
+        var ordered = available
+        let preferred = ordered.remove(at: preferredIndex)
+        ordered.insert(preferred, at: 0)
+        return ordered
     }
 }
 
@@ -486,6 +545,179 @@ private struct CompanionUploadDirectoryPicker: View {
             } catch {
                 errorMessage = error.localizedDescription
             }
+        }
+    }
+}
+
+@MainActor
+struct CompanionServerFilePicker: View {
+    let service: any CompanionWorkspaceServing
+    let onSelect: (String, String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var roots: [CompanionWorkspaceRoot] = []
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            List(Array(roots.enumerated()), id: \.offset) { _, root in
+                if let rootID = root.id?.nilIfEmpty {
+                    NavigationLink {
+                        CompanionServerFileDirectoryPicker(
+                            service: service,
+                            rootID: rootID,
+                            title: root.name ?? rootID,
+                            path: "",
+                            onSelect: onSelect
+                        )
+                    } label: {
+                        Label(root.name ?? rootID, systemImage: "folder")
+                    }
+                }
+            }
+            .overlay {
+                if let errorMessage, roots.isEmpty {
+                    ContentUnavailableView {
+                        Label(
+                            "Server files unavailable",
+                            systemImage: "exclamationmark.triangle"
+                        )
+                    } description: {
+                        Text(errorMessage)
+                    }
+                } else if roots.isEmpty {
+                    ProgressView("Loading folders...")
+                }
+            }
+            .navigationTitle("Server Files")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .task {
+                do {
+                    roots = try await service.roots()
+                } catch {
+                    guard !(error is CancellationError) else { return }
+                    errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+}
+
+@MainActor
+private struct CompanionServerFileDirectoryPicker: View {
+    let service: any CompanionWorkspaceServing
+    let rootID: String
+    let title: String
+    let path: String
+    let onSelect: (String, String) -> Void
+
+    @State private var entries: [CompanionWorkspaceEntry] = []
+    @State private var nextCursor: String?
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        List {
+            ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
+                if entry.isDirectory,
+                   let childPath = entry.path?.nilIfEmpty {
+                    NavigationLink {
+                        CompanionServerFileDirectoryPicker(
+                            service: service,
+                            rootID: rootID,
+                            title: entry.name ?? childPath,
+                            path: childPath,
+                            onSelect: onSelect
+                        )
+                    } label: {
+                        Label(entry.name ?? childPath, systemImage: "folder")
+                    }
+                } else if let filePath = entry.path?.nilIfEmpty {
+                    Button {
+                        onSelect(rootID, filePath)
+                    } label: {
+                        HStack {
+                            Label(
+                                entry.name ?? filePath,
+                                systemImage: "doc"
+                            )
+                            Spacer()
+                            if let size = entry.size {
+                                Text(ByteCountFormatter.string(
+                                    fromByteCount: Int64(size),
+                                    countStyle: .file
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            if nextCursor != nil {
+                Button {
+                    Task { await load(reset: false) }
+                } label: {
+                    if isLoading {
+                        ProgressView()
+                    } else {
+                        Label("Load more", systemImage: "arrow.down.circle")
+                    }
+                }
+                .disabled(isLoading)
+            }
+        }
+        .overlay {
+            if isLoading && entries.isEmpty {
+                ProgressView("Loading files...")
+            } else if let errorMessage, entries.isEmpty {
+                ContentUnavailableView {
+                    Label(
+                        "Folder unavailable",
+                        systemImage: "exclamationmark.triangle"
+                    )
+                } description: {
+                    Text(errorMessage)
+                }
+            } else if entries.isEmpty {
+                ContentUnavailableView(
+                    "Empty folder",
+                    systemImage: "folder"
+                )
+            }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .refreshable { await load(reset: true) }
+        .task { await load(reset: true) }
+    }
+
+    private func load(reset: Bool) async {
+        guard !isLoading else { return }
+        if !reset && nextCursor == nil { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let page = try await service.entries(
+                rootID: rootID,
+                path: path,
+                cursor: reset ? nil : nextCursor
+            )
+            if reset {
+                entries = page.entries ?? []
+            } else {
+                entries.append(contentsOf: page.entries ?? [])
+            }
+            nextCursor = page.nextCursor?.nilIfEmpty
+        } catch {
+            guard !(error is CancellationError) else { return }
+            errorMessage = error.localizedDescription
         }
     }
 }
