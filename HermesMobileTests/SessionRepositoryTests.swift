@@ -222,7 +222,7 @@ final class SessionRepositoryTests: APIClientTestCase {
         var observed: [(String, String, [String: Any]?)] = []
         let session = makeSession { request in
             let url = try XCTUnwrap(request.url)
-            let body = try request.httpBody.map {
+            let body = try apiTestBodyData(from: request).map {
                 try XCTUnwrap(
                     JSONSerialization.jsonObject(with: $0) as? [String: Any]
                 )

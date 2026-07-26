@@ -274,7 +274,7 @@ private struct GatewaySessionHistoryPayload: Decodable {
 
     enum CodingKeys: String, CodingKey {
         case object
-        case sessionID
+        case sessionID = "sessionId"
         case data
     }
 
@@ -304,7 +304,7 @@ private struct GatewayMessagePayload: Decodable {
         case id
         case role
         case content
-        case toolCallID
+        case toolCallID = "toolCallId"
         case toolCalls
         case toolName
         case timestamp
