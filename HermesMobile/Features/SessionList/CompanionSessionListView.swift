@@ -351,11 +351,13 @@ private struct CompanionChatWelcomeView: View {
 }
 
 @MainActor
-private struct CompanionSessionHistoryView: View {
+struct CompanionSessionHistoryView: View {
     let repository: any SessionRepository
     let companionURL: URL
     let supportsRunApprovals: Bool
     let supportsModelSelection: Bool
+    let runService: (any ConversationRunServing)?
+    let modelService: (any CompanionModelServing)?
     let onUpdated: (SessionSummary) -> Void
     let onForked: () -> Void
     let onDeleted: (String) -> Void
@@ -380,6 +382,8 @@ private struct CompanionSessionHistoryView: View {
         companionURL: URL,
         supportsRunApprovals: Bool,
         supportsModelSelection: Bool,
+        runService: (any ConversationRunServing)? = nil,
+        modelService: (any CompanionModelServing)? = nil,
         onUpdated: @escaping (SessionSummary) -> Void,
         onForked: @escaping () -> Void,
         onDeleted: @escaping (String) -> Void
@@ -388,6 +392,8 @@ private struct CompanionSessionHistoryView: View {
         self.companionURL = companionURL
         self.supportsRunApprovals = supportsRunApprovals
         self.supportsModelSelection = supportsModelSelection
+        self.runService = runService
+        self.modelService = modelService
         self.onUpdated = onUpdated
         self.onForked = onForked
         self.onDeleted = onDeleted
@@ -396,8 +402,10 @@ private struct CompanionSessionHistoryView: View {
                 session: session,
                 repository: repository,
                 companionURL: companionURL,
+                runService: runService,
                 supportsRunApprovals: supportsRunApprovals,
-                supportsModelSelection: supportsModelSelection
+                supportsModelSelection: supportsModelSelection,
+                modelService: modelService
             )
         )
     }
@@ -587,6 +595,8 @@ private struct CompanionSessionHistoryView: View {
                 companionURL: companionURL,
                 supportsRunApprovals: supportsRunApprovals,
                 supportsModelSelection: supportsModelSelection,
+                runService: runService,
+                modelService: modelService,
                 onUpdated: onUpdated,
                 onForked: onForked,
                 onDeleted: onDeleted

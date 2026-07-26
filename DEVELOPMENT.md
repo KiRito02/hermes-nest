@@ -249,6 +249,21 @@ Never install a simulator build produced with
 `CODE_SIGNING_ALLOWED=NO`. It lacks the entitlements required for Keychain
 testing.
 
+### Pull-request iPhone UI smoke
+
+When app code changes, `PR CI` also creates a separate ad-hoc-signed Debug
+simulator build and installs it on `iPhone 17 Pro Max` (or the nearest
+available iPhone Pro). It launches server-free Debug fixtures and captures:
+
+- `core-chat-en.png`
+- `core-chat-zh-Hans.png`
+- `long-chat.png`
+
+Download them from the workflow run's **Artifacts** section under
+`iphone-ui-smoke`. The fixture contains no Companion URL, device credential,
+NAS secret, or network request. iPad remains an adaptive-layout compile check;
+the automated launch and screenshot acceptance path is iPhone-only.
+
 Human/CLI equivalents:
 
 ```bash
@@ -280,8 +295,7 @@ xcodebuild test \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max'
 ```
 
-Compile-only CI may disable signing, but signed simulator/manual validation
-must not:
+The compile-only CI build may disable signing:
 
 ```bash
 xcodebuild build \
@@ -290,6 +304,9 @@ xcodebuild build \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max' \
   CODE_SIGNING_ALLOWED=NO
 ```
+
+Do not install that output. For simulator launch and manual validation, use
+the signed `build_run_sim` flow above or a normal signed Debug build.
 
 Build the adaptive iPad layout with the installed 13-inch iPad Pro simulator
 name reported by `xcrun simctl list devices available`. Simulator checks cover

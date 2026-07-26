@@ -277,6 +277,7 @@
 		C21300000000000000000005 /* StreamingTextFadeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C21300000000000000000006 /* StreamingTextFadeTests.swift */; };
 		C23400000000000000000001 /* StreamingLabReplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23400000000000000000002 /* StreamingLabReplay.swift */; };
 		C23400000000000000000003 /* StreamingLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23400000000000000000004 /* StreamingLabView.swift */; };
+		C72600000000000000000001 /* CoreChatLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C72600000000000000000002 /* CoreChatLabView.swift */; };
 		C23400000000000000000005 /* StreamingLabReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23400000000000000000006 /* StreamingLabReplayTests.swift */; };
 		C14900000000000000000001 /* Kanban.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14900000000000000000002 /* Kanban.swift */; };
 		C14900000000000000000003 /* APIClient+Kanban.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14900000000000000000004 /* APIClient+Kanban.swift */; };
@@ -652,6 +653,7 @@
 		C21300000000000000000006 /* StreamingTextFadeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingTextFadeTests.swift; sourceTree = "<group>"; };
 		C23400000000000000000002 /* StreamingLabReplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingLabReplay.swift; sourceTree = "<group>"; };
 		C23400000000000000000004 /* StreamingLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingLabView.swift; sourceTree = "<group>"; };
+		C72600000000000000000002 /* CoreChatLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreChatLabView.swift; sourceTree = "<group>"; };
 		C23400000000000000000006 /* StreamingLabReplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingLabReplayTests.swift; sourceTree = "<group>"; };
 		C14900000000000000000002 /* Kanban.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Kanban.swift; sourceTree = "<group>"; };
 		C14900000000000000000004 /* APIClient+Kanban.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+Kanban.swift"; sourceTree = "<group>"; };
@@ -1146,6 +1148,7 @@
 				1A2B3C4D5E6F70000000111 /* ArchivedSessionsView.swift */,
 				C23400000000000000000002 /* StreamingLabReplay.swift */,
 				C23400000000000000000004 /* StreamingLabView.swift */,
+				C72600000000000000000002 /* CoreChatLabView.swift */,
 				1A2B3C4D5E6F70000000113 /* ArchivedSessionsViewModel.swift */,
 				19C1150000000000000000A2 /* CliSessionsSyncModel.swift */,
 				26AB000000000000000000F2 /* ProvidersView.swift */,
@@ -1530,6 +1533,7 @@
 				1A2B3C4D5E6F70000000110 /* ArchivedSessionsView.swift in Sources */,
 				C23400000000000000000001 /* StreamingLabReplay.swift in Sources */,
 				C23400000000000000000003 /* StreamingLabView.swift in Sources */,
+				C72600000000000000000001 /* CoreChatLabView.swift in Sources */,
 				1A2B3C4D5E6F70000000112 /* ArchivedSessionsViewModel.swift in Sources */,
 				19C1150000000000000000A1 /* CliSessionsSyncModel.swift in Sources */,
 				1A2B3C4D5E6F7000000000F8 /* AppConfig.swift in Sources */,

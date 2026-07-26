@@ -8,9 +8,8 @@
 #
 # Uses no repository secrets, so PRs from forks get green CI too.
 #
-# Code signing is disabled (CODE_SIGNING_ALLOWED=NO) — fine for compile/test
-# runs per DEVELOPMENT.md; the "simulator installs must be signed" rule applies
-# to manual simulator testing, not CI.
+# Compile/test artifacts remain unsigned. UI smoke testing uses a separate
+# ad-hoc-signed Debug simulator build so installing it preserves entitlements.
 
 name: PR CI
 
@@ -83,13 +82,17 @@ jobs:
       DERIVED_DATA_PATH: DerivedData
       RESULT_BUNDLE_PATH: TestResults.xcresult
       TEST_WORKER_COUNT: 1
+      UI_SMOKE_DERIVED_DATA_PATH: DerivedData-UI-Smoke
+      UI_SMOKE_OUTPUT_PATH: iphone-ui-smoke
 
     steps:
       - name: Check out
         uses: actions/checkout@v7
 
-      - name: Check ProMotion and adaptive targets
-        run: python3 scripts/check-promotion-config
+      - name: Check simulator acceptance configuration
+        run: |
+          python3 scripts/check-promotion-config
+          python3 scripts/check-iphone-ui-smoke
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -98,28 +101,33 @@ jobs:
         id: sim
         run: |
           set -euo pipefail
-          name=$(xcrun simctl list devices available --json | python3 -c '
+          selection=$(xcrun simctl list devices available --json | python3 -c '
           import json, sys
           data = json.load(sys.stdin)
           phones = [
-              device["name"]
+              (device["name"], device["udid"])
               for runtime, devices in data["devices"].items()
               if "iOS" in runtime
               for device in devices
               if device.get("isAvailable") and device["name"].startswith("iPhone")
           ]
           preferred = "iPhone 17 Pro Max"
-          pro_phones = [name for name in phones if " Pro" in name]
-          fallback = pro_phones[0] if pro_phones else phones[0] if phones else ""
-          print(preferred if preferred in phones else fallback)
+          selected = next((phone for phone in phones if phone[0] == preferred), None)
+          if selected is None:
+              selected = next((phone for phone in phones if " Pro" in phone[0]), None)
+          if selected is None and phones:
+              selected = phones[0]
+          print("\t".join(selected) if selected else "")
           ')
-          if [[ -z "${name}" ]]; then
+          IFS=$'\t' read -r name udid <<< "${selection}"
+          if [[ -z "${name}" || -z "${udid}" ]]; then
             echo "No available iPhone simulator found:" >&2
             xcrun simctl list devices available >&2
             exit 1
           fi
-          echo "Using simulator: ${name}"
+          echo "Using simulator: ${name} (${udid})"
           echo "name=${name}" >> "$GITHUB_OUTPUT"
+          echo "udid=${udid}" >> "$GITHUB_OUTPUT"
 
       - name: Select adaptive iPad simulator
         id: ipad_sim
@@ -154,14 +162,14 @@ jobs:
 
       - name: Build for testing
         env:
-          SIMULATOR_NAME: ${{ steps.sim.outputs.name }}
+          SIMULATOR_UDID: ${{ steps.sim.outputs.udid }}
         run: |
           set -euo pipefail
           start_seconds=${SECONDS}
           xcodebuild build-for-testing \
             -project "${PROJECT_PATH}" \
             -scheme "${SCHEME}" \
-            -destination "platform=iOS Simulator,name=${SIMULATOR_NAME}" \
+            -destination "platform=iOS Simulator,id=${SIMULATOR_UDID}" \
             -derivedDataPath "${DERIVED_DATA_PATH}" \
             -showBuildTimingSummary \
             CODE_SIGNING_ALLOWED=NO
@@ -189,14 +197,14 @@ jobs:
 
       - name: Test without building
         env:
-          SIMULATOR_NAME: ${{ steps.sim.outputs.name }}
+          SIMULATOR_UDID: ${{ steps.sim.outputs.udid }}
         run: |
           set -euo pipefail
           start_seconds=${SECONDS}
           xcodebuild test-without-building \
             -project "${PROJECT_PATH}" \
             -scheme "${SCHEME}" \
-            -destination "platform=iOS Simulator,name=${SIMULATOR_NAME}" \
+            -destination "platform=iOS Simulator,id=${SIMULATOR_UDID}" \
             -derivedDataPath "${DERIVED_DATA_PATH}" \
             -resultBundlePath "${RESULT_BUNDLE_PATH}" \
             -parallel-testing-enabled YES \
@@ -205,6 +213,92 @@ jobs:
           duration_seconds=$((SECONDS - start_seconds))
           echo "Test-without-building duration: ${duration_seconds}s"
           echo "- Test without building (${TEST_WORKER_COUNT} workers): ${duration_seconds}s" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Build signed iPhone UI smoke app
+        id: signed_app
+        env:
+          SIMULATOR_UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project "${PROJECT_PATH}" \
+            -scheme "${SCHEME}" \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${SIMULATOR_UDID}" \
+            -derivedDataPath "${UI_SMOKE_DERIVED_DATA_PATH}" \
+            -showBuildTimingSummary \
+            DEVELOPMENT_TEAM= \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGN_IDENTITY=-
+
+          app_path="${UI_SMOKE_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/HermesMobile.app"
+          if [[ ! -d "${app_path}" ]]; then
+            echo "Signed simulator app was not produced at ${app_path}" >&2
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 "${app_path}"
+          echo "path=${app_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Capture iPhone UI smoke screenshots
+        env:
+          APP_PATH: ${{ steps.signed_app.outputs.path }}
+          SIMULATOR_NAME: ${{ steps.sim.outputs.name }}
+          SIMULATOR_UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${UI_SMOKE_OUTPUT_PATH}"
+
+          xcrun simctl boot "${SIMULATOR_UDID}" 2>/dev/null || true
+          xcrun simctl bootstatus "${SIMULATOR_UDID}" -b
+          xcrun simctl ui "${SIMULATOR_UDID}" appearance light
+          xcrun simctl status_bar "${SIMULATOR_UDID}" override \
+            --time 9:41 \
+            --batteryState charged \
+            --batteryLevel 100 \
+            --wifiBars 3 \
+            --cellularBars 4
+          xcrun simctl install "${SIMULATOR_UDID}" "${APP_PATH}"
+
+          bundle_id=$(/usr/libexec/PlistBuddy \
+            -c "Print :CFBundleIdentifier" \
+            "${APP_PATH}/Info.plist")
+
+          capture_ui() {
+            local language="$1"
+            local locale="$2"
+            local fixture="$3"
+            local filename="$4"
+            xcrun simctl terminate "${SIMULATOR_UDID}" "${bundle_id}" \
+              2>/dev/null || true
+            xcrun simctl launch \
+              "${SIMULATOR_UDID}" \
+              "${bundle_id}" \
+              -AppleLanguages "(${language})" \
+              -AppleLocale "${locale}" \
+              "${fixture}" | tee -a "${UI_SMOKE_OUTPUT_PATH}/launch.log"
+            sleep 4
+            xcrun simctl io "${SIMULATOR_UDID}" screenshot \
+              "${UI_SMOKE_OUTPUT_PATH}/${filename}"
+          }
+
+          capture_ui en en_US --core-chat-lab core-chat-en.png
+          capture_ui zh-Hans zh_CN --core-chat-lab core-chat-zh-Hans.png
+          capture_ui en en_US --long-chat-lab long-chat.png
+
+          {
+            echo "Simulator: ${SIMULATOR_NAME}"
+            echo "UDID: ${SIMULATOR_UDID}"
+            echo "Bundle: ${bundle_id}"
+            echo "Build: signed Debug iphonesimulator"
+          } > "${UI_SMOKE_OUTPUT_PATH}/metadata.txt"
+
+      - name: Upload iPhone UI smoke artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: iphone-ui-smoke
+          path: ${{ env.UI_SMOKE_OUTPUT_PATH }}
+          if-no-files-found: error
 
       - name: Report slowest tests
         if: always()
