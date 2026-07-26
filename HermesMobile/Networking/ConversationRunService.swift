@@ -234,6 +234,49 @@ struct ConversationRunSSEParser {
     }
 }
 
+struct ConversationRunSSELineDecoder {
+    private var buffer: [UInt8] = []
+    private var previousByteWasCarriageReturn = false
+    private let maximumLineBytes: Int
+
+    init(
+        maximumLineBytes: Int = ConversationRunService.maximumResponseBytes
+    ) {
+        self.maximumLineBytes = maximumLineBytes
+    }
+
+    mutating func consume(byte: UInt8) throws -> String? {
+        switch byte {
+        case 0x0D:
+            previousByteWasCarriageReturn = true
+            return drain()
+        case 0x0A:
+            if previousByteWasCarriageReturn {
+                previousByteWasCarriageReturn = false
+                return nil
+            }
+            return drain()
+        default:
+            previousByteWasCarriageReturn = false
+            guard buffer.count < maximumLineBytes else {
+                throw ConversationRunServiceError.gatewayResponseTooLarge
+            }
+            buffer.append(byte)
+            return nil
+        }
+    }
+
+    mutating func finish() -> String? {
+        guard !buffer.isEmpty else { return nil }
+        return drain()
+    }
+
+    private mutating func drain() -> String {
+        defer { buffer.removeAll(keepingCapacity: true) }
+        return String(decoding: buffer, as: UTF8.self)
+    }
+}
+
 protocol ConversationRunServing: Sendable {
     func start(
         _ request: ConversationRunStartRequest
@@ -323,7 +366,6 @@ actor ConversationRunService: ConversationRunServing {
         self.session = session ?? Self.makeSession()
 
         let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
         self.decoder = decoder
     }
 
@@ -435,10 +477,20 @@ actor ConversationRunService: ConversationRunServing {
                         throw ConversationRunServiceError.unexpectedResponse
                     }
 
+                    var lineDecoder = ConversationRunSSELineDecoder()
                     var parser = ConversationRunSSEParser()
-                    for try await line in bytes.lines {
+                    for try await byte in bytes {
                         try Task.checkCancellation()
+                        guard let line = try lineDecoder.consume(byte: byte)
+                        else {
+                            continue
+                        }
                         for event in parser.consume(line: line) {
+                            continuation.yield(event)
+                        }
+                    }
+                    if let finalLine = lineDecoder.finish() {
+                        for event in parser.consume(line: finalLine) {
                             continuation.yield(event)
                         }
                     }

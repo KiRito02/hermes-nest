@@ -195,6 +195,26 @@ final class ConversationRunServiceTests: APIClientTestCase {
         XCTAssertEqual("run.completed", transportOnly.semanticEvent)
     }
 
+    func testLineDecoderPreservesSSEBlankLinesAndLineEndings() throws {
+        var decoder = ConversationRunSSELineDecoder()
+        var lines: [String] = []
+        let bytes = ": keepalive\r\n\r\ndata: {}\n\nfinal\r".utf8
+
+        for byte in bytes {
+            if let line = try decoder.consume(byte: byte) {
+                lines.append(line)
+            }
+        }
+        if let finalLine = decoder.finish() {
+            lines.append(finalLine)
+        }
+
+        XCTAssertEqual(
+            [": keepalive", "", "data: {}", "", "final"],
+            lines
+        )
+    }
+
     func testStreamDeliversDeltaBeforeTerminalAndUsesNoCookies() async throws {
         RunSSEURLProtocol.configure(chunks: [
             .init(
