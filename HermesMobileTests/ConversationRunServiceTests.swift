@@ -90,6 +90,75 @@ final class ConversationRunServiceTests: APIClientTestCase {
         XCTAssertEqual(.started, snapshot.state)
     }
 
+    func testStartIncludesExactProviderModelAndReasoningOverride() async throws {
+        let keychain = InMemoryKeychainStore()
+        try keychain.save(
+            "device-credential",
+            forKey: .companionDeviceCredential
+        )
+        let session = makeSession { request in
+            let body = try apiTestJSONBody(from: request)
+            XCTAssertEqual(
+                [
+                    "conversation_history",
+                    "input",
+                    "model",
+                    "model_options",
+                    "provider",
+                    "session_id",
+                ],
+                body.keys.sorted()
+            )
+            XCTAssertEqual(
+                "anthropic/claude-sonnet-4.6",
+                body["model"] as? String
+            )
+            XCTAssertEqual("openrouter", body["provider"] as? String)
+            let options = try XCTUnwrap(
+                body["model_options"] as? [String: Any]
+            )
+            XCTAssertEqual(
+                "high",
+                options["reasoning_effort"] as? String
+            )
+            XCTAssertEqual(
+                true,
+                (options["reasoning"] as? [String: Any])?["enabled"]
+                    as? Bool
+            )
+            XCTAssertEqual(
+                "high",
+                (options["reasoning"] as? [String: Any])?["effort"]
+                    as? String
+            )
+            return self.response(
+                status: 202,
+                json: #"{"run_id":"run-1","status":"started"}"#,
+                request: request
+            )
+        }
+        let service = ConversationRunService(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            keychain: keychain,
+            session: session
+        )
+
+        _ = try await service.start(
+            ConversationRunStartRequest(
+                input: "Continue",
+                sessionID: "session-1",
+                conversationHistory: [],
+                selection: CompanionModelSelection(
+                    model: "anthropic/claude-sonnet-4.6",
+                    provider: "openrouter",
+                    reasoningEffort: .high
+                )
+            )
+        )
+    }
+
     func testStatusAndStopKeepLifecycleStatesDistinct() async throws {
         let keychain = InMemoryKeychainStore()
         try keychain.save(
@@ -470,6 +539,63 @@ final class ConversationRunServiceTests: APIClientTestCase {
         XCTAssertEqual("session-1", startRequests[0].sessionID)
         XCTAssertEqual(["run-1"], statusRunIDs)
         XCTAssertEqual(.completed, viewModel.runState)
+    }
+
+    @MainActor
+    func testSessionModelSelectionLocksThenAppliesToSubsequentRun() async throws {
+        let session = try makeSessionSummary()
+        let repository = RunHistoryRepositoryStub(session: session)
+        let runService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: []
+        )
+        let inventory = CompanionModelInventory(
+            providers: [
+                CompanionModelProvider(
+                    slug: "openrouter",
+                    name: "OpenRouter",
+                    models: [
+                        .string("anthropic/claude-sonnet-4.6")
+                    ],
+                    authenticated: true,
+                    capabilities: [
+                        "anthropic/claude-sonnet-4.6": .object([
+                            "reasoning": .bool(true)
+                        ])
+                    ]
+                )
+            ],
+            model: "anthropic/claude-sonnet-4.6",
+            provider: "openrouter"
+        )
+        let modelService = ModelServiceStub(inventory: inventory)
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: runService,
+            supportsModelSelection: true,
+            modelService: modelService
+        )
+        await viewModel.load()
+        await viewModel.loadModelOptions()
+
+        let option = try XCTUnwrap(
+            viewModel.modelGroups.first?.models.first
+        )
+        XCTAssertTrue(await viewModel.selectModel(option))
+        XCTAssertTrue(await viewModel.selectReasoning(.high))
+        XCTAssertTrue(await viewModel.send("Continue"))
+
+        let locks = await modelService.lockedSelections
+        XCTAssertEqual(2, locks.count)
+        XCTAssertEqual(.high, locks.last?.reasoningEffort)
+
+        let requests = await runService.startRequests
+        XCTAssertEqual(1, requests.count)
+        XCTAssertEqual(locks.last, requests[0].selection)
     }
 
     @MainActor
@@ -1701,6 +1827,37 @@ private actor RunServiceStub: ConversationRunServing {
                 continuation.onTermination = { _ in task.cancel() }
             }
         }
+    }
+}
+
+private actor ModelServiceStub: CompanionModelServing {
+    private let inventory: CompanionModelInventory
+    private(set) var lockedSelections: [CompanionModelSelection] = []
+
+    init(inventory: CompanionModelInventory) {
+        self.inventory = inventory
+    }
+
+    func fetchOptions(
+        refresh: Bool
+    ) async throws -> CompanionModelInventory {
+        inventory
+    }
+
+    func lock(
+        _ selection: CompanionModelSelection,
+        sessionID: String
+    ) async throws -> CompanionModelLockAcknowledgement {
+        lockedSelections.append(selection)
+        return CompanionModelLockAcknowledgement(
+            object: "hermes.session.model_lock",
+            sessionID: sessionID,
+            runtime: CompanionModelRuntime(
+                provider: selection.provider,
+                model: selection.model,
+                modelLock: "accepted"
+            )
+        )
     }
 }
 

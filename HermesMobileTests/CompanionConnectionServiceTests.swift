@@ -468,6 +468,205 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
         XCTAssertFalse(missingResponseFeature.supportsRunApprovals)
     }
 
+    func testModelSelectionSupportRequiresCompanionAndGatewayContracts() throws {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let capabilities = try decoder.decode(
+            CompanionCapabilities.self,
+            from: Data(
+                """
+                {
+                  "companion": {
+                    "features": {
+                      "model_options_proxy": true,
+                      "session_model_lock_proxy": true
+                    },
+                    "endpoints": {
+                      "model_options": {
+                        "method": "GET",
+                        "path": "/api/model/options"
+                      },
+                      "session_model_lock": {
+                        "method": "POST",
+                        "path": "/api/sessions/{session_id}/model"
+                      }
+                    }
+                  },
+                  "gateway": {
+                    "status": "ok",
+                    "capabilities": {
+                      "features": {
+                        "model_options": true,
+                        "session_model_lock": true
+                      },
+                      "endpoints": {
+                        "model_options": {
+                          "method": "GET",
+                          "path": "/api/model/options"
+                        },
+                        "session_model_lock": {
+                          "method": "POST",
+                          "path": "/api/sessions/{session_id}/model"
+                        }
+                      }
+                    }
+                  }
+                }
+                """.utf8
+            )
+        )
+
+        XCTAssertTrue(capabilities.supportsModelSelection)
+    }
+
+    func testModelServiceUsesDeviceCredentialAndTolerantPickerShape() async throws {
+        let keychain = InMemoryKeychainStore()
+        try keychain.save(
+            "device-credential",
+            forKey: .companionDeviceCredential
+        )
+        var requestCount = 0
+        let session = makeSession { request in
+            requestCount += 1
+            XCTAssertEqual(
+                "Bearer device-credential",
+                request.value(forHTTPHeaderField: "Authorization")
+            )
+            XCTAssertNil(
+                request.value(forHTTPHeaderField: "API_SERVER_KEY")
+            )
+            switch requestCount {
+            case 1:
+                XCTAssertEqual("/api/model/options", request.url?.path)
+                XCTAssertEqual("refresh=true", request.url?.query)
+                XCTAssertEqual("GET", request.httpMethod)
+                return (
+                    self.httpResponse(for: request, status: 200),
+                    Data(
+                        """
+                        {
+                          "providers": [
+                            {
+                              "slug": "openrouter",
+                              "name": "OpenRouter",
+                              "models": [
+                                "anthropic/claude-sonnet-4.6",
+                                42
+                              ],
+                              "authenticated": true,
+                              "capabilities": {
+                                "anthropic/claude-sonnet-4.6": {
+                                  "reasoning": true,
+                                  "fast": false,
+                                  "future": "ignored"
+                                }
+                              },
+                              "future": {"ignored": true}
+                            },
+                            {
+                              "slug": "unconfigured",
+                              "name": "Unavailable",
+                              "models": [],
+                              "authenticated": false
+                            }
+                          ],
+                          "model": "anthropic/claude-sonnet-4.6",
+                          "provider": "openrouter",
+                          "future": ["ignored"]
+                        }
+                        """.utf8
+                    )
+                )
+            default:
+                XCTAssertEqual(
+                    "/api/sessions/session-1/model",
+                    request.url?.path
+                )
+                XCTAssertEqual("POST", request.httpMethod)
+                let body = try Self.requestBody(from: request)
+                let object = try XCTUnwrap(
+                    JSONSerialization.jsonObject(with: body)
+                        as? [String: Any]
+                )
+                XCTAssertEqual(
+                    "anthropic/claude-sonnet-4.6",
+                    object["model"] as? String
+                )
+                XCTAssertEqual(
+                    "openrouter",
+                    object["provider"] as? String
+                )
+                let options = try XCTUnwrap(
+                    object["model_options"] as? [String: Any]
+                )
+                XCTAssertEqual(
+                    "high",
+                    options["reasoning_effort"] as? String
+                )
+                XCTAssertEqual(
+                    true,
+                    (options["reasoning"] as? [String: Any])?["enabled"]
+                        as? Bool
+                )
+                XCTAssertEqual(
+                    "high",
+                    (options["reasoning"] as? [String: Any])?["effort"]
+                        as? String
+                )
+                return (
+                    self.httpResponse(for: request, status: 200),
+                    Data(
+                        """
+                        {
+                          "object": "hermes.session.model_lock",
+                          "session_id": "session-1",
+                          "runtime": {
+                            "provider": "openrouter",
+                            "model": "anthropic/claude-sonnet-4.6",
+                            "model_lock": "accepted",
+                            "future": true
+                          },
+                          "future": true
+                        }
+                        """.utf8
+                    )
+                )
+            }
+        }
+        let service = CompanionModelService(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            keychain: keychain,
+            session: session
+        )
+
+        let inventory = try await service.fetchOptions(refresh: true)
+        XCTAssertEqual(
+            "anthropic/claude-sonnet-4.6",
+            inventory.currentSelection?.model
+        )
+        XCTAssertEqual(1, inventory.catalogGroups.count)
+        XCTAssertTrue(
+            inventory.catalogGroups[0].models[0].supportsReasoning
+        )
+
+        let selection = CompanionModelSelection(
+            model: "anthropic/claude-sonnet-4.6",
+            provider: "openrouter",
+            reasoningEffort: .high
+        )
+        let acknowledgement = try await service.lock(
+            selection,
+            sessionID: "session-1"
+        )
+        XCTAssertEqual(selection.model, acknowledgement.selection?.model)
+        XCTAssertEqual(
+            selection.provider,
+            acknowledgement.selection?.provider
+        )
+    }
+
     @MainActor
     func testManagerTreatsGatewayUnavailableAsConnectedCompanionState() async throws {
         let connection = CompanionConnection(
@@ -531,6 +730,18 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
         configuration.httpShouldSetCookies = false
         configuration.protocolClasses = [MockURLProtocol.self]
         return URLSession(configuration: configuration)
+    }
+
+    private func httpResponse(
+        for request: URLRequest,
+        status: Int
+    ) -> HTTPURLResponse {
+        HTTPURLResponse(
+            url: request.url!,
+            statusCode: status,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/json"]
+        )!
     }
 
     private static func requestBody(from request: URLRequest) throws -> Data {
