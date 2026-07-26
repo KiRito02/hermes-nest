@@ -376,7 +376,7 @@ class GatewayDiscovery:
                 raise GatewayProxyError(
                     502,
                     "gateway_unauthorized",
-                    "The Hermes Gateway rejected its NAS-local credential.",
+            "The Hermes Gateway rejected its host-local credential.",
                 )
             if response.status >= 500:
                 raise GatewayProxyError(
@@ -483,7 +483,7 @@ class GatewayDiscovery:
                         raise GatewayProxyError(
                             502,
                             "gateway_unauthorized",
-                            "The Hermes Gateway rejected its NAS-local credential.",
+            "The Hermes Gateway rejected its host-local credential.",
                         )
                     if response.status >= 500:
                         raise GatewayProxyError(

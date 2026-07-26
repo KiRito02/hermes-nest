@@ -10,12 +10,12 @@ struct OnboardingTailscalePage: View {
                     stepNumber: 2,
                     icon: "iphone.and.arrow.forward",
                     title: String(localized: "Use a trusted HTTPS connection"),
-                    description: String(localized: "Use your Lucky HTTPS URL, or install Tailscale and join the same tailnet as your NAS. The next screen accepts either trusted HTTPS URL.")
+                    description: String(localized: "Use your Lucky HTTPS URL, or install Tailscale and join the same tailnet as your Hermes Agent host. The next screen accepts either trusted HTTPS URL.")
                 )
 
                 VStack(alignment: .leading, spacing: 14) {
                     tailscaleStep(number: "1", text: String(localized: "Preferred: use the Lucky HTTPS hostname that proxies only to Companion."))
-                    tailscaleStep(number: "2", text: String(localized: "Private alternative: install Tailscale and sign in to the NAS tailnet."))
+                    tailscaleStep(number: "2", text: String(localized: "Private alternative: install Tailscale and sign in to the Hermes Agent host's tailnet."))
                     tailscaleStep(number: "3", text: String(localized: "Do not expose Hermes Gateway directly or disable certificate checks."))
 
                     Button(action: openTailscaleInAppStore) {

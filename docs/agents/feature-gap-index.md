@@ -34,15 +34,15 @@ Issue/PR, not this index.
 | Persisted streaming turn | implemented | P0 | exec | Gateway Runs coordination in [#13](https://github.com/KiRito02/hermes-nest/pull/13) |
 | Run status/reconnect/stop | implemented | P0 | exec | Same-run reconciliation in [#13](https://github.com/KiRito02/hermes-nest/pull/13); never resubmits a prompt |
 | Approval request/response | implemented | P0 | exec | Capability-gated approval loop in [#14](https://github.com/KiRito02/hermes-nest/pull/14) |
-| Progressive streaming + long-chat benchmark | in-progress | P0 | — | [#19](https://github.com/KiRito02/hermes-nest/issues/19): windowed history, bounded presentation, adaptive chat surface |
+| Progressive streaming + long-chat benchmark | implemented | P0 | — | [#20](https://github.com/KiRito02/hermes-nest/pull/20): windowed history, bounded presentation, adaptive chat surface |
 | Rich model/provider/reasoning options | implemented | P1 | secret | [#17](https://github.com/KiRito02/hermes-nest/pull/17); live-accepted on Hermes `37a27664` |
 | Jobs | roadmap | P1 | write | Capability-gated scheduled/background work |
 | Skills/toolsets discovery | implemented | P1 | read | Read-only proxy and native discovery in [#18](https://github.com/KiRito02/hermes-nest/pull/18) |
-| Inline images | in-progress | P1 | privacy | [#19](https://github.com/KiRito02/hermes-nest/issues/19); current Runs transport does not advertise a safe multimodal contract |
-| Adaptive iPhone/iPad layout | in-progress | P1 | — | [#19](https://github.com/KiRito02/hermes-nest/issues/19): split shell, composer, sheets, transcript |
-| Allowed-root file browse/preview/download | roadmap | P1 | privacy | Companion-native; no arbitrary filesystem |
-| Streaming upload + turn availability | roadmap | P1 | write | Bounded, cancelable, atomic |
-| Built-in Memory management | roadmap | P1 | privacy | `MEMORY.md`/`USER.md`, locking and stale-write defense |
+| Inline images | roadmap | P1 | privacy | The current Runs transport still lacks a verified multimodal fixture; image files use the ordinary attachment path only |
+| Adaptive iPhone/iPad layout | implemented | P1 | — | [#20](https://github.com/KiRito02/hermes-nest/pull/20): split shell, composer, sheets, transcript |
+| Allowed-root file browse/preview/download | in-progress | P1 | privacy | [#21](https://github.com/KiRito02/hermes-nest/issues/21); Companion-native aliases, no arbitrary filesystem |
+| Streaming upload + turn availability | in-progress | P1 | write | [#21](https://github.com/KiRito02/hermes-nest/issues/21); bounded, cancelable, atomic |
+| Built-in Memory management | in-progress | P1 | privacy | [#21](https://github.com/KiRito02/hermes-nest/issues/21); `MEMORY.md`/`USER.md`, locking and stale-write defense |
 | Personal app-only signing/sideload workflow | roadmap | P0 | secret | Disable inherited extensions/App Groups in the personal scheme |
 | Arbitrary file delete/terminal/Git mutation | n-a | — | exec | Outside Companion v1 |
 | Hermes Bridge Kanban/Boards | n-a | — | write | WebUI/Bridge-specific |
@@ -58,7 +58,8 @@ For a selected capability:
 2. Probe the owner's Companion and capture sanitized capability evidence.
 3. For proxied behavior, record Hermes Agent version/commit and sanitized
    `/v1/capabilities`.
-4. Probe the local Gateway only from NAS; never expose `API_SERVER_KEY`.
+4. Probe the local Gateway only from the Hermes Agent host; never expose
+   `API_SERVER_KEY`.
 5. Check official API Server documentation and the matching read-only source,
    especially `gateway/platforms/api_server.py` and `tests/gateway/`.
 6. Record method/path/status/content type, required fields, event vocabulary,

@@ -27,7 +27,7 @@ reasonable window to ship a fix before disclosing publicly.
 
 ## Scope
 
-This repository owns the iOS App and planned NAS Companion. Vulnerabilities in
+This repository owns the iOS App and its self-hosted Companion. Vulnerabilities in
 the underlying
 [Hermes Agent API Server](https://github.com/NousResearch/hermes-agent) should
 be reported upstream. Pairing, device authentication/revocation, Gateway key

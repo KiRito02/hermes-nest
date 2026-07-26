@@ -5,7 +5,10 @@ from aiohttp.test_utils import TestClient, TestServer
 
 from hermex_companion.app import create_app
 from hermex_companion.gateway import GatewayDiscovery
-from hermex_companion.registry import DeviceRegistry
+from hermex_companion.registry import (
+    DeviceRegistry,
+    attachment_prompt_fingerprint,
+)
 
 
 class SessionLifecycleProxyContractTests(unittest.IsolatedAsyncioTestCase):
@@ -189,6 +192,52 @@ class SessionLifecycleProxyContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(415, non_json.status)
         self.assertEqual([], self.gateway_requests)
 
+    async def test_consumed_attachments_are_restored_on_matching_user_message(
+        self,
+    ) -> None:
+        self.gateway_mode = "attachment_history"
+        device = self.registry.authenticate(self.device_credential)
+        attachment_id = self.registry.reserve_attachment(
+            device_id=device.id,
+            session_id="session-1",
+            root_id="projects",
+            relative_path="incoming/notes.txt",
+            name="notes.txt",
+            content_type="text/plain",
+        )
+        self.registry.add_attachment_bytes(attachment_id, 12)
+        self.registry.complete_attachment(attachment_id)
+        self.registry.consume_attachments(
+            device_id=device.id,
+            session_id="session-1",
+            attachment_ids=[attachment_id],
+            run_id="run-attachment",
+            prompt_fingerprint=attachment_prompt_fingerprint("Review it"),
+        )
+
+        response = await self.client.get(
+            "/api/sessions/session-1/messages",
+            headers={
+                "Authorization": f"Bearer {self.device_credential}",
+            },
+        )
+
+        self.assertEqual(200, response.status)
+        messages = (await response.json())["data"]
+        self.assertEqual(
+            [
+                {
+                    "name": "notes.txt",
+                    "path": "incoming/notes.txt",
+                    "mime": "text/plain",
+                    "size": 12,
+                    "is_image": False,
+                }
+            ],
+            messages[0]["attachments"],
+        )
+        self.assertNotIn("attachments", messages[1])
+
     async def test_gateway_client_error_is_preserved_but_bad_success_is_bounded(
         self,
     ) -> None:
@@ -298,6 +347,29 @@ class SessionLifecycleProxyContractTests(unittest.IsolatedAsyncioTestCase):
 
     async def _gateway_messages(self, request: web.Request) -> web.Response:
         await self._record(request)
+        if self.gateway_mode == "attachment_history":
+            return web.json_response(
+                {
+                    "object": "list",
+                    "session_id": request.match_info["session_id"],
+                    "data": [
+                        {
+                            "id": 40,
+                            "session_id": request.match_info["session_id"],
+                            "role": "user",
+                            "content": "Review it",
+                            "timestamp": 100.0,
+                        },
+                        {
+                            "id": 41,
+                            "session_id": request.match_info["session_id"],
+                            "role": "assistant",
+                            "content": "Done",
+                            "timestamp": 101.0,
+                        },
+                    ],
+                }
+            )
         return web.json_response(
             {
                 "object": "list",

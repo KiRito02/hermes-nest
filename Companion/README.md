@@ -3,7 +3,7 @@
 Hermes Nest Companion is the App's only network endpoint. It listens on
 `127.0.0.1:8643` by default, authenticates each iPhone/iPad with a revocable
 device credential, and connects to Hermes Agent API Server on
-`127.0.0.1:8642`. The Gateway `API_SERVER_KEY` stays on the NAS.
+`127.0.0.1:8642`. The Gateway `API_SERVER_KEY` stays on the Hermes Agent host.
 
 The versioned App-facing protocol is defined by [CONTRACT.md](CONTRACT.md).
 
@@ -19,7 +19,7 @@ PYTHONPATH=Companion/src Companion/.venv/bin/python -m hermex_companion
 
 The process uses:
 
-- `$XDG_CONFIG_HOME/hermex-companion/` for NAS-local configuration;
+- `$XDG_CONFIG_HOME/hermex-companion/` for host-local configuration;
 - `$XDG_STATE_HOME/hermex-companion/companion.sqlite3` for the device registry;
 - `$XDG_DATA_HOME/hermex-companion/releases/` for installed releases.
 
@@ -27,7 +27,7 @@ If an XDG variable is unset, choose its normal absolute path for the service
 account before following the deployment steps. Do not put owner-local paths,
 user/group names, or secrets in git.
 
-## Install a release on a systemd NAS
+## Install a release on the Hermes Agent host with systemd
 
 The following placeholders mean absolute paths owned by the dedicated service
 account:
@@ -64,6 +64,39 @@ Edit that environment file locally and replace only
 `HERMEX_COMPANION_GATEWAY_KEY` with the existing Hermes Agent API Server key.
 Do not paste the key into a shell command, ticket, chat, log, or screenshot.
 
+Create `<config-home>/hermex-companion/workspaces.json` with only the folders
+the App may see. The paths are chosen on the Hermes Agent host, not in the App:
+
+```json
+{
+  "agent_working_directory": "/srv/hermes/workspace",
+  "roots": [
+    {
+      "id": "projects",
+      "name": "Projects",
+      "path": "/srv/hermes/workspace/projects",
+      "writable": true
+    },
+    {
+      "id": "archive",
+      "name": "Archive",
+      "path": "/srv/archive",
+      "writable": false
+    }
+  ],
+  "memory": {
+    "directory": "/srv/hermes/profile/memories",
+    "memory_char_limit": 2200,
+    "user_char_limit": 1375
+  }
+}
+```
+
+All configured directories must already exist. The App can browse aliases and
+choose subdirectories, but cannot add roots. Only writable roots inside
+`agent_working_directory` can supply chat attachments. The `memory` block is
+optional and enables only built-in `MEMORY.md` and `USER.md`.
+
 Render the unit with the real service identity and XDG paths:
 
 ```bash
@@ -74,6 +107,7 @@ python3 Companion/deploy/render_systemd.py \
   --state-home "<state-home>" \
   --data-home "<data-home>" \
   --companion-dir "<data-home>/hermex-companion/current/Companion" \
+  --host-config "<config-home>/hermex-companion/workspaces.json" \
   | sudo tee /etc/systemd/system/hermex-companion.service >/dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable --now hermex-companion.service
@@ -82,7 +116,9 @@ sudo systemctl enable --now hermex-companion.service
 The unit starts after network-online and, when that unit name exists, after
 `hermes-gateway.service`; it deliberately does not require Gateway. Companion
 therefore remains available and reports a degraded Gateway state during a
-Gateway restart.
+Gateway restart. The renderer derives systemd `ReadWritePaths` only from
+writable roots and the built-in Memory directory in the same host
+configuration.
 
 Verify bounded local liveness:
 

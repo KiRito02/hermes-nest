@@ -89,7 +89,7 @@ struct OnboardingView: View {
                 advanceToNextPage()
             }
         } message: {
-            Text("Copy the setup prompt before continuing so Hermes Nest Companion and HTTPS access are configured on your NAS.")
+            Text("Copy the setup prompt before continuing so Hermes Nest Companion and HTTPS access are configured on your Hermes Agent host.")
         }
     }
 

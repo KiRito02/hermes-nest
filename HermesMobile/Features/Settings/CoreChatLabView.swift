@@ -77,7 +77,7 @@ private enum CoreChatLabFixture {
             content = [
                 (
                     "user",
-                    "检查 NAS 上 Hermes Agent 的运行状态，并给我一个简洁摘要。"
+                    "检查运行服务器上 Hermes Agent 的状态，并给我一个简洁摘要。"
                 ),
                 (
                     "assistant",
@@ -96,7 +96,7 @@ private enum CoreChatLabFixture {
                 (
                     "assistant",
                     """
-                    可以，在 NAS 宿主机运行：
+                    可以，在 Hermes Agent 运行服务器上执行：
 
                     ```bash
                     systemctl status hermes-nest-companion
@@ -120,7 +120,7 @@ private enum CoreChatLabFixture {
             content = [
                 (
                     "user",
-                    "Check the Hermes Agent running on my NAS and give me a concise summary."
+                    "Check the Hermes Agent host and give me a concise summary."
                 ),
                 (
                     "assistant",
@@ -139,7 +139,7 @@ private enum CoreChatLabFixture {
                 (
                     "assistant",
                     """
-                    Run this on the NAS host:
+                    Run this on the Hermes Agent host:
 
                     ```bash
                     systemctl status hermes-nest-companion
@@ -236,8 +236,8 @@ private actor CoreChatLabRunService: ConversationRunServing {
 
     init(usesSimplifiedChinese: Bool) {
         response = usesSimplifiedChinese
-            ? "这是本地界面验收回复；没有向 NAS 或 Companion 发送请求。"
-            : "This is a local UI-review response; no NAS or Companion request was sent."
+            ? "这是本地界面验收回复；没有向 Hermes Agent 服务器或 Companion 发送请求。"
+            : "This is a local UI-review response; no Hermes Agent host or Companion request was sent."
     }
 
     func start(

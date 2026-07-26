@@ -1,7 +1,7 @@
-# Hermes Nest — iOS App + NAS Companion Project Specification
+# Hermes Nest — iOS App + Hermes Agent Host Companion Project Specification
 
 **Status:** source of truth for the `KiRito02/hermes-nest` fork
-**Target:** native iOS client for a self-hosted NAS Companion that uses the
+**Target:** native iOS client for a self-hosted Hermes Agent Companion that uses the
 local Hermes Agent API Server
 **Distribution:** personal sideload first; no App Store or TestFlight requirement
 
@@ -37,13 +37,13 @@ unknown SSE event types must be tolerated.
 ### 1.1 What we are building
 
 Hermes Nest is a native SwiftUI iPhone and iPad application plus a small
-self-hosted Companion running on the owner's NAS. The App connects only to the
+self-hosted Companion running on the Hermes Agent host. The App connects only to the
 Companion. The Companion connects over loopback to the API Server started by
 `hermes gateway`, transparently carries supported Gateway REST/SSE behavior,
 and supplies restricted file, upload, and built-in Memory management that the
 Gateway does not expose.
 
-The phone is the interaction and review surface. The NAS remains the execution
+The phone is the interaction and review surface. The Hermes Agent host remains the execution
 plane and owns agent processes, tools, memory, skills, sessions, and scheduled
 work. No vendor account, hosted relay, or third-party control plane is required.
 
@@ -69,7 +69,7 @@ This fork combines:
 - Not a hosted relay or account service.
 - Not a copy of Hermes Agent running on iOS.
 - Not dependent on `hermes-webui`.
-- Not a general NAS administration API, arbitrary filesystem browser, SSH/SFTP
+- Not a general host administration API, arbitrary filesystem browser, SSH/SFTP
   client, terminal, or Git mutation service.
 - Not required to preserve WebUI-only Kanban, projects, profile cookies,
   personalities, analytics, or private route shapes.
@@ -88,11 +88,11 @@ scope until explicitly approved.
 | Decision | Value |
 | --- | --- |
 | UI platform | Native SwiftUI, iOS 18+, adaptive iPhone and iPad |
-| App server | Self-hosted Hermes Nest Companion on the owner's NAS |
+| App server | Self-hosted Hermes Nest Companion on the Hermes Agent host |
 | Agent upstream | Hermes Agent API Server on Companion-local loopback |
 | App authentication | Revocable per-device Companion credential |
-| Gateway authentication | `API_SERVER_KEY`, stored only on the NAS |
-| Secret storage | App device credential in Keychain; NAS secrets outside git/logs |
+| Gateway authentication | `API_SERVER_KEY`, stored only on the Hermes Agent host |
+| Secret storage | App device credential in Keychain; host secrets outside git/logs |
 | Compatibility | Companion capabilities merged with sanitized Gateway capabilities |
 | Conversation storage | Server-owned sessions; local cache is read-only/offline support |
 | Streaming | SSE over `URLSession`/existing LDSwiftEventSource dependency |
@@ -131,12 +131,12 @@ The owner approved this Companion baseline on 2026-07-25:
 
 | Component | Approved value | Purpose |
 | --- | --- | --- |
-| Runtime | Python 3.11 | NAS-hosted Companion process |
+| Runtime | Python 3.11 | Hermes Agent host Companion process |
 | Direct runtime dependency | `aiohttp==3.13.3` | HTTP server/client and streaming transport |
 | Persistent store | SQLite through Python standard-library `sqlite3` | Device, pairing, revocation, and schema-version state |
 | Package layout | `Companion/pyproject.toml` plus `src/hermex_companion/` | PEP 621 repository package |
 | Locking/environment | `uv.lock`; `uv sync --frozen` creates `Companion/.venv` | Reproducible isolation from system Python and Hermes Agent |
-| Deployment | XDG user directories plus a repository systemd unit template | Restart-safe direct NAS deployment without Docker |
+| Deployment | XDG user directories plus a repository systemd unit template | Restart-safe direct host deployment without Docker |
 
 `aiohttp` is the only approved direct third-party runtime dependency. Adding
 another direct runtime or test dependency requires separate approval. The
@@ -172,7 +172,7 @@ Companion database, and virtual environments remain outside git.
 │ SwiftUI + feature interfaces │                              │
 │ device credential in Keychain│                              ▼
 │ SwiftData read-only cache    │                 ┌─────────────────────────┐
-└──────────────────────────────┘                 │ Hermes Nest Companion on NAS │
+└──────────────────────────────┘                 │ Companion on Agent host │
                                                │ device auth + capability│
                                                │ Gateway proxy           │
                                                │ workspace/upload        │
@@ -296,7 +296,7 @@ Gateway-compatible routes and adds separately versioned native operations.
 Companion URL examples:
 
 - private reverse proxy: `https://hermes-nest.example.com`
-- Tailscale with valid TLS: `https://nas-name.tailnet-name.ts.net`
+- Tailscale with valid TLS: `https://hermes-host.tailnet-name.ts.net`
 - simulator-only local development: an implementation-defined localhost port
 
 The App authenticates with its device credential. The Companion authenticates
@@ -313,7 +313,8 @@ Companion foundation must provide a versioned, testable interface for:
 - tolerant capabilities and version discovery;
 - listing and revoking paired devices.
 
-Pairing must require a short-lived, single-use secret created on the NAS. It may
+Pairing must require a short-lived, single-use secret created on the Hermes
+Agent host. It may
 be transferred by QR code or manual entry. Pairing must not require a Hermes Nest
 account, hosted claim server, or relay. The exact wire contract is owned by
 Issue #1.
@@ -424,7 +425,7 @@ capability explicitly supports mutation.
 
 The Companion first release supports:
 
-- NAS-configured allowed workspace roots that the App cannot broaden;
+- Hermes Agent host-configured workspace roots that the App cannot broaden;
 - paged directory browsing under those roots;
 - bounded text/binary metadata preview and authenticated download;
 - streaming upload to a selected allowed destination;
@@ -437,10 +438,13 @@ allowed root. Sensitive files and directories are denied even if nested under
 an allowed root. The first release does not include arbitrary delete, recursive
 mutation, shell access, or Git mutation.
 
-Uploads stream into a sibling temporary file, enforce a configured byte limit,
-and atomically publish only after success. Exact attachment-reference and
-turn-coordination shapes require a dedicated contract issue and live Gateway
-verification.
+Uploads stream into a sibling temporary file, enforce 50 MiB per file,
+10 pending files per device/session, and 200 MiB pending bytes per
+device/session, then atomically publish without overwriting only after success.
+The Companion-only
+`attachment_ids` field is resolved to Agent-working-directory-relative paths
+server-side and stripped before Gateway forwarding. Roots outside the
+configured Agent working directory are browse/download-only.
 
 ### 4.8 Companion built-in Memory management
 
@@ -461,7 +465,7 @@ adapters.
 
 The following inherited features are outside the approved first release:
 
-- arbitrary NAS filesystem or secret-file access;
+- arbitrary host filesystem or secret-file access;
 - file deletion, recursive directory mutation, terminal, and Git mutations;
 - WebUI projects, pin/archive actions, profile cookies, personalities, usage
   dashboard, and bridge slash-command metadata;
@@ -477,7 +481,7 @@ WebUI route against either the Companion or Agent API Server.
 
 ## 5. Security and networking
 
-### 5.1 NAS configuration
+### 5.1 Hermes Agent host configuration
 
 Hermes Gateway remains configured with a long random key:
 
@@ -494,9 +498,10 @@ hermes gateway
 
 The documented Gateway default is `127.0.0.1:8642`. Keep it on loopback so only
 the Companion can reach it. The Companion owns its separate configuration,
-device registry, allowed workspace roots, and Gateway credential. Exact
-configuration keys and service commands are defined only when the Companion
-implementation issue locks them.
+device registry, allowed workspace roots, built-in Memory directory, and
+Gateway credential. The App selects only aliases and descendants already
+authorized in host configuration; it cannot submit an absolute host path or
+add a root.
 
 ### 5.2 Remote transport
 
@@ -514,7 +519,7 @@ selected private/TLS transport.
 
 - Store Companion URL, device ID, and device credential in App Keychain.
 - Never place `API_SERVER_KEY` on the iPhone or in a pairing payload.
-- Store Companion device and Gateway secrets with owner-only NAS permissions.
+- Store Companion device and Gateway secrets with owner-only host permissions.
 - Do not persist secrets in SwiftData.
 - Do not include secrets in URLs, query strings, crash text, analytics, or logs.
 - Clear the App credential when the user removes the server or the device is
@@ -526,7 +531,8 @@ selected private/TLS transport.
 
 ### 5.4 Device lifecycle
 
-- Pairing secrets are single-use, short-lived, and generated on the NAS.
+- Pairing secrets are single-use, short-lived, and generated on the Hermes
+  Agent host.
 - Each installed App receives a distinct revocable credential.
 - Revocation affects only the selected device.
 - Device listing exposes labels and bounded activity metadata, never credential
@@ -568,7 +574,8 @@ Add a dedicated personal-sideload configuration/scheme during implementation:
 
 ### 6.2 Linux/Windows workflow
 
-- Linux/NAS can host the repository, run source-level checks, and drive GitHub.
+- Linux and Windows can host the repository, run source-level checks, and
+  drive GitHub.
 - A macOS GitHub Actions runner performs Xcode build/test validation.
 - CI may package an unsigned sideload artifact where appropriate.
 - AltStore/SideStore on Windows performs owner-device signing and installation.
@@ -676,9 +683,9 @@ Tracking issue: https://github.com/KiRito02/hermes-nest/issues/1
   systemd unit/install layout.
 - [ ] Define versioned health, pairing, device-auth, capability, error, and
   revocation contracts with tests.
-- [ ] Start the minimal NAS Companion without a hosted relay.
+- [ ] Start the minimal self-hosted Companion without a hosted relay.
 - [ ] Connect Companion to Gateway over loopback while keeping
-  `API_SERVER_KEY` NAS-local.
+  `API_SERVER_KEY` host-local.
 - [ ] Replace password/cookie/API-key onboarding with Companion URL and
   one-time local pairing.
 - [ ] Store only the device credential in App Keychain and redact secrets/logs.
@@ -722,7 +729,7 @@ This is the first implementation issue.
 
 ### Phase G — Companion files, upload, and built-in Memory
 
-- [ ] Configure NAS-side allowed roots.
+- [ ] Configure Hermes Agent host-side allowed roots.
 - [ ] Browse, preview, and download bounded allowed files.
 - [ ] Stream uploads with progress, cancellation, limits, and atomic completion.
 - [ ] Lock the verified upload-to-turn attachment strategy.
@@ -742,7 +749,7 @@ This is the first implementation issue.
 - [ ] Add personal signing configuration and app-only scheme.
 - [ ] Add macOS CI build/test and sideload artifact workflow.
 - [ ] Document Windows AltStore/SideStore installation.
-- [ ] Deploy Companion reproducibly on the owner's NAS with restart-safe state.
+- [ ] Deploy Companion reproducibly on the Hermes Agent host with restart-safe state.
 - [ ] Verify on the owner's iPhone and iPad-compatible layout.
 
 ---
@@ -782,12 +789,12 @@ When live credentials are available locally:
 
 ### 9.3 Companion validation
 
-- Run unit and contract suites on Linux/NAS.
+- Run unit and contract suites on Linux.
 - Verify Gateway proxy streaming with split frames, keepalives, reconnect, and
   slow subscribers.
 - Verify the service restarts without losing paired-device/revocation state or
   exposing secret material.
-- Validate allowed-root behavior against real NAS filesystem and container
+- Validate allowed-root behavior against real host filesystem and container
   mount layouts.
 - Run a live smoke only with owner-approved local credentials and sanitized
   output.
@@ -811,12 +818,13 @@ features, and explicitly unsupported destinations.
 
 ## 10. Definition of done for Companion v1
 
-Companion v1 is complete when the owner can deploy the NAS Companion, sideload
+Companion v1 is complete when the owner can deploy Companion on the Hermes
+Agent host, sideload
 the App, and:
 
 - pair locally without a vendor account or relay;
 - connect using a revocable device credential while `API_SERVER_KEY` remains
-  on the NAS;
+  on the Hermes Agent host;
 - pass Companion, Gateway, authentication, and capability checks;
 - list/create/open supported Hermes sessions;
 - load conversation history;
@@ -826,7 +834,7 @@ the App, and:
 - use the app without any `hermes-webui` process;
 - manage advertised Jobs, browse Skills/Toolsets, choose models, and send
   inline images;
-- browse allowed NAS files, upload a file with progress, and make the completed
+- browse allowed host files, upload a file with progress, and make the completed
   upload available to a Hermes turn;
 - view and safely manage built-in `MEMORY.md` and `USER.md`;
 - preserve supported Sessions/Chat behavior, compact text-send interaction,
@@ -839,7 +847,7 @@ the App, and:
 - reproduce the long-chat benchmark and compare it with the recorded baseline;
 - rebuild and reinstall through the documented Linux/Windows/macOS-CI
   sideload workflow;
-- restart/upgrade the Companion through the documented NAS workflow without
+- restart/upgrade the Companion through the documented host workflow without
   losing device or configuration state.
 
 No App Store listing, TestFlight build, public account system, telemetry, or
@@ -854,9 +862,6 @@ Stop and ask before implementing a choice that depends on one of these:
 1. Owner-specific bundle ID and Apple Team ID for the sideload configuration.
 2. Whether persisted session chat or Runs API is the primary turn transport
    after live verification.
-3. Exact NAS workspace roots and upload byte limits.
-4. Whether Companion v1 Memory management is built-in Memory only, as currently
-   specified, or must include a named external provider.
 
 ---
 

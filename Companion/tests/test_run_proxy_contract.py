@@ -1,14 +1,18 @@
 import asyncio
 import io
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
-from aiohttp import web
+from aiohttp import FormData, web
 from aiohttp.test_utils import TestClient, TestServer
 
 from hermex_companion.app import create_app
 from hermex_companion.gateway import GatewayDiscovery
 from hermex_companion.registry import DeviceRegistry
 from hermex_companion.run_proxy_contract import RUN_REQUEST_MAX_BODY_BYTES
+from hermex_companion.workspace import WorkspaceAccess, WorkspaceRoot
 
 
 class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
@@ -139,6 +143,156 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertIsNone(item["private_header"])
             self.assertEqual([], item["query"])
+
+    async def test_ready_attachments_are_resolved_server_side_then_consumed(
+        self,
+    ) -> None:
+        await self.client.close()
+        with TemporaryDirectory() as directory:
+            self.registry = DeviceRegistry(":memory:")
+            host_path = Path(directory) / "agent-workspace"
+            incoming = host_path / "incoming"
+            incoming.mkdir(parents=True)
+            workspace = WorkspaceAccess(
+                [
+                    WorkspaceRoot(
+                        id="projects",
+                        name="Projects",
+                        path=host_path,
+                        writable=True,
+                    )
+                ],
+                agent_working_directory=host_path,
+            )
+            companion_app = create_app(
+                self.registry,
+                GatewayDiscovery(
+                    str(self.gateway_server.make_url("")).rstrip("/"),
+                    "gateway-run-key",
+                ),
+                workspace=workspace,
+            )
+            self.client = TestClient(TestServer(companion_app))
+            await self.client.start_server()
+            self.device_credential = await self._pair_device()
+            headers = {
+                "Authorization": f"Bearer {self.device_credential}",
+            }
+            form = FormData()
+            form.add_field(
+                "metadata",
+                json.dumps(
+                    {
+                        "root_id": "projects",
+                        "directory": "incoming",
+                        "session_id": "session-attachments",
+                    }
+                ),
+                content_type="application/json",
+            )
+            form.add_field(
+                "file",
+                b"attachment body",
+                filename="notes.txt",
+                content_type="text/plain",
+            )
+            uploaded = await self.client.post(
+                "/companion/v1/uploads",
+                data=form,
+                headers=headers,
+            )
+            upload_id = (await uploaded.json())["upload"]["id"]
+
+            started = await self.client.post(
+                "/v1/runs",
+                json={
+                    "input": "Summarize the attachment.",
+                    "session_id": "session-attachments",
+                    "attachment_ids": [upload_id],
+                },
+                headers=headers,
+            )
+
+            self.assertEqual(202, started.status)
+            forwarded = self.gateway_requests[-1]["body"]
+            self.assertNotIn("attachment_ids", forwarded)
+            self.assertIn("incoming/notes.txt", forwarded["instructions"])
+            self.assertNotIn(str(host_path), forwarded["instructions"])
+            pending = await self.client.get(
+                "/companion/v1/uploads",
+                params={"session_id": "session-attachments"},
+                headers=headers,
+            )
+            self.assertEqual([], (await pending.json())["uploads"])
+
+    async def test_attachment_outside_agent_working_directory_is_rejected(
+        self,
+    ) -> None:
+        await self.client.close()
+        with TemporaryDirectory() as directory:
+            container = Path(directory)
+            agent_path = container / "agent-workspace"
+            host_path = container / "browse-only"
+            agent_path.mkdir()
+            host_path.mkdir()
+            attached_file = host_path / "notes.txt"
+            attached_file.write_text("attachment", encoding="utf-8")
+            self.registry = DeviceRegistry(":memory:")
+            workspace = WorkspaceAccess(
+                [
+                    WorkspaceRoot(
+                        id="browse-only",
+                        name="Browse Only",
+                        path=host_path,
+                        writable=True,
+                    )
+                ],
+                agent_working_directory=agent_path,
+            )
+            companion_app = create_app(
+                self.registry,
+                GatewayDiscovery(
+                    str(self.gateway_server.make_url("")).rstrip("/"),
+                    "gateway-run-key",
+                ),
+                workspace=workspace,
+            )
+            self.client = TestClient(TestServer(companion_app))
+            await self.client.start_server()
+            self.device_credential = await self._pair_device()
+            device = self.registry.authenticate(self.device_credential)
+            attachment_id = self.registry.reserve_attachment(
+                device_id=device.id,
+                session_id="session-outside",
+                root_id="browse-only",
+                relative_path="notes.txt",
+                name="notes.txt",
+                content_type="text/plain",
+            )
+            self.registry.add_attachment_bytes(
+                attachment_id,
+                attached_file.stat().st_size,
+            )
+            self.registry.complete_attachment(attachment_id)
+
+            response = await self.client.post(
+                "/v1/runs",
+                json={
+                    "input": "Read it.",
+                    "session_id": "session-outside",
+                    "attachment_ids": [attachment_id],
+                },
+                headers={
+                    "Authorization": f"Bearer {self.device_credential}",
+                },
+            )
+
+            self.assertEqual(409, response.status)
+            self.assertEqual(
+                "attachment_agent_path_unavailable",
+                (await response.json())["error"]["code"],
+            )
+            self.assertEqual([], self.gateway_requests)
 
     async def test_sse_is_forwarded_incrementally_and_byte_for_byte(self) -> None:
         headers = {

@@ -1,6 +1,8 @@
 import SwiftData
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
+import PhotosUI
 
 /// Native Companion-backed session management and paged history presentation.
 @MainActor
@@ -129,6 +131,32 @@ struct CompanionSessionListView: View {
                             ? "Browses read-only Hermes capabilities"
                             : "Unavailable with this Gateway or Companion"
                     ))
+                }
+
+                if connection.capabilities.supportsFiles {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        NavigationLink {
+                            CompanionWorkspaceView(
+                                companionURL: connection.companionURL
+                            )
+                        } label: {
+                            Image(systemName: "folder")
+                        }
+                        .accessibilityLabel("Files")
+                    }
+                }
+
+                if connection.capabilities.supportsBuiltInMemory {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        NavigationLink {
+                            CompanionMemoryView(
+                                companionURL: connection.companionURL
+                            )
+                        } label: {
+                            Image(systemName: "brain")
+                        }
+                        .accessibilityLabel("Memory")
+                    }
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -264,6 +292,7 @@ struct CompanionSessionListView: View {
                 connection.capabilities.supportsRunApprovals,
             supportsModelSelection:
                 connection.capabilities.supportsModelSelection,
+            supportsUploads: connection.capabilities.supportsUploads,
             onUpdated: { session in
                 selectedSessionID = session.id
                 viewModel.updateSessionSnapshot(
@@ -356,8 +385,10 @@ struct CompanionSessionHistoryView: View {
     let companionURL: URL
     let supportsRunApprovals: Bool
     let supportsModelSelection: Bool
+    let supportsUploads: Bool
     let runService: (any ConversationRunServing)?
     let modelService: (any CompanionModelServing)?
+    let workspaceService: any CompanionWorkspaceServing
     let onUpdated: (SessionSummary) -> Void
     let onForked: () -> Void
     let onDeleted: (String) -> Void
@@ -373,6 +404,13 @@ struct CompanionSessionHistoryView: View {
     @State private var showsModelPicker = false
     @State private var showsUsage = false
     @State private var showsAttachmentUnavailable = false
+    @State private var showsUploadDestination = false
+    @State private var showsFileImporter = false
+    @State private var showsAttachmentSourcePicker = false
+    @State private var showsPhotoPicker = false
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
+    @State private var uploadDestination: CompanionUploadDestination?
+    @State private var attachmentUploadTask: Task<Void, Never>?
     @State private var draftMessage = ""
     @State private var isUserInteractingWithScroll = false
     @FocusState private var composerIsFocused: Bool
@@ -383,8 +421,10 @@ struct CompanionSessionHistoryView: View {
         companionURL: URL,
         supportsRunApprovals: Bool,
         supportsModelSelection: Bool,
+        supportsUploads: Bool = false,
         runService: (any ConversationRunServing)? = nil,
         modelService: (any CompanionModelServing)? = nil,
+        workspaceService: (any CompanionWorkspaceServing)? = nil,
         onUpdated: @escaping (SessionSummary) -> Void,
         onForked: @escaping () -> Void,
         onDeleted: @escaping (String) -> Void
@@ -393,8 +433,12 @@ struct CompanionSessionHistoryView: View {
         self.companionURL = companionURL
         self.supportsRunApprovals = supportsRunApprovals
         self.supportsModelSelection = supportsModelSelection
+        self.supportsUploads = supportsUploads
         self.runService = runService
         self.modelService = modelService
+        let resolvedWorkspaceService = workspaceService
+            ?? CompanionWorkspaceService(companionURL: companionURL)
+        self.workspaceService = resolvedWorkspaceService
         self.onUpdated = onUpdated
         self.onForked = onForked
         self.onDeleted = onDeleted
@@ -406,7 +450,8 @@ struct CompanionSessionHistoryView: View {
                 runService: runService,
                 supportsRunApprovals: supportsRunApprovals,
                 supportsModelSelection: supportsModelSelection,
-                modelService: modelService
+                modelService: modelService,
+                workspaceService: resolvedWorkspaceService
             )
         )
     }
@@ -477,6 +522,12 @@ struct CompanionSessionHistoryView: View {
                 ForEach(viewModel.visibleMessages) { message in
                     CompanionMessageRow(
                         message: message,
+                        reasoningGroups: viewModel.durableReasoning(
+                            anchoredTo: message
+                        ),
+                        toolCallGroups: viewModel.durableToolActivity(
+                            anchoredTo: message
+                        ),
                         transcriptMediaCacheNamespace: companionURL.absoluteString
                     )
                     .equatable()
@@ -596,8 +647,10 @@ struct CompanionSessionHistoryView: View {
                 companionURL: companionURL,
                 supportsRunApprovals: supportsRunApprovals,
                 supportsModelSelection: supportsModelSelection,
+                supportsUploads: supportsUploads,
                 runService: runService,
                 modelService: modelService,
+                workspaceService: workspaceService,
                 onUpdated: onUpdated,
                 onForked: onForked,
                 onDeleted: onDeleted
@@ -646,9 +699,15 @@ struct CompanionSessionHistoryView: View {
                 await viewModel.load(modelContext: modelContext)
             }
             await viewModel.loadModelOptions()
+            if supportsUploads {
+                await viewModel.restorePendingUploads()
+            }
         }
         .refreshable {
             await viewModel.load(modelContext: modelContext)
+            if supportsUploads {
+                await viewModel.restorePendingUploads()
+            }
         }
         .alert("Rename Session", isPresented: $isRenaming) {
             TextField("Session name", text: $renameTitle)
@@ -695,6 +754,74 @@ struct CompanionSessionHistoryView: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showsUploadDestination) {
+            CompanionUploadDestinationPicker(
+                service: workspaceService
+            ) { destination in
+                uploadDestination = destination
+                showsUploadDestination = false
+                Task { @MainActor in
+                    await Task.yield()
+                    showsAttachmentSourcePicker = true
+                }
+            }
+        }
+        .confirmationDialog(
+            "Choose attachment source",
+            isPresented: $showsAttachmentSourcePicker,
+            titleVisibility: .visible
+        ) {
+            Button("Files") {
+                showsFileImporter = true
+            }
+            Button("Photos") {
+                showsPhotoPicker = true
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .fileImporter(
+            isPresented: $showsFileImporter,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: true
+        ) { result in
+            handleSelectedFiles(result)
+        }
+        .photosPicker(
+            isPresented: $showsPhotoPicker,
+            selection: $selectedPhotoItems,
+            maxSelectionCount: max(
+                1,
+                10 - viewModel.pendingUploads.count
+            ),
+            matching: .images
+        )
+        .onChange(of: selectedPhotoItems) { _, items in
+            guard !items.isEmpty else { return }
+            handleSelectedPhotos(items)
+        }
+        .alert(
+            "Attachment failed",
+            isPresented: Binding(
+                get: { viewModel.attachmentErrorMessage != nil },
+                set: { if !$0 { viewModel.clearAttachmentError() } }
+            )
+        ) {
+            if viewModel.canRetryAttachmentUpload {
+                Button("Retry") {
+                    viewModel.clearAttachmentError()
+                    attachmentUploadTask?.cancel()
+                    attachmentUploadTask = Task { @MainActor in
+                        defer { attachmentUploadTask = nil }
+                        await viewModel.retryAttachmentUpload()
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                viewModel.clearAttachmentError()
+            }
+        } message: {
+            Text(viewModel.attachmentErrorMessage ?? "")
+        }
     }
 
     private var companionComposer: some View {
@@ -711,32 +838,48 @@ struct CompanionSessionHistoryView: View {
                     .accessibilityIdentifier("companion.run.status")
             }
 
+            if !viewModel.pendingUploads.isEmpty
+                || viewModel.isUploadingAttachment {
+                attachmentStrip
+            }
+
             modelControls
 
             composerInputLayout {
                 Button {
-                    showsAttachmentUnavailable = true
+                    if supportsUploads {
+                        viewModel.prepareAttachmentSelection()
+                        showsUploadDestination = true
+                    } else {
+                        showsAttachmentUnavailable = true
+                    }
                 } label: {
                     Image(systemName: "plus")
                         .frame(width: 32, height: 32)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .accessibilityLabel("Add image")
+                .disabled(
+                    viewModel.pendingUploads.count >= 10
+                        || viewModel.isUploadingAttachment
+                )
+                .accessibilityLabel("Add attachment")
                 .accessibilityHint(
-                    "Unavailable because the current Hermes Runs API does not advertise image input."
+                    supportsUploads
+                        ? "Choose an authorized upload folder, then select files."
+                        : "Unavailable because Companion does not advertise uploads."
                 )
                 .accessibilityIdentifier(
                     "companion.attachment.unavailable"
                 )
                 .alert(
-                    "Images unavailable with Hermes Runs",
+                    "Attachments unavailable",
                     isPresented: $showsAttachmentUnavailable
                 ) {
                     Button("OK", role: .cancel) {}
                 } message: {
                     Text(
-                        "Unavailable because the current Hermes Runs API does not advertise image input."
+                        "The connected Companion does not advertise the secure upload contract."
                     )
                 }
 
@@ -815,6 +958,59 @@ struct CompanionSessionHistoryView: View {
         .frame(maxWidth: HermesNestDesign.transcriptMaximumWidth)
         .frame(maxWidth: .infinity)
         .background(.regularMaterial)
+    }
+
+    private var attachmentStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(
+                    Array(viewModel.pendingUploads.enumerated()),
+                    id: \.offset
+                ) { _, upload in
+                    HStack(spacing: 6) {
+                        Image(systemName: "doc")
+                        Text(upload.name?.nilIfEmpty ?? "Attachment")
+                            .lineLimit(1)
+                        Button {
+                            Task {
+                                await viewModel.removePendingUpload(upload)
+                            }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Remove attachment")
+                    }
+                    .font(.caption)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(
+                        Color.secondary.opacity(0.12),
+                        in: Capsule()
+                    )
+                }
+
+                if viewModel.isUploadingAttachment {
+                    HStack(spacing: 7) {
+                        ProgressView(
+                            value: viewModel.attachmentUploadProgress ?? 0
+                        )
+                        .frame(width: 54)
+                            .controlSize(.small)
+                        Text(
+                            (viewModel.attachmentUploadProgress ?? 0)
+                                .formatted(.percent.precision(.fractionLength(0)))
+                        )
+                        .monospacedDigit()
+                        Button("Cancel") {
+                            attachmentUploadTask?.cancel()
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .font(.caption)
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -964,6 +1160,124 @@ struct CompanionSessionHistoryView: View {
             }
         }
     }
+
+    private func handleSelectedFiles(
+        _ result: Result<[URL], Error>
+    ) {
+        guard let destination = uploadDestination else { return }
+        switch result {
+        case .failure(let error):
+            viewModel.setAttachmentError(error.localizedDescription)
+        case .success(let urls):
+            let remaining = max(
+                0,
+                10 - viewModel.pendingUploads.count
+            )
+            let selected = Array(urls.prefix(remaining))
+            attachmentUploadTask?.cancel()
+            attachmentUploadTask = Task { @MainActor in
+                defer { attachmentUploadTask = nil }
+                for url in selected {
+                    guard !Task.isCancelled else { return }
+                    let accessed = url.startAccessingSecurityScopedResource()
+                    defer {
+                        if accessed {
+                            url.stopAccessingSecurityScopedResource()
+                        }
+                    }
+                    do {
+                        let values = try url.resourceValues(
+                            forKeys: [.fileSizeKey, .contentTypeKey]
+                        )
+                        if let size = values.fileSize,
+                           size > CompanionWorkspaceService.maximumUploadBytes {
+                            viewModel.setAttachmentError(
+                                String(
+                                    localized:
+                                        "\(url.lastPathComponent) exceeds the 50 MiB limit."
+                                )
+                            )
+                            continue
+                        }
+                        let data = try await Task.detached(
+                            priority: .userInitiated
+                        ) {
+                            try Data(
+                                contentsOf: url,
+                                options: [.mappedIfSafe]
+                            )
+                        }.value
+                        guard !Task.isCancelled else { return }
+                        _ = await viewModel.uploadAttachment(
+                            data: data,
+                            filename: url.lastPathComponent,
+                            contentType:
+                                values.contentType?.preferredMIMEType
+                                ?? "application/octet-stream",
+                            destination: destination
+                        )
+                    } catch {
+                        guard !(error is CancellationError) else { return }
+                        viewModel.setAttachmentError(
+                            error.localizedDescription
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func handleSelectedPhotos(_ items: [PhotosPickerItem]) {
+        guard let destination = uploadDestination else { return }
+        attachmentUploadTask?.cancel()
+        attachmentUploadTask = Task { @MainActor in
+            defer {
+                attachmentUploadTask = nil
+                selectedPhotoItems = []
+            }
+            for item in items {
+                guard !Task.isCancelled else { return }
+                do {
+                    guard
+                        let data = try await item.loadTransferable(
+                            type: Data.self
+                        )
+                    else {
+                        continue
+                    }
+                    guard
+                        data.count
+                            <= CompanionWorkspaceService.maximumUploadBytes
+                    else {
+                        viewModel.setAttachmentError(
+                            String(
+                                localized:
+                                    "The selected photo exceeds the 50 MiB limit."
+                            )
+                        )
+                        continue
+                    }
+                    let type = item.supportedContentTypes.first
+                        ?? UTType.image
+                    let fileExtension =
+                        type.preferredFilenameExtension ?? "jpg"
+                    _ = await viewModel.uploadAttachment(
+                        data: data,
+                        filename:
+                            "photo-\(UUID().uuidString).\(fileExtension)",
+                        contentType:
+                            type.preferredMIMEType ?? "image/jpeg",
+                        destination: destination
+                    )
+                } catch {
+                    guard !(error is CancellationError) else { return }
+                    viewModel.setAttachmentError(
+                        error.localizedDescription
+                    )
+                }
+            }
+        }
+    }
 }
 
 private struct CompanionSendButtonStyle: ButtonStyle {
@@ -993,6 +1307,8 @@ private struct CompanionSendButtonStyle: ButtonStyle {
 @MainActor
 private struct CompanionMessageRow: View, Equatable {
     let message: ChatMessage
+    let reasoningGroups: [ReasoningGroup]
+    let toolCallGroups: [ToolCallGroup]
     let transcriptMediaCacheNamespace: String
 
     static func == (
@@ -1000,12 +1316,24 @@ private struct CompanionMessageRow: View, Equatable {
         rhs: CompanionMessageRow
     ) -> Bool {
         lhs.message == rhs.message
+            && lhs.reasoningGroups == rhs.reasoningGroups
+            && lhs.toolCallGroups == rhs.toolCallGroups
             && lhs.transcriptMediaCacheNamespace
                 == rhs.transcriptMediaCacheNamespace
     }
 
     var body: some View {
         VStack(alignment: actionAlignment, spacing: 2) {
+            if message.role == "assistant" {
+                ForEach(reasoningGroups) { group in
+                    ReasoningBlockView(text: group.text)
+                }
+
+                ForEach(toolCallGroups) { group in
+                    ToolActivityGroupView(group: group)
+                }
+            }
+
             MessageBubbleView(
                 message: message,
                 transcriptMediaCacheNamespace:

@@ -73,7 +73,7 @@ enum SessionRepositoryError: LocalizedError, Equatable {
         case .invalidQuery:
             return String(localized: "The session list request is invalid.")
         case .gatewayUnauthorized:
-            return String(localized: "Companion's NAS-local Gateway credential was rejected.")
+            return String(localized: "Companion's host-local Gateway credential was rejected.")
         case .gatewayUnavailable:
             return String(localized: "Hermes Gateway is temporarily unavailable.")
         case .gatewayIncompatible:

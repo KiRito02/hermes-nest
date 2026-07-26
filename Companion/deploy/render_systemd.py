@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 from pathlib import Path
 
@@ -12,6 +13,7 @@ PLACEHOLDERS = {
     "STATE_HOME",
     "DATA_HOME",
     "COMPANION_DIR",
+    "HOST_WRITE_PATHS",
 }
 
 
@@ -42,7 +44,31 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--state-home", required=True, type=absolute_path)
     result.add_argument("--data-home", required=True, type=absolute_path)
     result.add_argument("--companion-dir", required=True, type=absolute_path)
+    result.add_argument("--host-config", type=absolute_path)
     return result
+
+
+def configured_write_paths(config_path: str | None) -> list[str]:
+    if config_path is None:
+        return []
+    payload = json.loads(Path(config_path).read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("host configuration must be a JSON object")
+    paths: list[str] = []
+    roots = payload.get("roots", [])
+    if not isinstance(roots, list):
+        raise ValueError("host configuration roots must be a list")
+    for root in roots:
+        if not isinstance(root, dict):
+            raise ValueError("host configuration roots must be objects")
+        if root.get("writable") is True:
+            paths.append(absolute_path(root.get("path", "")))
+    memory = payload.get("memory")
+    if memory is not None:
+        if not isinstance(memory, dict):
+            raise ValueError("host Memory configuration must be an object")
+        paths.append(absolute_path(memory.get("directory", "")))
+    return list(dict.fromkeys(paths))
 
 
 def render(arguments: argparse.Namespace) -> str:
@@ -55,6 +81,10 @@ def render(arguments: argparse.Namespace) -> str:
         "STATE_HOME": arguments.state_home,
         "DATA_HOME": arguments.data_home,
         "COMPANION_DIR": arguments.companion_dir,
+        "HOST_WRITE_PATHS": "\n".join(
+            f"ReadWritePaths={path}"
+            for path in configured_write_paths(arguments.host_config)
+        ),
     }
     for name, value in values.items():
         rendered = rendered.replace(f"@{name}@", value)

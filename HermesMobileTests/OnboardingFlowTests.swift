@@ -81,7 +81,7 @@ final class OnboardingFlowTests: XCTestCase {
         XCTAssertFalse(OnboardingFlowPolicy.showsServerShortcut(for: OnboardingFlowPolicy.connectPageIndex))
     }
 
-    func testAgentSetupPromptUsesCompanionAndKeepsGatewaySecretOnNAS() {
+    func testAgentSetupPromptUsesCompanionAndKeepsGatewaySecretOnHost() {
         let prompt = OnboardingFlowPolicy.agentSetupPrompt
 
         XCTAssertTrue(prompt.contains("Hermes Nest Companion"))
@@ -89,7 +89,7 @@ final class OnboardingFlowTests: XCTestCase {
         XCTAssertTrue(prompt.contains("API_SERVER_KEY"))
         XCTAssertTrue(prompt.contains("Lucky HTTPS"))
         XCTAssertTrue(prompt.contains("/companion/v1/health"))
-        XCTAssertTrue(prompt.contains("trusted NAS shell"))
+        XCTAssertTrue(prompt.contains("trusted shell on the Hermes Agent host"))
         XCTAssertTrue(prompt.contains("Do not create, print, request, or include the pairing secret in this chat."))
         XCTAssertTrue(prompt.contains("Do not install hermes-webui"))
         XCTAssertFalse(prompt.contains("HERMES_WEBUI_PASSWORD"))

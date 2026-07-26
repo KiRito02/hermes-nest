@@ -74,7 +74,7 @@ struct OnboardingWelcomePage: View {
                         .minimumScaleFactor(0.86)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text("Connect securely to Hermes Nest Companion on your NAS.")
+                    Text("Connect securely to Companion on your Hermes Agent host.")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.58))
                         .fixedSize(horizontal: false, vertical: true)

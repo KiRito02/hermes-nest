@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 import hashlib
+import json
 from pathlib import Path
 import secrets
 import sqlite3
@@ -10,6 +11,8 @@ import time
 from uuid import uuid4
 
 MAX_LISTED_DEVICES = 256
+MAX_PENDING_ATTACHMENTS = 10
+MAX_PENDING_ATTACHMENT_BYTES = 200 * 1024 * 1024
 
 
 class RegistryError(Exception):
@@ -34,6 +37,41 @@ class RegisteredDevice:
     created_at: int
     last_seen_at: int | None
     revoked_at: int | None
+
+
+@dataclass(frozen=True)
+class AttachmentRecord:
+    id: str
+    root_id: str
+    relative_path: str
+    name: str
+    content_type: str
+    size: int
+    state: str
+    file_device: int | None
+    file_inode: int | None
+
+
+@dataclass(frozen=True)
+class ConsumedAttachmentRecord:
+    id: str
+    root_id: str
+    relative_path: str
+    name: str
+    content_type: str
+    size: int
+    run_id: str
+    prompt_fingerprint: str
+
+
+def attachment_prompt_fingerprint(content: object) -> str:
+    encoded = json.dumps(
+        content,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 class DeviceRegistry:
@@ -228,6 +266,339 @@ class DeviceRegistry:
                 "Device was not found.",
             )
 
+    def reserve_attachment(
+        self,
+        *,
+        device_id: str,
+        session_id: str,
+        root_id: str,
+        relative_path: str,
+        name: str,
+        content_type: str,
+    ) -> str:
+        attachment_id = str(uuid4())
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            pending_count = self._connection.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM attachments
+                WHERE device_id = ?
+                  AND session_id = ?
+                  AND state IN ('receiving', 'ready')
+                """,
+                (device_id, session_id),
+            ).fetchone()["count"]
+            if pending_count >= MAX_PENDING_ATTACHMENTS:
+                raise RegistryError(
+                    409,
+                    "attachment_count_exceeded",
+                    f"A session may have at most {MAX_PENDING_ATTACHMENTS} pending attachments.",
+                )
+            self._connection.execute(
+                """
+                INSERT INTO attachments (
+                    id, device_id, session_id, root_id, relative_path, name,
+                    content_type, size, state, created_at, consumed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'receiving', ?, NULL)
+                """,
+                (
+                    attachment_id,
+                    device_id,
+                    session_id,
+                    root_id,
+                    relative_path,
+                    name,
+                    content_type,
+                    int(self._clock()),
+                ),
+            )
+            self._connection.commit()
+            return attachment_id
+        except Exception:
+            self._connection.rollback()
+            raise
+
+    def add_attachment_bytes(self, attachment_id: str, byte_count: int) -> None:
+        if byte_count <= 0:
+            return
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            attachment = self._connection.execute(
+                """
+                SELECT device_id, session_id, state
+                FROM attachments
+                WHERE id = ?
+                """,
+                (attachment_id,),
+            ).fetchone()
+            if attachment is None or attachment["state"] != "receiving":
+                raise RegistryError(
+                    409,
+                    "attachment_not_receiving",
+                    "The attachment is not accepting bytes.",
+                )
+            pending_bytes = self._connection.execute(
+                """
+                SELECT COALESCE(SUM(size), 0) AS total
+                FROM attachments
+                WHERE device_id = ?
+                  AND session_id = ?
+                  AND state IN ('receiving', 'ready')
+                """,
+                (attachment["device_id"], attachment["session_id"]),
+            ).fetchone()["total"]
+            if pending_bytes + byte_count > MAX_PENDING_ATTACHMENT_BYTES:
+                raise RegistryError(
+                    413,
+                    "attachment_bytes_exceeded",
+                    "Pending attachments may not exceed 200 MiB per device and session.",
+                )
+            self._connection.execute(
+                "UPDATE attachments SET size = size + ? WHERE id = ?",
+                (byte_count, attachment_id),
+            )
+            self._connection.commit()
+        except Exception:
+            self._connection.rollback()
+            raise
+
+    def complete_attachment(
+        self,
+        attachment_id: str,
+        *,
+        file_device: int | None = None,
+        file_inode: int | None = None,
+    ) -> None:
+        cursor = self._connection.execute(
+            """
+            UPDATE attachments
+            SET state = 'ready', file_device = ?, file_inode = ?
+            WHERE id = ? AND state = 'receiving'
+            """,
+            (file_device, file_inode, attachment_id),
+        )
+        self._connection.commit()
+        if cursor.rowcount != 1:
+            raise RegistryError(
+                409,
+                "attachment_not_receiving",
+                "The attachment is not accepting bytes.",
+            )
+
+    def discard_attachment(self, attachment_id: str) -> None:
+        self._connection.execute(
+            "DELETE FROM attachments WHERE id = ? AND state = 'receiving'",
+            (attachment_id,),
+        )
+        self._connection.commit()
+
+    def list_ready_attachments(
+        self,
+        *,
+        device_id: str,
+        session_id: str,
+    ) -> list[AttachmentRecord]:
+        rows = self._connection.execute(
+            """
+            SELECT id, root_id, relative_path, name, content_type, size, state,
+                   file_device, file_inode
+            FROM attachments
+            WHERE device_id = ? AND session_id = ? AND state = 'ready'
+            ORDER BY created_at, id
+            LIMIT ?
+            """,
+            (device_id, session_id, MAX_PENDING_ATTACHMENTS),
+        ).fetchall()
+        return [
+            AttachmentRecord(
+                id=row["id"],
+                root_id=row["root_id"],
+                relative_path=row["relative_path"],
+                name=row["name"],
+                content_type=row["content_type"],
+                size=row["size"],
+                state=row["state"],
+                file_device=row["file_device"],
+                file_inode=row["file_inode"],
+            )
+            for row in rows
+        ]
+
+    def ready_attachment_for_device(
+        self,
+        *,
+        device_id: str,
+        attachment_id: str,
+    ) -> AttachmentRecord:
+        row = self._connection.execute(
+            """
+            SELECT id, root_id, relative_path, name, content_type, size, state,
+                   file_device, file_inode
+            FROM attachments
+            WHERE id = ? AND device_id = ? AND state = 'ready'
+            """,
+            (attachment_id, device_id),
+        ).fetchone()
+        if row is None:
+            raise RegistryError(
+                404,
+                "attachment_not_found",
+                "The pending attachment was not found.",
+            )
+        return AttachmentRecord(
+            id=row["id"],
+            root_id=row["root_id"],
+            relative_path=row["relative_path"],
+            name=row["name"],
+            content_type=row["content_type"],
+            size=row["size"],
+            state=row["state"],
+            file_device=row["file_device"],
+            file_inode=row["file_inode"],
+        )
+
+    def delete_ready_attachment(
+        self,
+        *,
+        device_id: str,
+        attachment_id: str,
+    ) -> None:
+        cursor = self._connection.execute(
+            """
+            DELETE FROM attachments
+            WHERE id = ? AND device_id = ? AND state = 'ready'
+            """,
+            (attachment_id, device_id),
+        )
+        self._connection.commit()
+        if cursor.rowcount != 1:
+            raise RegistryError(
+                404,
+                "attachment_not_found",
+                "The pending attachment was not found.",
+            )
+
+    def get_ready_attachments(
+        self,
+        *,
+        device_id: str,
+        session_id: str,
+        attachment_ids: list[str],
+    ) -> list[AttachmentRecord]:
+        if not attachment_ids:
+            return []
+        placeholders = ",".join("?" for _ in attachment_ids)
+        rows = self._connection.execute(
+            f"""
+            SELECT id, root_id, relative_path, name, content_type, size, state,
+                   file_device, file_inode
+            FROM attachments
+            WHERE device_id = ?
+              AND session_id = ?
+              AND state = 'ready'
+              AND id IN ({placeholders})
+            """,
+            (device_id, session_id, *attachment_ids),
+        ).fetchall()
+        records = {
+            row["id"]: AttachmentRecord(
+                id=row["id"],
+                root_id=row["root_id"],
+                relative_path=row["relative_path"],
+                name=row["name"],
+                content_type=row["content_type"],
+                size=row["size"],
+                state=row["state"],
+                file_device=row["file_device"],
+                file_inode=row["file_inode"],
+            )
+            for row in rows
+        }
+        if len(records) != len(attachment_ids):
+            raise RegistryError(
+                409,
+                "attachment_not_ready",
+                "One or more attachments are missing, consumed, or owned by another device.",
+            )
+        return [records[attachment_id] for attachment_id in attachment_ids]
+
+    def consume_attachments(
+        self,
+        *,
+        device_id: str,
+        session_id: str,
+        attachment_ids: list[str],
+        run_id: str,
+        prompt_fingerprint: str,
+    ) -> None:
+        if not attachment_ids:
+            return
+        placeholders = ",".join("?" for _ in attachment_ids)
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            cursor = self._connection.execute(
+                f"""
+                UPDATE attachments
+                SET state = 'consumed', consumed_at = ?, run_id = ?,
+                    prompt_fingerprint = ?
+                WHERE device_id = ?
+                  AND session_id = ?
+                  AND state = 'ready'
+                  AND id IN ({placeholders})
+                """,
+                (
+                    int(self._clock()),
+                    run_id,
+                    prompt_fingerprint,
+                    device_id,
+                    session_id,
+                    *attachment_ids,
+                ),
+            )
+            if cursor.rowcount != len(attachment_ids):
+                raise RegistryError(
+                    409,
+                    "attachment_not_ready",
+                    "One or more attachments are no longer ready.",
+                )
+            self._connection.commit()
+        except Exception:
+            self._connection.rollback()
+            raise
+
+    def list_consumed_attachments(
+        self,
+        *,
+        session_id: str,
+    ) -> list[ConsumedAttachmentRecord]:
+        rows = self._connection.execute(
+            """
+            SELECT id, root_id, relative_path, name, content_type, size,
+                   run_id, prompt_fingerprint
+            FROM attachments
+            WHERE session_id = ?
+              AND state = 'consumed'
+              AND run_id IS NOT NULL
+              AND prompt_fingerprint IS NOT NULL
+            ORDER BY consumed_at, run_id, id
+            """,
+            (session_id,),
+        ).fetchall()
+        return [
+            ConsumedAttachmentRecord(
+                id=row["id"],
+                root_id=row["root_id"],
+                relative_path=row["relative_path"],
+                name=row["name"],
+                content_type=row["content_type"],
+                size=row["size"],
+                run_id=row["run_id"],
+                prompt_fingerprint=row["prompt_fingerprint"],
+            )
+            for row in rows
+        ]
+
     def _initialize_schema(self) -> None:
         self._connection.executescript(
             """
@@ -248,9 +619,54 @@ class DeviceRegistry:
                 revoked_at INTEGER
             );
 
-            PRAGMA user_version = 1;
+            CREATE TABLE IF NOT EXISTS attachments (
+                id TEXT PRIMARY KEY,
+                device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+                session_id TEXT NOT NULL,
+                root_id TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                name TEXT NOT NULL,
+                content_type TEXT NOT NULL,
+                size INTEGER NOT NULL CHECK (size >= 0),
+                state TEXT NOT NULL CHECK (
+                    state IN ('receiving', 'ready', 'consumed')
+                ),
+                created_at INTEGER NOT NULL,
+                consumed_at INTEGER,
+                run_id TEXT,
+                prompt_fingerprint TEXT,
+                file_device INTEGER,
+                file_inode INTEGER
+            );
+
+            CREATE INDEX IF NOT EXISTS attachments_pending
+            ON attachments (device_id, session_id, state);
+
+            PRAGMA user_version = 5;
             """
         )
+        attachment_columns = {
+            row["name"]
+            for row in self._connection.execute(
+                "PRAGMA table_info(attachments)"
+            ).fetchall()
+        }
+        if "run_id" not in attachment_columns:
+            self._connection.execute(
+                "ALTER TABLE attachments ADD COLUMN run_id TEXT"
+            )
+        if "prompt_fingerprint" not in attachment_columns:
+            self._connection.execute(
+                "ALTER TABLE attachments ADD COLUMN prompt_fingerprint TEXT"
+            )
+        if "file_device" not in attachment_columns:
+            self._connection.execute(
+                "ALTER TABLE attachments ADD COLUMN file_device INTEGER"
+            )
+        if "file_inode" not in attachment_columns:
+            self._connection.execute(
+                "ALTER TABLE attachments ADD COLUMN file_inode INTEGER"
+            )
         self._connection.commit()
 
     @staticmethod

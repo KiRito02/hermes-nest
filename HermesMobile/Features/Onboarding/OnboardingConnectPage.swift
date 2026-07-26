@@ -29,7 +29,7 @@ struct OnboardingConnectPage: View {
                         .font(.title3.weight(.bold))
                         .foregroundStyle(.white)
 
-                    Text("Enter the HTTPS URL that Lucky or Tailscale proxies to Hermes Nest Companion, then enter a one-time pairing secret created on your NAS.")
+                    Text("Enter the HTTPS URL that Lucky or Tailscale proxies to Hermes Nest Companion, then enter a one-time pairing secret created on your Hermes Agent host.")
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.5))
                         .fixedSize(horizontal: false, vertical: true)

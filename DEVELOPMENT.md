@@ -3,7 +3,7 @@
 Hermes Nest is developed as two cooperating deliverables:
 
 - the native iPhone/iPad App;
-- a self-hosted Companion on the owner's NAS.
+- a self-hosted Companion on the server running Hermes Agent.
 
 The App connects only to Companion. Companion connects over loopback to the
 Hermes Agent API Server started by `hermes gateway` and adds restricted file,
@@ -19,9 +19,9 @@ development workflow.
 
 ## Development environments
 
-### Linux/NAS and Windows
+### Linux and Windows
 
-Linux/NAS and Windows are suitable for:
+Linux and Windows are suitable for:
 
 - source editing and Git/GitHub work;
 - documentation and fixture review;
@@ -47,7 +47,7 @@ The approved Companion implementation baseline is:
 - `uv.lock` and `uv sync --frozen` creating `Companion/.venv`;
 - a dedicated virtual environment separate from both system Python packages
   and the Hermes Agent venv;
-- direct NAS-host deployment through systemd.
+- direct Hermes Agent host deployment through systemd.
 
 Configuration, state, and installed releases use the service account's XDG
 config/state/data directories. The repository supplies a systemd unit template;
@@ -70,7 +70,7 @@ The App uses a system-trusted HTTPS Companion URL:
 https://<your-companion-host>
 ```
 
-The NAS runs Companion beside a loopback-only Gateway:
+The Hermes Agent host runs Companion beside a loopback-only Gateway:
 
 ```dotenv
 API_SERVER_ENABLED=true
@@ -98,7 +98,8 @@ Before debugging the App, verify in order:
 4. sanitized Gateway capabilities carried by Companion.
 
 Never put `API_SERVER_KEY` on the App device. Local Gateway diagnostics may use
-it on the NAS, but it must not appear in shared logs, issues, screenshots, or
+it on the Hermes Agent host, but it must not appear in shared logs, issues,
+screenshots, or
 fixtures.
 
 ## Remote access
@@ -266,7 +267,7 @@ on `iPhone 17 Pro Max` (or the nearest available iPhone Pro). Its optional
 
 Download them from the workflow run's **Artifacts** section under
 `iphone-ui-smoke`. The fixture contains no Companion URL, device credential,
-NAS secret, or network request.
+host secret, or network request.
 
 Enable `run_ipad` only when adaptive layout changed. It independently builds,
 installs, and launches the signed App on an available 13-inch iPad Pro. Neither
@@ -429,7 +430,7 @@ Compare matched fixtures against `master`:
 
 ### Companion files and Memory
 
-- Directory browsing cannot escape a NAS-configured allowed root.
+- Directory browsing cannot escape a host-configured allowed root.
 - Sensitive paths, symlink escapes, special files, and oversized previews fail
   safely.
 - Upload reports progress, supports cancellation, and leaves no partial
