@@ -128,7 +128,7 @@ enum CompanionReasoningEffort:
         case .low: return String(localized: "Low")
         case .medium: return String(localized: "Medium")
         case .high: return String(localized: "High")
-        case .xhigh: return String(localized: "Extra High")
+        case .xhigh: return String(localized: "XHigh")
         }
     }
 }
@@ -414,10 +414,87 @@ protocol CompanionModelServing: Sendable {
     ) async throws -> CompanionModelLockAcknowledgement
 }
 
+protocol CompanionModelSelectionStoring: Sendable {
+    func load(
+        companionURL: URL,
+        sessionID: String
+    ) async -> CompanionModelSelection?
+    func save(
+        _ selection: CompanionModelSelection,
+        companionURL: URL,
+        sessionID: String
+    ) async
+}
+
+actor CompanionModelSelectionStore: CompanionModelSelectionStoring {
+    private static let keyPrefix =
+        "hermesNest.companionModelSelection."
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    func load(
+        companionURL: URL,
+        sessionID: String
+    ) -> CompanionModelSelection? {
+        guard
+            let value = defaults.dictionary(
+                forKey: Self.key(
+                    companionURL: companionURL,
+                    sessionID: sessionID
+                )
+            ) as? [String: String],
+            let model = value["model"]?.trimmedNonEmpty,
+            let provider = value["provider"]?.trimmedNonEmpty
+        else {
+            return nil
+        }
+        let reasoningEffort = value["reasoning_effort"].flatMap {
+            CompanionReasoningEffort(rawValue: $0)
+        }
+        return CompanionModelSelection(
+            model: model,
+            provider: provider,
+            reasoningEffort: reasoningEffort
+        )
+    }
+
+    func save(
+        _ selection: CompanionModelSelection,
+        companionURL: URL,
+        sessionID: String
+    ) {
+        var value = [
+            "model": selection.model,
+            "provider": selection.provider,
+        ]
+        value["reasoning_effort"] = selection.reasoningEffort?.rawValue
+        defaults.set(
+            value,
+            forKey: Self.key(
+                companionURL: companionURL,
+                sessionID: sessionID
+            )
+        )
+    }
+
+    private static func key(
+        companionURL: URL,
+        sessionID: String
+    ) -> String {
+        let scope = "\(companionURL.absoluteString)|\(sessionID)"
+        return keyPrefix + Data(scope.utf8).base64EncodedString()
+    }
+}
+
 enum CompanionModelServiceError: LocalizedError, Equatable {
     case missingDeviceCredential
     case invalidSelection
     case invalidSessionID
+    case noAvailableModels
     case companionUnreachable
     case deviceCredentialInvalid
     case deviceRevoked
@@ -433,6 +510,8 @@ enum CompanionModelServiceError: LocalizedError, Equatable {
             return String(localized: "Choose a valid Hermes model and provider.")
         case .invalidSessionID:
             return String(localized: "The Hermes session identity is invalid.")
+        case .noAvailableModels:
+            return String(localized: "No authenticated Hermes model providers are available.")
         case .companionUnreachable:
             return String(localized: "Hermes Nest Companion is unreachable.")
         case .deviceRevoked:
@@ -490,7 +569,7 @@ actor CompanionModelService: CompanionModelServing {
             body: Optional<CompanionModelLockBody>.none
         )
         guard !inventory.catalogGroups.isEmpty else {
-            throw CompanionModelServiceError.gatewayIncompatible
+            throw CompanionModelServiceError.noAvailableModels
         }
         return inventory
     }
@@ -655,13 +734,13 @@ actor CompanionModelService: CompanionModelServing {
 private struct CompanionModelLockBody: Encodable {
     let model: String
     let provider: String
-    let modelOptions: CompanionModelOptionsBody?
+    let modelOptions: HermesModelOptionsBody?
 
     init(selection: CompanionModelSelection) {
         model = selection.model
         provider = selection.provider
         modelOptions = selection.reasoningEffort.map {
-            CompanionModelOptionsBody(reasoningEffort: $0)
+            HermesModelOptionsBody(reasoningEffort: $0)
         }
     }
 
@@ -672,13 +751,13 @@ private struct CompanionModelLockBody: Encodable {
     }
 }
 
-private struct CompanionModelOptionsBody: Encodable {
+struct HermesModelOptionsBody: Encodable {
     let reasoningEffort: CompanionReasoningEffort
-    let reasoning: CompanionReasoningBody
+    let reasoning: HermesReasoningBody
 
     init(reasoningEffort: CompanionReasoningEffort) {
         self.reasoningEffort = reasoningEffort
-        reasoning = CompanionReasoningBody(
+        reasoning = HermesReasoningBody(
             enabled: reasoningEffort != .none,
             effort: reasoningEffort
         )
@@ -690,7 +769,7 @@ private struct CompanionModelOptionsBody: Encodable {
     }
 }
 
-private struct CompanionReasoningBody: Encodable {
+struct HermesReasoningBody: Encodable {
     let enabled: Bool
     let effort: CompanionReasoningEffort
 }

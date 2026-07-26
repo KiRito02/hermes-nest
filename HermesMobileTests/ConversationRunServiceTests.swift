@@ -585,9 +585,12 @@ final class ConversationRunServiceTests: APIClientTestCase {
         let option = try XCTUnwrap(
             viewModel.modelGroups.first?.models.first
         )
-        XCTAssertTrue(await viewModel.selectModel(option))
-        XCTAssertTrue(await viewModel.selectReasoning(.high))
-        XCTAssertTrue(await viewModel.send("Continue"))
+        let didSelectModel = await viewModel.selectModel(option)
+        let didSelectReasoning = await viewModel.selectReasoning(.high)
+        let didSend = await viewModel.send("Continue")
+        XCTAssertTrue(didSelectModel)
+        XCTAssertTrue(didSelectReasoning)
+        XCTAssertTrue(didSend)
 
         let locks = await modelService.lockedSelections
         XCTAssertEqual(2, locks.count)
@@ -596,6 +599,151 @@ final class ConversationRunServiceTests: APIClientTestCase {
         let requests = await runService.startRequests
         XCTAssertEqual(1, requests.count)
         XCTAssertEqual(locks.last, requests[0].selection)
+    }
+
+    @MainActor
+    func testModelSelectionBlocksSendAndRejectsOverlappingLocks() async throws {
+        let session = try makeSessionSummary()
+        let repository = RunHistoryRepositoryStub(session: session)
+        let runService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: []
+        )
+        let modelService = ModelServiceStub(
+            inventory: makeModelInventory()
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: runService,
+            supportsModelSelection: true,
+            modelService: modelService,
+            modelSelectionStore: InMemoryModelSelectionStore()
+        )
+        await viewModel.load()
+        await viewModel.loadModelOptions()
+        await modelService.setLockDelayNanoseconds(100_000_000)
+
+        let lockTask = Task { @MainActor in
+            await viewModel.selectReasoning(.high)
+        }
+        await waitUntil { viewModel.isApplyingModelSelection }
+
+        XCTAssertFalse(viewModel.canSend)
+        let overlappingLock = await viewModel.selectReasoning(.low)
+        let sendWhileLocking = await viewModel.send("Must wait")
+        XCTAssertFalse(overlappingLock)
+        XCTAssertFalse(sendWhileLocking)
+        let didLock = await lockTask.value
+        XCTAssertTrue(didLock)
+
+        let didSend = await viewModel.send("Continue")
+        XCTAssertTrue(didSend)
+        let requests = await runService.startRequests
+        XCTAssertEqual(.high, requests.first?.selection?.reasoningEffort)
+    }
+
+    @MainActor
+    func testAcknowledgedReasoningSelectionRestoresForSameServerSession() async throws {
+        let session = SessionSummary(
+            sessionId: "session-1",
+            title: "Run test",
+            model: "anthropic/claude-sonnet-4.6",
+            modelProvider: "openrouter"
+        )
+        let companionURL = try XCTUnwrap(
+            URL(string: "https://companion.example.test")
+        )
+        let store = InMemoryModelSelectionStore()
+        let modelService = ModelServiceStub(
+            inventory: makeModelInventory()
+        )
+
+        let firstViewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: RunHistoryRepositoryStub(session: session),
+            companionURL: companionURL,
+            runService: RunServiceStub(
+                eventResult: .holdOpen,
+                statuses: []
+            ),
+            supportsModelSelection: true,
+            modelService: modelService,
+            modelSelectionStore: store
+        )
+        await firstViewModel.load()
+        await firstViewModel.loadModelOptions()
+        let didSelectReasoning =
+            await firstViewModel.selectReasoning(.high)
+        XCTAssertTrue(didSelectReasoning)
+
+        let restoredViewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: RunHistoryRepositoryStub(session: session),
+            companionURL: companionURL,
+            runService: RunServiceStub(
+                eventResult: .holdOpen,
+                statuses: []
+            ),
+            supportsModelSelection: true,
+            modelService: modelService,
+            modelSelectionStore: store
+        )
+        await restoredViewModel.load()
+        await restoredViewModel.loadModelOptions()
+
+        XCTAssertEqual(.high, restoredViewModel.selectedModel?.reasoningEffort)
+    }
+
+    @MainActor
+    func testRestoredSelectionDropsReasoningWhenCatalogNoLongerSupportsIt() async throws {
+        let session = SessionSummary(
+            sessionId: "session-1",
+            model: "anthropic/claude-sonnet-4.6",
+            modelProvider: "openrouter"
+        )
+        let companionURL = try XCTUnwrap(
+            URL(string: "https://companion.example.test")
+        )
+        let store = InMemoryModelSelectionStore()
+        await store.save(
+            CompanionModelSelection(
+                model: "anthropic/claude-sonnet-4.6",
+                provider: "openrouter",
+                reasoningEffort: .high
+            ),
+            companionURL: companionURL,
+            sessionID: "session-1"
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: RunHistoryRepositoryStub(session: session),
+            companionURL: companionURL,
+            runService: RunServiceStub(
+                eventResult: .holdOpen,
+                statuses: []
+            ),
+            supportsModelSelection: true,
+            modelService: ModelServiceStub(
+                inventory: makeModelInventory(
+                    supportsReasoning: false
+                )
+            ),
+            modelSelectionStore: store
+        )
+
+        await viewModel.load()
+        await viewModel.loadModelOptions()
+
+        XCTAssertNil(viewModel.selectedModel?.reasoningEffort)
+        let storedSelection = await store.load(
+            companionURL: companionURL,
+            sessionID: "session-1"
+        )
+        XCTAssertNil(storedSelection?.reasoningEffort)
     }
 
     @MainActor
@@ -1534,6 +1682,30 @@ final class ConversationRunServiceTests: APIClientTestCase {
         )
     }
 
+    private func makeModelInventory(
+        supportsReasoning: Bool = true
+    ) -> CompanionModelInventory {
+        CompanionModelInventory(
+            providers: [
+                CompanionModelProvider(
+                    slug: "openrouter",
+                    name: "OpenRouter",
+                    models: [
+                        .string("anthropic/claude-sonnet-4.6")
+                    ],
+                    authenticated: true,
+                    capabilities: [
+                        "anthropic/claude-sonnet-4.6": .object([
+                            "reasoning": .bool(supportsReasoning)
+                        ])
+                    ]
+                )
+            ],
+            model: "anthropic/claude-sonnet-4.6",
+            provider: "openrouter"
+        )
+    }
+
     @MainActor
     private func waitUntil(
         timeoutNanoseconds: UInt64 = 1_000_000_000,
@@ -1833,6 +2005,7 @@ private actor RunServiceStub: ConversationRunServing {
 private actor ModelServiceStub: CompanionModelServing {
     private let inventory: CompanionModelInventory
     private(set) var lockedSelections: [CompanionModelSelection] = []
+    private var lockDelayNanoseconds: UInt64 = 0
 
     init(inventory: CompanionModelInventory) {
         self.inventory = inventory
@@ -1844,11 +2017,18 @@ private actor ModelServiceStub: CompanionModelServing {
         inventory
     }
 
+    func setLockDelayNanoseconds(_ value: UInt64) {
+        lockDelayNanoseconds = value
+    }
+
     func lock(
         _ selection: CompanionModelSelection,
         sessionID: String
     ) async throws -> CompanionModelLockAcknowledgement {
         lockedSelections.append(selection)
+        if lockDelayNanoseconds > 0 {
+            try await Task.sleep(nanoseconds: lockDelayNanoseconds)
+        }
         return CompanionModelLockAcknowledgement(
             object: "hermes.session.model_lock",
             sessionID: sessionID,
@@ -1858,6 +2038,32 @@ private actor ModelServiceStub: CompanionModelServing {
                 modelLock: "accepted"
             )
         )
+    }
+}
+
+private actor InMemoryModelSelectionStore:
+    CompanionModelSelectionStoring
+{
+    private var selections: [String: CompanionModelSelection] = [:]
+
+    func load(
+        companionURL: URL,
+        sessionID: String
+    ) -> CompanionModelSelection? {
+        selections[key(companionURL: companionURL, sessionID: sessionID)]
+    }
+
+    func save(
+        _ selection: CompanionModelSelection,
+        companionURL: URL,
+        sessionID: String
+    ) {
+        selections[key(companionURL: companionURL, sessionID: sessionID)] =
+            selection
+    }
+
+    private func key(companionURL: URL, sessionID: String) -> String {
+        "\(companionURL.absoluteString)|\(sessionID)"
     }
 }
 

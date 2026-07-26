@@ -648,88 +648,94 @@ private struct CompanionSessionHistoryView: View {
 
     @ViewBuilder
     private var modelControls: some View {
-        if let error = viewModel.modelSelectionErrorMessage,
-           viewModel.modelGroups.isEmpty {
-            HStack(spacing: 8) {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .lineLimit(2)
-                Spacer(minLength: 8)
-                Button("Retry") {
-                    Task {
-                        await viewModel.loadModelOptions(refresh: true)
-                    }
-                }
-                .font(.caption.weight(.semibold))
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        } else {
-            HStack(spacing: 8) {
-                Button {
-                    showsModelPicker = true
-                } label: {
-                    HStack(spacing: 6) {
-                        if viewModel.isLoadingModelOptions {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Image(systemName: "cpu")
-                        }
-                        Text(viewModel.selectedModelDisplayName)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Image(systemName: "chevron.down")
-                            .font(.caption2.weight(.semibold))
-                    }
-                    .font(.caption.weight(.semibold))
-                    .frame(minHeight: 32)
-                }
-                .buttonStyle(.bordered)
-                .disabled(
-                    !viewModel.canChangeModel
-                        || viewModel.modelGroups.isEmpty
-                )
-                .accessibilityLabel("Choose model")
-                .accessibilityIdentifier("companion.model.picker")
-
-                if viewModel.selectedModelSupportsReasoning {
-                    Menu {
-                        ForEach(
-                            CompanionReasoningEffort.allCases,
-                            id: \.self
-                        ) { effort in
-                            Button {
-                                Task {
-                                    await viewModel.selectReasoning(effort)
-                                }
-                            } label: {
-                                if viewModel.selectedModel?
-                                    .reasoningEffort == effort {
-                                    Label(
-                                        effort.displayName,
-                                        systemImage: "checkmark"
-                                    )
-                                } else {
-                                    Text(effort.displayName)
-                                }
+        VStack(alignment: .leading, spacing: 6) {
+            if let error = viewModel.modelSelectionErrorMessage {
+                HStack(spacing: 8) {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .lineLimit(2)
+                    Spacer(minLength: 8)
+                    if viewModel.modelGroups.isEmpty {
+                        Button("Retry") {
+                            Task {
+                                await viewModel.loadModelOptions(refresh: true)
                             }
                         }
+                        .font(.caption.weight(.semibold))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if !viewModel.modelGroups.isEmpty
+                || viewModel.modelSelectionErrorMessage == nil {
+                HStack(spacing: 8) {
+                    Button {
+                        showsModelPicker = true
                     } label: {
-                        Label(
-                            viewModel.selectedReasoningDisplayName,
-                            systemImage: "brain"
-                        )
+                        HStack(spacing: 6) {
+                            if viewModel.isLoadingModelOptions {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "cpu")
+                            }
+                            Text(viewModel.selectedModelDisplayName)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Image(systemName: "chevron.down")
+                                .font(.caption2.weight(.semibold))
+                        }
                         .font(.caption.weight(.semibold))
                         .frame(minHeight: 32)
                     }
                     .buttonStyle(.bordered)
-                    .disabled(!viewModel.canChangeModel)
-                    .accessibilityLabel("Choose reasoning effort")
-                    .accessibilityIdentifier("companion.reasoning.picker")
-                }
+                    .disabled(
+                        !viewModel.canChangeModel
+                            || viewModel.modelGroups.isEmpty
+                    )
+                    .accessibilityLabel("Choose model")
+                    .accessibilityIdentifier("companion.model.picker")
 
-                Spacer(minLength: 0)
+                    if viewModel.selectedModelSupportsReasoning {
+                        Menu {
+                            ForEach(
+                                CompanionReasoningEffort.allCases,
+                                id: \.self
+                            ) { effort in
+                                Button {
+                                    Task {
+                                        await viewModel.selectReasoning(effort)
+                                    }
+                                } label: {
+                                    if viewModel.selectedModel?
+                                        .reasoningEffort == effort {
+                                        Label(
+                                            effort.displayName,
+                                            systemImage: "checkmark"
+                                        )
+                                    } else {
+                                        Text(effort.displayName)
+                                    }
+                                }
+                            }
+                        } label: {
+                            Label(
+                                viewModel.selectedReasoningDisplayName,
+                                systemImage: "brain"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .frame(minHeight: 32)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!viewModel.canChangeModel)
+                        .accessibilityLabel("Choose reasoning effort")
+                        .accessibilityIdentifier("companion.reasoning.picker")
+                    }
+
+                    Spacer(minLength: 0)
+                }
             }
         }
     }

@@ -509,7 +509,7 @@ actor ConversationRunService: ConversationRunServing {
             model: request.selection?.model,
             provider: request.selection?.provider,
             modelOptions: request.selection?.reasoningEffort.map {
-                RunModelOptions(reasoningEffort: $0)
+                HermesModelOptionsBody(reasoningEffort: $0)
             }
         )
         let encoded: Data
@@ -890,7 +890,7 @@ private struct RunStartBody: Encodable {
     let conversationHistory: [RunHistoryMessage]
     let model: String?
     let provider: String?
-    let modelOptions: RunModelOptions?
+    let modelOptions: HermesModelOptionsBody?
 
     enum CodingKeys: String, CodingKey {
         case input
@@ -900,29 +900,6 @@ private struct RunStartBody: Encodable {
         case provider
         case modelOptions = "model_options"
     }
-}
-
-private struct RunModelOptions: Encodable {
-    let reasoningEffort: CompanionReasoningEffort
-    let reasoning: RunReasoningBody
-
-    init(reasoningEffort: CompanionReasoningEffort) {
-        self.reasoningEffort = reasoningEffort
-        reasoning = RunReasoningBody(
-            enabled: reasoningEffort != .none,
-            effort: reasoningEffort
-        )
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case reasoningEffort = "reasoning_effort"
-        case reasoning
-    }
-}
-
-private struct RunReasoningBody: Encodable {
-    let enabled: Bool
-    let effort: CompanionReasoningEffort
 }
 
 private struct RunApprovalBody: Encodable {

@@ -167,6 +167,8 @@ class ModelProxyContractTests(unittest.IsolatedAsyncioTestCase):
             ("malformed", 502, "gateway_malformed_response"),
             ("wrong_shape", 502, "gateway_incompatible"),
             ("bad_provider", 502, "gateway_incompatible"),
+            ("wrong_content_type", 502, "gateway_incompatible"),
+            ("too_large", 502, "gateway_response_too_large"),
             ("unauthorized", 502, "gateway_unauthorized"),
             ("unavailable", 503, "gateway_unavailable"),
         ):
@@ -340,6 +342,13 @@ class ModelProxyContractTests(unittest.IsolatedAsyncioTestCase):
                     "model": "m",
                     "provider": "p",
                 }
+            )
+        if self.gateway_mode == "wrong_content_type":
+            return web.Response(text="{}", content_type="text/plain")
+        if self.gateway_mode == "too_large":
+            return web.Response(
+                body=b"x" * ((2 * 1024 * 1024) + 1),
+                content_type="application/json",
             )
         if self.gateway_mode == "unauthorized":
             return web.json_response({"private": "detail"}, status=403)

@@ -349,9 +349,11 @@ does not follow redirects:
 | POST | `/api/sessions/{id}/model` | Persist a model and reasoning lock on one existing session |
 
 This surface is pinned to Hermes Agent `main` commit
-`d9f1043c3337818b1f29224a7deb5bbb17402370`, its API Server source and Gateway
-tests, and the official API Server documentation. Final live acceptance is
-pending the owner's Gateway upgrade: the currently running Hermes Agent
+`d9f1043c3337818b1f29224a7deb5bbb17402370`. Its API Server source and Gateway
+tests verify both routes; the official API Server documentation additionally
+verifies model options and per-Run overrides, but does not yet document the
+session model-lock route or acknowledgement. Final local and live acceptance
+is pending the owner's Gateway upgrade: the currently running Hermes Agent
 `0.19.0` returns `404` for model options and does not advertise either
 capability, so the App keeps the controls hidden on that version.
 

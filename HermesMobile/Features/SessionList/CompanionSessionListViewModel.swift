@@ -359,11 +359,13 @@ final class CompanionSessionHistoryViewModel {
     private(set) var modelGroups: [CompanionModelGroup] = []
     private(set) var selectedModel: CompanionModelSelection?
     private(set) var isLoadingModelOptions = false
+    private(set) var isApplyingModelSelection = false
     private(set) var modelSelectionErrorMessage: String?
 
     private let repository: any SessionRepository
     private let runService: any ConversationRunServing
     private let modelService: any CompanionModelServing
+    private let modelSelectionStore: any CompanionModelSelectionStoring
     private let companionURL: URL
     private let pageSize: Int
     private let reconciliationDelayNanoseconds: UInt64
@@ -391,6 +393,9 @@ final class CompanionSessionHistoryViewModel {
         supportsRunApprovals: Bool = false,
         supportsModelSelection: Bool = false,
         modelService: (any CompanionModelServing)? = nil,
+        modelSelectionStore: (
+            any CompanionModelSelectionStoring
+        )? = nil,
         reconciliationDelayNanoseconds: UInt64 = 1_000_000_000
     ) {
         self.session = session
@@ -403,6 +408,8 @@ final class CompanionSessionHistoryViewModel {
         self.modelService = modelService ?? CompanionModelService(
             companionURL: companionURL
         )
+        self.modelSelectionStore =
+            modelSelectionStore ?? CompanionModelSelectionStore()
         self.supportsRunApprovals = supportsRunApprovals
         self.supportsModelSelection = supportsModelSelection
         self.reconciliationDelayNanoseconds =
@@ -427,6 +434,7 @@ final class CompanionSessionHistoryViewModel {
             && !isLoading
             && !isViewingCachedData
             && !isTerminalRefreshPending
+            && !isApplyingModelSelection
             && errorMessage == nil
     }
 
@@ -438,6 +446,7 @@ final class CompanionSessionHistoryViewModel {
         supportsModelSelection
             && !isRunActive
             && !isLoadingModelOptions
+            && !isApplyingModelSelection
             && !isViewingCachedData
     }
 
@@ -601,9 +610,35 @@ final class CompanionSessionHistoryViewModel {
             )
             modelGroups = inventory.catalogGroups
             if selectedModel == nil {
-                selectedModel = resolvedSessionSelection(
-                    inventory: inventory
+                let persistedSelection: CompanionModelSelection?
+                if let sessionID = session.sessionId {
+                    persistedSelection = await modelSelectionStore.load(
+                        companionURL: companionURL,
+                        sessionID: sessionID
+                    )
+                } else {
+                    persistedSelection = nil
+                }
+                let resolvedSelection = resolvedSessionSelection(
+                    inventory: inventory,
+                    persistedSelection: persistedSelection
                 )
+                selectedModel = resolvedSelection
+                if
+                    let persistedSelection,
+                    let resolvedSelection,
+                    persistedSelection.model == resolvedSelection.model,
+                    persistedSelection.provider == resolvedSelection.provider,
+                    persistedSelection.reasoningEffort
+                        != resolvedSelection.reasoningEffort,
+                    let sessionID = session.sessionId
+                {
+                    await modelSelectionStore.save(
+                        resolvedSelection,
+                        companionURL: companionURL,
+                        sessionID: sessionID
+                    )
+                }
             }
         } catch {
             guard !(error is CancellationError) else { return }
@@ -784,10 +819,17 @@ final class CompanionSessionHistoryViewModel {
         else {
             return false
         }
+        isApplyingModelSelection = true
         modelSelectionErrorMessage = nil
+        defer { isApplyingModelSelection = false }
         do {
             _ = try await modelService.lock(
                 selection,
+                sessionID: sessionID
+            )
+            await modelSelectionStore.save(
+                selection,
+                companionURL: companionURL,
                 sessionID: sessionID
             )
             selectedModel = selection
@@ -800,9 +842,36 @@ final class CompanionSessionHistoryViewModel {
     }
 
     private func resolvedSessionSelection(
-        inventory: CompanionModelInventory
+        inventory: CompanionModelInventory,
+        persistedSelection: CompanionModelSelection?
     ) -> CompanionModelSelection? {
         let options = inventory.catalogGroups.flatMap(\.models)
+        let persistedSessionModel = session.model?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).nilIfEmpty
+        let persistedSessionProvider =
+            session.modelProvider?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).nilIfEmpty
+        if
+            let persistedSelection,
+            let persistedOption = options.first(where: {
+                $0.model == persistedSelection.model
+                    && $0.provider == persistedSelection.provider
+            }),
+            persistedSessionModel == nil
+                || persistedSessionModel == persistedSelection.model,
+            persistedSessionProvider == nil
+                || persistedSessionProvider == persistedSelection.provider
+        {
+            return CompanionModelSelection(
+                model: persistedSelection.model,
+                provider: persistedSelection.provider,
+                reasoningEffort: persistedOption.supportsReasoning
+                    ? persistedSelection.reasoningEffort
+                    : nil
+            )
+        }
         if let sessionModel = session.model?.trimmingCharacters(
             in: .whitespacesAndNewlines
         ).nilIfEmpty {

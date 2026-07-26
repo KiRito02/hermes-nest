@@ -75,6 +75,15 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
             "conversation_history": [
                 {"role": "user", "content": long_history},
             ],
+            "model": "anthropic/claude-sonnet-4.6",
+            "provider": "openrouter",
+            "model_options": {
+                "reasoning": {
+                    "enabled": True,
+                    "effort": "high",
+                },
+                "reasoning_effort": "high",
+            },
         }
 
         started = await self.client.post(

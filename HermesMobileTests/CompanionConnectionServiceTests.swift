@@ -8,11 +8,11 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
 
         var dataRequest = URLRequest(url: url)
         dataRequest.httpBody = expected
-        XCTAssertEqual(try Self.requestBody(from: dataRequest), expected)
+        XCTAssertEqual(apiTestBodyData(from: dataRequest), expected)
 
         var streamRequest = URLRequest(url: url)
         streamRequest.httpBodyStream = InputStream(data: expected)
-        XCTAssertEqual(try Self.requestBody(from: streamRequest), expected)
+        XCTAssertEqual(apiTestBodyData(from: streamRequest), expected)
     }
 
     func testPairingUsesOnlyVersionedCompanionRoutesAndStoresDeviceIdentity() async throws {
@@ -48,7 +48,7 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
             case "/companion/v1/pairings/claim":
                 XCTAssertEqual(request.httpMethod, "POST")
                 XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
-                let body = try Self.requestBody(from: request)
+                let body = try XCTUnwrap(apiTestBodyData(from: request))
                 let object = try XCTUnwrap(
                     JSONSerialization.jsonObject(with: body) as? [String: String]
                 )
@@ -583,7 +583,7 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
                     request.url?.path
                 )
                 XCTAssertEqual("POST", request.httpMethod)
-                let body = try Self.requestBody(from: request)
+                let body = try XCTUnwrap(apiTestBodyData(from: request))
                 let object = try XCTUnwrap(
                     JSONSerialization.jsonObject(with: body)
                         as? [String: Any]
@@ -667,6 +667,49 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
         )
     }
 
+    func testModelSelectionStoreScopesReasoningByServerAndSession() async throws {
+        let suiteName = "test.hermes.model-selection.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let companionURL = try XCTUnwrap(
+            URL(string: "https://companion.example.test")
+        )
+        let selection = CompanionModelSelection(
+            model: "anthropic/claude-sonnet-4.6",
+            provider: "openrouter",
+            reasoningEffort: .high
+        )
+        let store = CompanionModelSelectionStore(defaults: defaults)
+
+        await store.save(
+            selection,
+            companionURL: companionURL,
+            sessionID: "session-1"
+        )
+
+        let restoredSelection =
+            await CompanionModelSelectionStore(defaults: defaults).load(
+                companionURL: companionURL,
+                sessionID: "session-1"
+            )
+        let otherSessionSelection = await store.load(
+            companionURL: companionURL,
+            sessionID: "session-2"
+        )
+        let otherServerSelection = await store.load(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://other.example.test")
+            ),
+            sessionID: "session-1"
+        )
+        XCTAssertEqual(
+            selection,
+            restoredSelection
+        )
+        XCTAssertNil(otherSessionSelection)
+        XCTAssertNil(otherServerSelection)
+    }
+
     @MainActor
     func testManagerTreatsGatewayUnavailableAsConnectedCompanionState() async throws {
         let connection = CompanionConnection(
@@ -744,34 +787,7 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
         )!
     }
 
-    private static func requestBody(from request: URLRequest) throws -> Data {
-        if let body = request.httpBody {
-            return body
-        }
-
-        let stream = try XCTUnwrap(
-            request.httpBodyStream,
-            "Foundation should preserve a POST body as Data or an input stream"
-        )
-        stream.open()
-        defer { stream.close() }
-
-        var body = Data()
-        var buffer = [UInt8](repeating: 0, count: 4_096)
-        while true {
-            let bytesRead = stream.read(&buffer, maxLength: buffer.count)
-            if bytesRead == 0 {
-                return body
-            }
-            guard bytesRead > 0 else {
-                throw RequestBodyStreamReadError()
-            }
-            body.append(contentsOf: buffer.prefix(bytesRead))
-        }
-    }
 }
-
-private struct RequestBodyStreamReadError: Error {}
 
 private actor StubCompanionConnectionService: CompanionConnectionServing {
     private let resumedConnection: CompanionConnection?

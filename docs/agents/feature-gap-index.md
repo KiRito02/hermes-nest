@@ -35,7 +35,7 @@ Issue/PR, not this index.
 | Run status/reconnect/stop | roadmap | P0 | exec | Never resend a prompt on reconnect |
 | Approval request/response | roadmap | P0 | exec | Capability-gated; preserve explicit human decision |
 | Progressive streaming + long-chat benchmark | roadmap | P0 | — | Windowed history and bounded presentation cadence |
-| Rich model/provider/reasoning options | roadmap | P1 | secret | Capability-gated Gateway surface |
+| Rich model/provider/reasoning options | in-progress | P1 | secret | [#15](https://github.com/KiRito02/hermes-nest/issues/15); pinned to Hermes `d9f1043`, live acceptance awaits owner upgrade |
 | Jobs | roadmap | P1 | write | Capability-gated scheduled/background work |
 | Skills/toolsets discovery | roadmap | P1 | read | Read-only in Companion v1 |
 | Inline images | roadmap | P1 | privacy | Verified Gateway multimodal input |
