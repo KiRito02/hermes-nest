@@ -7,27 +7,27 @@ import UniformTypeIdentifiers
 @testable import HermesMobile
 
 final class APIClientAuthAndErrorTests: APIClientTestCase {
-    func testOnboardingPasswordValidationOnlyRequiresKnownAuthEnabledPassword() {
+    func testCompanionOnboardingRequiresURLAndPairingSecret() {
         XCTAssertEqual(
-            OnboardingViewModel.passwordValidationMessage(
-                authStatus: AuthStatusResponse(authEnabled: true, loggedIn: false),
-                password: " \n "
+            OnboardingViewModel.pairingValidationMessage(
+                companionURL: "",
+                pairingSecret: ""
             ),
-            OnboardingViewModel.emptyPasswordMessage
+            "Enter the Companion URL."
+        )
+        XCTAssertEqual(
+            OnboardingViewModel.pairingValidationMessage(
+                companionURL: "https://companion.example.test",
+                pairingSecret: " \n "
+            ),
+            OnboardingViewModel.emptyPairingSecretMessage
         )
         XCTAssertNil(
-            OnboardingViewModel.passwordValidationMessage(
-                authStatus: AuthStatusResponse(authEnabled: true, loggedIn: false),
-                password: "secret"
+            OnboardingViewModel.pairingValidationMessage(
+                companionURL: "https://companion.example.test",
+                pairingSecret: "one-time-secret"
             )
         )
-        XCTAssertNil(
-            OnboardingViewModel.passwordValidationMessage(
-                authStatus: AuthStatusResponse(authEnabled: false, loggedIn: false),
-                password: ""
-            )
-        )
-        XCTAssertNil(OnboardingViewModel.passwordValidationMessage(authStatus: nil, password: ""))
     }
 
     @MainActor

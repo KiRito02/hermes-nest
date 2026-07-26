@@ -74,14 +74,14 @@ struct OnboardingWelcomePage: View {
                         .minimumScaleFactor(0.86)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text("Connect to your self-hosted Web UI over Tailscale.")
+                    Text("Connect securely to Hermex Companion on your NAS.")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.58))
                         .fixedSize(horizontal: false, vertical: true)
 
                     HStack(spacing: 8) {
-                        HeroBadge(systemImage: "lock.shield.fill", title: String(localized: "Password protected"))
-                        HeroBadge(systemImage: "network", title: String(localized: "Tailscale ready"))
+                        HeroBadge(systemImage: "lock.shield.fill", title: String(localized: "Device credential"))
+                        HeroBadge(systemImage: "network", title: String(localized: "Lucky / Tailscale"))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -42,7 +42,7 @@ struct HermexCommands: Commands {
 
 @main
 struct HermesMobileApp: App {
-    @State private var authManager = AuthManager()
+    @State private var connectionManager = CompanionConnectionManager()
     @AppStorage(AppTheme.storageKey) private var appThemeRawValue = AppTheme.system.rawValue
 
     var body: some Scene {
@@ -60,11 +60,11 @@ struct HermesMobileApp: App {
                     KanbanLabView()
                 }
             } else {
-                ContentView(authManager: authManager)
+                CompanionRootView(connectionManager: connectionManager)
                     .preferredColorScheme(AppTheme.storedValue(appThemeRawValue).colorScheme)
             }
             #else
-            ContentView(authManager: authManager)
+            CompanionRootView(connectionManager: connectionManager)
                 .preferredColorScheme(AppTheme.storedValue(appThemeRawValue).colorScheme)
             #endif
         }

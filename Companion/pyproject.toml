@@ -1,0 +1,11 @@
+[project]
+name = "hermex-companion"
+version = "0.1.0"
+description = "Self-hosted NAS Companion for Hermex Direct"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "aiohttp==3.13.3",
+]
+
+[tool.uv]
+package = false
