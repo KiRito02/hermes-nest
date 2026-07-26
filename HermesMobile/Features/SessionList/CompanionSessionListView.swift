@@ -385,7 +385,8 @@ private struct CompanionSessionHistoryView: View {
                 if let streamingMessage = viewModel.streamingMessage {
                     MessageBubbleView(
                         message: streamingMessage,
-                        transcriptMediaCacheNamespace: companionURL.absoluteString
+                        transcriptMediaCacheNamespace: companionURL.absoluteString,
+                        isStreaming: viewModel.isRunActive
                     )
                     .accessibilityLabel("Streaming assistant response")
                 }

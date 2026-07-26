@@ -30,6 +30,18 @@ Read by every agent (Codex, Claude Code, …); keep it tool-agnostic.
   owner's standing authorization. Triage bot/review comments before accepting
   them.
 
+## Review depth
+- Small documentation, configuration, fixture, and isolated single-file
+  changes use focused tests plus a direct diff/self-review. Do not invoke the
+  full dual-axis `code-review` workflow for these by default.
+- Ordinary issue branches receive one Standards + Spec dual-axis review at the
+  push/PR boundary, after implementation and local checks are complete.
+- Protocol, authentication, security, persistence, signing, migration, and
+  concurrency changes receive the full dual-axis review. Rerun both axes only
+  when fixes materially alter one of those high-risk seams; otherwise verify
+  the findings with focused tests and a targeted final inspection.
+- CI and unresolved PR feedback remain required regardless of review tier.
+
 ## Hard rules
 1. **Never invent endpoints or JSON shapes.** For App-facing behavior verify:
    (a) the versioned Companion contract/tests; (b) `curl` the owner's running
@@ -55,8 +67,10 @@ Read by every agent (Codex, Claude Code, …); keep it tool-agnostic.
   ask to open Xcode only when the terminal can't answer.
 - Use **XcodeBuildMCP** for simulator build/test/run/log; fall back to raw
   `xcodebuild`/`xcrun simctl` for release/archive or low-level diagnosis. Defaults live
-  in `.xcodebuildmcp/config.yaml` (scheme `HermesMobile`, sim **iPhone 17**); if that
-  sim is missing, pick a nearby iPhone and say which.
+  in `.xcodebuildmcp/config.yaml` (scheme `HermesMobile`, sim
+  **iPhone 17 Pro Max**); if that sim is missing, pick a nearby iPhone Pro and
+  say which. Adaptive-layout changes also require an available 13-inch iPad Pro
+  simulator build/launch before merge.
 - **Simulator installs must be signed.** Never install a `CODE_SIGNING_ALLOWED=NO`
   build on the simulator for manual testing — that flag is for compile-only checks
   (see `DEVELOPMENT.md`) and strips entitlements, so Keychain writes fail with

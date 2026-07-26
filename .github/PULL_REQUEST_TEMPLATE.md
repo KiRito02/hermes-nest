@@ -16,7 +16,8 @@ Fixes #
 
 ## Checklist
 
-- [ ] The full test suite passes locally (`xcodebuild test -project HermesMobile.xcodeproj -scheme HermesMobile -destination 'platform=iOS Simulator,name=iPhone 17'`)
+- [ ] The full test suite passes locally (`xcodebuild test -project HermesMobile.xcodeproj -scheme HermesMobile -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max'`)
+- [ ] UI changes were built/launched on iPhone 17 Pro Max and a 13-inch iPad Pro, or the remaining manual validation is stated above
 - [ ] New/changed `Codable` models decode tolerantly (optionals for fields the server might add or rename)
 - [ ] No new third-party dependencies (the list in `PROJECT_SPEC.md` is locked)
 - [ ] No invented API endpoints or JSON shapes (verified against upstream source or a running server)
