@@ -11,6 +11,13 @@ build/
 Package.resolved
 .swiftpm/
 
+# Python / Companion
+Companion/.venv/
+__pycache__/
+*.py[cod]
+.coverage
+htmlcov/
+
 # macOS
 .DS_Store
 

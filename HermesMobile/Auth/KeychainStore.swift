@@ -18,6 +18,11 @@ protocol KeychainStoring {
 struct KeychainStore: KeychainStoring {
     enum Key: String {
         case serverURL = "server_url"
+        // Hermes Nest Direct stores only its Companion address and revocable
+        // per-device identity. The Hermes Gateway API key never enters the App.
+        case companionURL = "companion_url"
+        case companionDeviceID = "companion_device_id"
+        case companionDeviceCredential = "companion_device_credential"
         // JSON-encoded [{name, value}] of user-supplied request headers (#255).
         // Values may be secrets, so the list lives in the Keychain, not defaults.
         case customHeaders = "custom_headers"

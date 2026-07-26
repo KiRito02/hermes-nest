@@ -28,6 +28,7 @@ struct ChatTranscriptView: View {
     let shouldFollowLatestMessage: Bool
     let latestTranscriptMessageRole: String?
     let isScrolledNearBottom: Bool
+    let isUserInteractingWithScroll: Bool
     let activeStreamID: String?
     let streamingScrollTrigger: Int
     let cacheFirstReconcileScrollToken: Int
@@ -62,7 +63,6 @@ struct ChatTranscriptView: View {
     let onPreviewTranscriptMedia: (TranscriptMediaReference) -> Void
     let onToggleListening: (MessageActionContext) -> Void
     let onSubmitClarification: (String) -> Void
-    let onSelectText: (MessageActionContext) -> Void
     let onRegenerate: (MessageActionContext) -> Void
     let onEdit: (MessageActionContext) -> Void
     let onFork: (MessageActionContext) -> Void
@@ -203,7 +203,7 @@ struct ChatTranscriptView: View {
         viewportWidth: CGFloat,
         contentWidth: CGFloat
     ) -> some View {
-        VStack(spacing: transcriptMessageSpacing) {
+        ChatTranscriptLazyStack(spacing: transcriptMessageSpacing) {
             olderMessagesButton(proxy: proxy)
 
             if let compressionReferenceCard, compressionReferenceCard.afterRenderID == nil {
@@ -249,7 +249,6 @@ struct ChatTranscriptView: View {
                     onPreviewAttachment: onPreviewAttachment,
                     onPreviewTranscriptMedia: onPreviewTranscriptMedia,
                     onToggleListening: onToggleListening,
-                    onSelectText: onSelectText,
                     onRegenerate: onRegenerate,
                     onEdit: onEdit,
                     onFork: onFork,
@@ -281,6 +280,10 @@ struct ChatTranscriptView: View {
         .padding(.horizontal, transcriptHorizontalPadding)
         .frame(width: viewportWidth, alignment: .leading)
         .clipped()
+        .environment(
+            \.chatIsUserInteractingWithScroll,
+            isUserInteractingWithScroll
+        )
         .background {
             ZStack {
                 ChatScrollObserver(isStreaming: activeStreamID != nil) { metrics in
@@ -442,7 +445,7 @@ struct ChatTranscriptView: View {
     }
 }
 
-private struct ChatTranscriptMessageBlock: View, Equatable {
+struct ChatTranscriptMessageBlock: View, Equatable {
     let transcriptMessage: TranscriptMessage
     let transcriptBlockSpacing: CGFloat
     let showsThinkingAndToolCards: Bool
@@ -470,7 +473,6 @@ private struct ChatTranscriptMessageBlock: View, Equatable {
     let onPreviewAttachment: (MessageAttachment, Data?) -> Void
     let onPreviewTranscriptMedia: (TranscriptMediaReference) -> Void
     let onToggleListening: (MessageActionContext) -> Void
-    let onSelectText: (MessageActionContext) -> Void
     let onRegenerate: (MessageActionContext) -> Void
     let onEdit: (MessageActionContext) -> Void
     let onFork: (MessageActionContext) -> Void
@@ -535,7 +537,6 @@ private struct ChatTranscriptMessageBlock: View, Equatable {
                     onPreviewAttachment: onPreviewAttachment,
                     onPreviewTranscriptMedia: onPreviewTranscriptMedia,
                     onToggleListening: onToggleListening,
-                    onSelectText: onSelectText,
                     onRegenerate: onRegenerate,
                     onEdit: onEdit,
                     onFork: onFork,
@@ -597,7 +598,7 @@ private struct ChatTranscriptMessageBlock: View, Equatable {
     }
 }
 
-private struct ChatTranscriptMessageRow: View {
+struct ChatTranscriptMessageRow: View {
     let message: ChatMessage
     let visibleIndex: Int
     let actionContext: MessageActionContext?
@@ -617,7 +618,6 @@ private struct ChatTranscriptMessageRow: View {
     let onPreviewAttachment: (MessageAttachment, Data?) -> Void
     let onPreviewTranscriptMedia: (TranscriptMediaReference) -> Void
     let onToggleListening: (MessageActionContext) -> Void
-    let onSelectText: (MessageActionContext) -> Void
     let onRegenerate: (MessageActionContext) -> Void
     let onEdit: (MessageActionContext) -> Void
     let onFork: (MessageActionContext) -> Void
@@ -630,24 +630,38 @@ private struct ChatTranscriptMessageRow: View {
         if let markerKind = ChatMarkerMessageClassifier.classify(message) {
             MarkerMessageCardView(kind: markerKind, content: message.content)
         } else if let actionContext {
-            bubble
-                .contextMenu {
-                    ChatMessageActionMenu(
-                        context: actionContext,
-                        listeningMessageID: listeningMessageID,
-                        isViewingCachedData: isViewingCachedData,
-                        hasActiveStream: hasActiveStream,
-                        isRegeneratingMessage: isRegeneratingMessage,
-                        isEditingMessage: isEditingMessage,
-                        isForkingMessage: isForkingMessage,
-                        onToggleListening: onToggleListening,
-                        onSelectText: onSelectText,
-                        onRegenerate: onRegenerate,
-                        onEdit: onEdit,
-                        onFork: onFork,
-                        onCopy: onCopy
-                    )
+            VStack(spacing: 1) {
+                bubble
+
+                if !isStreaming {
+                    HStack(spacing: 0) {
+                        if actionContext.role == .user {
+                            Spacer(minLength: 0)
+                        }
+
+                        ChatMessageActionsButton {
+                            ChatMessageActionMenu(
+                                context: actionContext,
+                                listeningMessageID: listeningMessageID,
+                                isViewingCachedData: isViewingCachedData,
+                                hasActiveStream: hasActiveStream,
+                                isRegeneratingMessage: isRegeneratingMessage,
+                                isEditingMessage: isEditingMessage,
+                                isForkingMessage: isForkingMessage,
+                                onToggleListening: onToggleListening,
+                                onRegenerate: onRegenerate,
+                                onEdit: onEdit,
+                                onFork: onFork,
+                                onCopy: onCopy
+                            )
+                        }
+
+                        if actionContext.role != .user {
+                            Spacer(minLength: 0)
+                        }
+                    }
                 }
+            }
         } else {
             bubble
         }

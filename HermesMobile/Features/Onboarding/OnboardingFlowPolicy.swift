@@ -6,21 +6,17 @@ enum OnboardingFlowPolicy {
     static let agentPromptPageIndex = 2
 
     static let agentSetupPrompt = """
-Set up Hermes Web UI on this machine for access from my iPhone via Tailscale.
+Set up the Hermes Nest Companion from my KiRito02/hermes-nest checkout on this NAS.
 
-Clone and install https://github.com/nesquena/hermes-webui — it's a Node.js web app. Install dependencies and start it on port 8787.
-Enable password authentication by setting the HERMES_WEBUI_PASSWORD environment variable. Generate a secure random password and save it — I'll need it for the iPhone app.
-Install Tailscale on this machine. Search the web for the correct install method for this OS if you're unsure. Authenticate to my Tailscale account — if this requires opening a URL or an auth key, tell me exactly what to do.
-Make the WebUI reachable over Tailscale:
-- Try tailscale serve --bg 8787 first (gives HTTPS + nice hostname).
-- If Tailscale Serve is disabled on my tailnet, fall back: bind the server to 0.0.0.0 instead of localhost so it listens on the tailnet interface. Before doing this, confirm password auth is active — never expose an unauthenticated WebUI.
-Set up auto-start appropriate for this OS so the WebUI survives reboots.
-Verify it works: curl http://$(tailscale ip -4):8787/health should return a success response.
+Follow Companion/README.md exactly. Use Python 3.11, `uv sync --frozen`, the dedicated Companion/.venv, SQLite in the service account's XDG state directory, and the repository systemd template.
+Keep Hermes Agent API Server on 127.0.0.1:8642. Put API_SERVER_KEY only in the NAS-local Companion environment file; never send it to the iPhone, print it, or place it in a URL.
+Keep Companion on its default loopback listener. Expose only Companion through my Lucky HTTPS reverse proxy. Tailscale HTTPS is also supported; do not expose Hermes Gateway directly and do not disable TLS verification.
+Verify `/companion/v1/health` through the public HTTPS Companion URL.
 Reply with:
-- The exact server URL I enter in Hermes Nest
-- The password
-- Any setup steps I still need to do on my iPhone
-Do not use Cloudflare. Optimize for Tailscale + iPhone.
+- The exact HTTPS Companion URL I enter in Hermes Nest
+- The exact command I should run myself in a trusted NAS shell to create a five-minute one-time pairing secret
+- Any Lucky, Tailscale, or iPhone step I still need to complete
+Do not create, print, request, or include the pairing secret in this chat. Do not install hermes-webui or use a hosted relay.
 """
 
     static let tailscaleAppStoreURL = URL(string: "itms-apps://apps.apple.com/us/app/tailscale/id1470499037")!

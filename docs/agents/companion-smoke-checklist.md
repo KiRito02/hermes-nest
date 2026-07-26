@@ -2,9 +2,9 @@
 
 Owner-run smoke for the App → Companion → loopback Gateway contract.
 
-Use it only after Issue #1 defines the Companion commands and versioned
-App-facing paths. Until then, this checklist records required evidence without
-inventing commands or wire shapes.
+Issue #1's implementation contract is `Companion/CONTRACT.md`. Run the commands
+from `Companion/README.md`; this checklist defines only the sanitized evidence
+to retain.
 
 ## Safety
 
@@ -32,7 +32,8 @@ its clean status and commit before using it as evidence. Never modify it.
 
 ## Step 1 — Companion liveness
 
-Use the exact command/path defined by Issue #1.
+Probe `GET /companion/v1/health` through loopback and the selected Lucky or
+Tailscale HTTPS origin.
 
 Green:
 
@@ -43,7 +44,8 @@ Green:
 ## Step 2 — Pairing and device authentication
 
 Generate a short-lived, single-use pairing secret on the NAS using the
-Issue #1 command.
+`python -m hermex_companion pairing create --expires-in 300` command documented
+in `Companion/README.md`.
 
 Green:
 

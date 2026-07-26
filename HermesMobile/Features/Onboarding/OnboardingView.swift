@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct OnboardingView: View {
-    @Bindable var authManager: AuthManager
+    @Bindable var connectionManager: CompanionConnectionManager
     @State private var viewModel: OnboardingViewModel
     @State private var currentPage: Int
     @State private var hasCopiedAgentPrompt = false
@@ -9,21 +9,22 @@ struct OnboardingView: View {
     @State private var isShowingCopyReminder = false
     @FocusState private var focusedField: OnboardingConnectField?
 
-    init(authManager: AuthManager, savedServer: URL? = nil) {
-        self.authManager = authManager
-        // A known server means a re-login, not first-run setup: skip the
-        // intro pager and land on the connect page with the server filled in.
+    init(
+        connectionManager: CompanionConnectionManager,
+        savedCompanionURL: URL? = nil,
+        initialErrorMessage: String? = nil
+    ) {
+        self.connectionManager = connectionManager
+        // A known Companion means re-pairing or retrying, so skip the
+        // introductory pages and prefill its URL.
         _viewModel = State(
             initialValue: OnboardingViewModel(
-                savedServer: savedServer,
-                // Headers survive a session-expiry sign-out, so prefill them on
-                // re-login behind a proxy (empty on first run / full sign-out).
-                savedHeaders: authManager.currentCustomHeaders,
-                initialErrorMessage: savedServer == nil ? nil : authManager.lastErrorMessage
+                savedCompanionURL: savedCompanionURL,
+                initialErrorMessage: initialErrorMessage
             )
         )
         _currentPage = State(
-            initialValue: savedServer == nil ? 0 : OnboardingFlowPolicy.connectPageIndex
+            initialValue: savedCompanionURL == nil ? 0 : OnboardingFlowPolicy.connectPageIndex
         )
     }
 
@@ -31,8 +32,13 @@ struct OnboardingView: View {
         currentPage == OnboardingFlowPolicy.connectPageIndex && focusedField != nil
     }
 
-    private var canSubmitConnection: Bool {
-        !viewModel.serverURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    private var canTestConnection: Bool {
+        !viewModel.companionURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var canPair: Bool {
+        canTestConnection
+            && !viewModel.pairingSecret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
@@ -55,7 +61,7 @@ struct OnboardingView: View {
 
                     OnboardingConnectPage(
                         viewModel: viewModel,
-                        authManager: authManager,
+                        connectionManager: connectionManager,
                         focusedField: $focusedField
                     )
                     .tag(4)
@@ -83,7 +89,7 @@ struct OnboardingView: View {
                 advanceToNextPage()
             }
         } message: {
-            Text("Copy the agent setup prompt on your desktop before continuing so Hermes Web UI and Tailscale are configured correctly.")
+            Text("Copy the setup prompt before continuing so Hermes Nest Companion and HTTPS access are configured on your NAS.")
         }
     }
 
@@ -166,24 +172,24 @@ struct OnboardingView: View {
 
     private var testConnectionButton: some View {
         Button {
-            Task { await viewModel.testConnection(authManager: authManager) }
+            Task { await viewModel.testConnection(connectionManager: connectionManager) }
         } label: {
             Label("Test Connection", systemImage: "network")
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(OnboardingSecondaryButtonStyle())
-        .disabled(viewModel.isWorking || !canSubmitConnection)
+        .disabled(viewModel.isWorking || !canTestConnection)
     }
 
     private var connectButton: some View {
         Button {
-            Task { await viewModel.connect(authManager: authManager) }
+            Task { await viewModel.connect(connectionManager: connectionManager) }
         } label: {
             Label("Connect", systemImage: "checkmark.circle.fill")
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(OnboardingPrimaryButtonStyle())
-        .disabled(viewModel.isWorking || !canSubmitConnection)
+        .disabled(viewModel.isWorking || !canPair)
     }
 
     private func handlePrimaryAction() {
@@ -234,5 +240,5 @@ struct OnboardingView: View {
 }
 
 #Preview {
-    OnboardingView(authManager: AuthManager())
+    OnboardingView(connectionManager: CompanionConnectionManager())
 }

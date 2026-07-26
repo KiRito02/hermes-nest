@@ -286,7 +286,7 @@ Gateway-compatible routes and adds separately versioned native operations.
 
 Companion URL examples:
 
-- private reverse proxy: `https://hermex.example.com`
+- private reverse proxy: `https://hermes-nest.example.com`
 - Tailscale with valid TLS: `https://nas-name.tailnet-name.ts.net`
 - simulator-only local development: an implementation-defined localhost port
 

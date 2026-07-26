@@ -1,0 +1,38 @@
+[Unit]
+Description=Hermes Nest Companion
+Documentation=file://@COMPANION_DIR@/README.md
+Wants=network-online.target
+After=network-online.target hermes-gateway.service
+
+[Service]
+Type=simple
+User=@SERVICE_USER@
+Group=@SERVICE_GROUP@
+WorkingDirectory=@COMPANION_DIR@
+Environment=XDG_CONFIG_HOME=@CONFIG_HOME@
+Environment=XDG_STATE_HOME=@STATE_HOME@
+Environment=XDG_DATA_HOME=@DATA_HOME@
+Environment=PYTHONPATH=@COMPANION_DIR@/src
+EnvironmentFile=@CONFIG_HOME@/hermex-companion/hermex-companion.env
+ExecStart=@COMPANION_DIR@/.venv/bin/python -m hermex_companion
+Restart=on-failure
+RestartSec=3
+UMask=0077
+
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@STATE_HOME@/hermex-companion
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

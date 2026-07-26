@@ -1,25 +1,24 @@
 import SwiftUI
 
 enum OnboardingConnectField: Hashable {
-    case serverURL
-    case password
+    case companionURL
+    case pairingSecret
 }
 
 struct OnboardingConnectPage: View {
     @Bindable var viewModel: OnboardingViewModel
-    @Bindable var authManager: AuthManager
+    @Bindable var connectionManager: CompanionConnectionManager
     @FocusState.Binding var focusedField: OnboardingConnectField?
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var isShowingAdvanced = false
 
     private var canSubmit: Bool {
-        !viewModel.serverURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !viewModel.companionURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func submitConnection() {
         guard canSubmit else { return }
-        Task { await viewModel.connect(authManager: authManager) }
+        Task { await viewModel.connect(connectionManager: connectionManager) }
     }
 
     var body: some View {
@@ -30,62 +29,54 @@ struct OnboardingConnectPage: View {
                         .font(.title3.weight(.bold))
                         .foregroundStyle(.white)
 
-                    Text("Enter the Tailscale URL your agent returned, for example `http://<tailnet-ip>:8787`.")
+                    Text("Enter the HTTPS URL that Lucky or Tailscale proxies to Hermes Nest Companion, then enter a one-time pairing secret created on your NAS.")
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.5))
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 VStack(spacing: 12) {
-                    OnboardingField(systemImage: "link", title: String(localized: "Server URL")) {
+                    OnboardingField(systemImage: "link", title: String(localized: "Companion URL")) {
                         ZStack(alignment: .leading) {
-                            if viewModel.serverURLString.isEmpty {
-                                Text(verbatim: "http://100.64.0.1:8787")
+                            if viewModel.companionURLString.isEmpty {
+                                Text(verbatim: "https://hermes-nest.example.com")
                                     .foregroundStyle(.white.opacity(0.38))
                                     .allowsHitTesting(false)
                             }
 
-                            TextField("", text: $viewModel.serverURLString)
+                            TextField("", text: $viewModel.companionURLString)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .keyboardType(.URL)
                                 .foregroundStyle(.white)
                                 .submitLabel(.go)
                                 .tint(Color(red: 1.0, green: 0.74, blue: 0.10))
-                                .focused($focusedField, equals: .serverURL)
-                                .onSubmit(submitConnection)
+                                .focused($focusedField, equals: .companionURL)
+                                .onSubmit {
+                                    focusedField = .pairingSecret
+                                }
                         }
                     }
 
-                    if viewModel.isPasswordRequired {
-                        OnboardingField(systemImage: "key.fill", title: String(localized: "Password")) {
-                            SecureField(
-                                "",
-                                text: $viewModel.password,
-                                prompt: Text("Server password")
-                                    .foregroundStyle(.white.opacity(0.38))
-                            )
-                            .textContentType(.password)
-                            .submitLabel(.go)
-                            .focused($focusedField, equals: .password)
-                            .onSubmit(submitConnection)
-                        }
+                    OnboardingField(systemImage: "key.fill", title: String(localized: "Pairing Secret")) {
+                        SecureField(
+                            "",
+                            text: $viewModel.pairingSecret,
+                            prompt: Text("One-time secret")
+                                .foregroundStyle(.white.opacity(0.38))
+                        )
+                        .textContentType(.oneTimeCode)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.go)
+                        .focused($focusedField, equals: .pairingSecret)
+                        .onSubmit(submitConnection)
                     }
                 }
-
-                DisclosureGroup(isExpanded: $isShowingAdvanced) {
-                    CustomHeadersEditor(headers: $viewModel.customHeaders, style: .onboarding)
-                        .padding(.top, 10)
-                } label: {
-                    Label("Advanced", systemImage: "slider.horizontal.3")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.85))
-                }
-                .tint(.white.opacity(0.6))
 
                 if viewModel.isWorking {
                     OnboardingStatusBanner(
-                        text: String(localized: "Checking server..."),
+                        text: String(localized: "Contacting Companion..."),
                         systemImage: "arrow.triangle.2.circlepath",
                         tint: .white.opacity(0.7),
                         showsProgress: true

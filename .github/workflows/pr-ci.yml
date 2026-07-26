@@ -1,6 +1,6 @@
 # Build and run the full XCTest suite on every pull request that touches app
-# code, or on any manually dispatched branch. Docs-only PRs skip the macOS
-# runner; manual runs always execute the full suite.
+# code, and run the Linux Companion contract suite when Companion changes.
+# Docs-only PRs skip the macOS runner; manual runs execute both suites.
 #
 # The required branch-protection check is "CI Gate", not "Build and Test":
 # a skipped required check would block merges forever, so the gate always
@@ -33,6 +33,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       run_ios: ${{ steps.filter.outputs.run_ios }}
+      run_companion: ${{ steps.filter.outputs.run_companion }}
     steps:
       - name: Classify changed files
         id: filter
@@ -43,6 +44,7 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             echo "Manual run — executing the full iOS suite."
             echo "run_ios=true" >> "$GITHUB_OUTPUT"
+            echo "run_companion=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           files=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
@@ -59,6 +61,13 @@ jobs:
           else
             echo "Docs-only change — skipping the macOS runner."
             echo "run_ios=false" >> "$GITHUB_OUTPUT"
+          fi
+          if echo "${files}" | grep -qE '^(Companion/|\.github/workflows/pr-ci\.yml$)'; then
+            echo "Companion or its CI changed — running the Linux contract suite."
+            echo "run_companion=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Companion change — skipping the Linux contract suite."
+            echo "run_companion=false" >> "$GITHUB_OUTPUT"
           fi
 
   test:
@@ -200,9 +209,36 @@ jobs:
           path: ${{ env.RESULT_BUNDLE_PATH }}
           if-no-files-found: ignore
 
+  companion:
+    name: Companion Contract Tests
+    needs: changes
+    if: needs.changes.outputs.run_companion == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Install uv and Python 3.11
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.18"
+          python-version: "3.11"
+          working-directory: Companion
+          enable-cache: true
+
+      - name: Sync locked environment
+        run: uv sync --frozen --project Companion
+
+      - name: Run Companion contract tests
+        run: |
+          PYTHONPATH=Companion/src \
+            Companion/.venv/bin/python -m unittest discover -s Companion/tests -v
+
   gate:
     name: CI Gate
-    needs: [changes, test]
+    needs: [changes, test, companion]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -212,6 +248,7 @@ jobs:
           set -euo pipefail
           echo "changes: ${{ needs.changes.result }}"
           echo "test: ${{ needs.test.result }}"
+          echo "companion: ${{ needs.companion.result }}"
           if [[ "${{ needs.changes.result }}" != "success" ]]; then
             echo "Path detection failed — failing the gate." >&2
             exit 1
@@ -219,4 +256,8 @@ jobs:
           case "${{ needs.test.result }}" in
             success|skipped) echo "Gate passed." ;;
             *) echo "Build and Test did not pass — failing the gate." >&2; exit 1 ;;
+          esac
+          case "${{ needs.companion.result }}" in
+            success|skipped) echo "Companion gate passed." ;;
+            *) echo "Companion tests did not pass — failing the gate." >&2; exit 1 ;;
           esac
