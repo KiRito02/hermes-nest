@@ -39,7 +39,7 @@ final class ConversationRunServiceTests: APIClientTestCase {
                 history[1]["content"] as? String
             )
 
-            return response(
+            return self.response(
                 status: 202,
                 json: """
                 {
@@ -97,7 +97,7 @@ final class ConversationRunServiceTests: APIClientTestCase {
             case 1:
                 XCTAssertEqual("/v1/runs/run-1", request.url?.path)
                 XCTAssertEqual("GET", request.httpMethod)
-                return response(
+                return self.response(
                     status: 200,
                     json: """
                     {
@@ -117,7 +117,7 @@ final class ConversationRunServiceTests: APIClientTestCase {
             default:
                 XCTAssertEqual("/v1/runs/run-1/stop", request.url?.path)
                 XCTAssertEqual("POST", request.httpMethod)
-                return response(
+                return self.response(
                     status: 200,
                     json: """
                     {"run_id":"run-1","status":"stopping"}
