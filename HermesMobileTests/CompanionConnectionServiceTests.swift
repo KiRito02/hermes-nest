@@ -2,6 +2,19 @@ import XCTest
 @testable import HermesMobile
 
 final class CompanionConnectionServiceTests: APIClientTestCase {
+    func testRequestBodyReaderSupportsDataAndStreamRepresentations() throws {
+        let expected = Data(#"{"device_name":"Owner iPad"}"#.utf8)
+        let url = try XCTUnwrap(URL(string: "https://companion.example.test"))
+
+        var dataRequest = URLRequest(url: url)
+        dataRequest.httpBody = expected
+        XCTAssertEqual(try Self.requestBody(from: dataRequest), expected)
+
+        var streamRequest = URLRequest(url: url)
+        streamRequest.httpBodyStream = InputStream(data: expected)
+        XCTAssertEqual(try Self.requestBody(from: streamRequest), expected)
+    }
+
     func testPairingUsesOnlyVersionedCompanionRoutesAndStoresDeviceIdentity() async throws {
         let keychain = InMemoryKeychainStore()
         let session = makeSession { request in
@@ -35,7 +48,7 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
             case "/companion/v1/pairings/claim":
                 XCTAssertEqual(request.httpMethod, "POST")
                 XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
-                let body = try XCTUnwrap(request.httpBody)
+                let body = try Self.requestBody(from: request)
                 let object = try XCTUnwrap(
                     JSONSerialization.jsonObject(with: body) as? [String: String]
                 )
@@ -443,7 +456,35 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
         configuration.protocolClasses = [MockURLProtocol.self]
         return URLSession(configuration: configuration)
     }
+
+    private static func requestBody(from request: URLRequest) throws -> Data {
+        if let body = request.httpBody {
+            return body
+        }
+
+        let stream = try XCTUnwrap(
+            request.httpBodyStream,
+            "Foundation should preserve a POST body as Data or an input stream"
+        )
+        stream.open()
+        defer { stream.close() }
+
+        var body = Data()
+        var buffer = [UInt8](repeating: 0, count: 4_096)
+        while true {
+            let bytesRead = stream.read(&buffer, maxLength: buffer.count)
+            if bytesRead == 0 {
+                return body
+            }
+            guard bytesRead > 0 else {
+                throw RequestBodyStreamReadError()
+            }
+            body.append(contentsOf: buffer.prefix(bytesRead))
+        }
+    }
 }
+
+private struct RequestBodyStreamReadError: Error {}
 
 private actor StubCompanionConnectionService: CompanionConnectionServing {
     private let resumedConnection: CompanionConnection?
