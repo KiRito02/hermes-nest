@@ -348,14 +348,21 @@ does not follow redirects:
 | GET | `/api/model/options` | Read the native Hermes provider/model picker inventory |
 | POST | `/api/sessions/{id}/model` | Persist a model and reasoning lock on one existing session |
 
-This surface is pinned to Hermes Agent `main` commit
-`d9f1043c3337818b1f29224a7deb5bbb17402370`. Its API Server source and Gateway
-tests verify both routes; the official API Server documentation additionally
-verifies model options and per-Run overrides, but does not yet document the
-session model-lock route or acknowledgement. Final local and live acceptance
-is pending the owner's Gateway upgrade: the currently running Hermes Agent
-`0.19.0` returns `404` for model options and does not advertise either
-capability, so the App keeps the controls hidden on that version.
+This surface was implemented from Hermes Agent `main` commit
+`d9f1043c3337818b1f29224a7deb5bbb17402370` and accepted against the owner's
+upgraded `main` commit
+`37a27664cc11a33d36739fafe864d1d084370c47`. The latter contains the former,
+with no intervening changes to the API Server file or corresponding Gateway
+tests. Its source and tests verify both routes; the official API Server
+documentation additionally verifies model options and per-Run overrides, but
+does not yet document the session model-lock route or acknowledgement.
+
+Live acceptance at `37a27664` verified the advertised capability and exact
+route, a bounded model inventory through Companion, and a disposable
+session-lock acknowledgement with matching session/model/provider identity.
+The disposable session was then deleted. The CLI still reports product version
+`0.19.0`, so capability advertisement rather than that version string gates
+the App controls.
 
 Model options accept no query or exactly one `refresh` boolean. The accepted
 spellings are `0`, `1`, `false`, `no`, `off`, `on`, `true`, and `yes`,
@@ -427,8 +434,8 @@ This contract was verified against Hermes Agent `0.19.0`, upstream commit
 official API Server documentation, and disposable runs on the owner's loopback
 Gateway. The optional `model`, `provider`, and `model_options` request override
 shown below is additionally pinned to Hermes Agent `main` commit
-`d9f1043c3337818b1f29224a7deb5bbb17402370`; live acceptance awaits the same
-Gateway upgrade as the model-selection surface.
+`d9f1043c3337818b1f29224a7deb5bbb17402370` and was live-accepted on descendant
+commit `37a27664cc11a33d36739fafe864d1d084370c47`.
 
 The exact allowlist is:
 
