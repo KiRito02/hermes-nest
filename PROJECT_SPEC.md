@@ -104,6 +104,7 @@ scope until explicitly approved.
 | Legacy WebUI backend | Unsupported by the Companion-v1 contract |
 | Performance work | Normally separate from protocol migration; owner-approved Issue #19 combines Core Chat UI, verified usage/images, and long-chat remediation |
 | Visual direction | Hermes Nest identity with a ChatGPT-inspired content hierarchy and interaction model; no copied OpenAI branding or assets |
+| App languages | English source language plus Simplified Chinese (`zh-Hans`) only |
 
 ### 2.1 Locked third-party dependencies
 

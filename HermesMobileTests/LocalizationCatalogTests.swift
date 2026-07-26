@@ -14,9 +14,10 @@ import XCTest
 /// guard covers it too.
 final class LocalizationCatalogTests: XCTestCase {
 
-    /// Non-English languages compiled into the app. Keep in sync with `knownRegions` in the
-    /// project file and the languages present in `Localizable.xcstrings`.
-    private static let shippedLanguages = ["de", "es", "fr", "it", "pl", "pt-BR", "nl", "tr", "ru", "ja", "zh-Hans", "ko", "ar", "he", "ur", "zh-Hant", "zh-HK"]
+    /// Non-English languages compiled into the app. English is the source
+    /// language; Simplified Chinese is the only translated language shipped by
+    /// Hermes Nest. Keep this in sync with `knownRegions` in the project file.
+    private static let shippedLanguages = ["zh-Hans"]
 
     private func resourceURL(_ relativePath: String) -> URL {
         URL(fileURLWithPath: #filePath)

@@ -1213,7 +1213,9 @@ final class ConversationRunServiceTests: APIClientTestCase {
         XCTAssertEqual(.stopping, viewModel.runState)
         XCTAssertNil(viewModel.pendingApproval)
 
-        await waitUntil { viewModel.activeRunID == nil }
+        await waitUntil(timeoutNanoseconds: 3_000_000_000) {
+            viewModel.activeRunID == nil
+        }
     }
 
     @MainActor
