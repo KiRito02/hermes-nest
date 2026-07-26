@@ -1,6 +1,6 @@
-# Build and run the full XCTest suite on every pull request that touches app
-# code, and run the Linux Companion contract suite when Companion changes.
-# Docs-only PRs skip the macOS runner; manual runs execute both suites.
+# Build and run the full XCTest suite on pull requests that touch iOS or shared
+# product code, and run the Linux Companion contract suite when Companion
+# changes. Companion-only and docs-only PRs skip the macOS runner.
 #
 # The required branch-protection check is "CI Gate", not "Build and Test":
 # a skipped required check would block merges forever, so the gate always
@@ -8,8 +8,9 @@
 #
 # Uses no repository secrets, so PRs from forks get green CI too.
 #
-# Compile/test artifacts remain unsigned. UI smoke testing uses a separate
-# ad-hoc-signed Debug simulator build so installing it preserves entitlements.
+# Compile/test artifacts remain unsigned and are never installed. Signed
+# simulator launch, optional screenshots, and iPad adaptive acceptance live in
+# the manually dispatched iOS Simulator Acceptance workflow.
 
 name: PR CI
 
@@ -34,6 +35,9 @@ jobs:
       run_ios: ${{ steps.filter.outputs.run_ios }}
       run_companion: ${{ steps.filter.outputs.run_companion }}
     steps:
+      - name: Check out routing policy
+        uses: actions/checkout@v7
+
       - name: Classify changed files
         id: filter
         env:
@@ -46,35 +50,19 @@ jobs:
             echo "run_companion=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          python3 scripts/classify-ci-paths.py --self-test
           files=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
             --paginate --jq '.[].filename')
           echo "Changed files:"
           echo "${files}"
-          # Fail closed: anything NOT on the docs-only allowlist triggers the
-          # full suite (including workflow, project, and config changes).
-          non_docs=$(echo "${files}" | grep -vE '^(docs/.*|LICENSE|\.gitignore|\.github/ISSUE_TEMPLATE/.*|\.github/CODEOWNERS|\.github/dependabot\.yml|\.github/FUNDING\.yml|.*\.md)$' || true)
-          if [[ -n "${non_docs}" ]]; then
-            echo "Non-docs changes detected — running the full suite:"
-            echo "${non_docs}"
-            echo "run_ios=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Docs-only change — skipping the macOS runner."
-            echo "run_ios=false" >> "$GITHUB_OUTPUT"
-          fi
-          if echo "${files}" | grep -qE '^(Companion/|\.github/workflows/pr-ci\.yml$)'; then
-            echo "Companion or its CI changed — running the Linux contract suite."
-            echo "run_companion=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "No Companion change — skipping the Linux contract suite."
-            echo "run_companion=false" >> "$GITHUB_OUTPUT"
-          fi
+          printf '%s\n' "${files}" | python3 scripts/classify-ci-paths.py
 
   test:
     name: Build and Test
     needs: changes
     if: needs.changes.outputs.run_ios == 'true'
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 45
 
     env:
       PROJECT_PATH: HermesMobile.xcodeproj
@@ -82,14 +70,12 @@ jobs:
       DERIVED_DATA_PATH: DerivedData
       RESULT_BUNDLE_PATH: TestResults.xcresult
       TEST_WORKER_COUNT: 1
-      UI_SMOKE_DERIVED_DATA_PATH: DerivedData-UI-Smoke
-      UI_SMOKE_OUTPUT_PATH: iphone-ui-smoke
 
     steps:
       - name: Check out
         uses: actions/checkout@v7
 
-      - name: Check simulator acceptance configuration
+      - name: Check CI and simulator configuration
         run: |
           python3 scripts/check-promotion-config
           python3 scripts/check-iphone-ui-smoke
@@ -129,37 +115,6 @@ jobs:
           echo "name=${name}" >> "$GITHUB_OUTPUT"
           echo "udid=${udid}" >> "$GITHUB_OUTPUT"
 
-      - name: Select adaptive iPad simulator
-        id: ipad_sim
-        run: |
-          set -euo pipefail
-          name=$(xcrun simctl list devices available --json | python3 -c '
-          import json, sys
-          data = json.load(sys.stdin)
-          ipads = [
-              device["name"]
-              for runtime, devices in data["devices"].items()
-              if "iOS" in runtime
-              for device in devices
-              if device.get("isAvailable") and device["name"].startswith("iPad Pro")
-          ]
-          preferred = [
-              "iPad Pro 13-inch (M5)",
-              "iPad Pro 13-inch (M4)",
-          ]
-          selected = next((name for name in preferred if name in ipads), "")
-          if not selected:
-              selected = next((name for name in ipads if "13-inch" in name), "")
-          print(selected if selected else ipads[0] if ipads else "")
-          ')
-          if [[ -z "${name}" ]]; then
-            echo "No available iPad Pro simulator found:" >&2
-            xcrun simctl list devices available >&2
-            exit 1
-          fi
-          echo "Using adaptive-layout simulator: ${name}"
-          echo "name=${name}" >> "$GITHUB_OUTPUT"
-
       - name: Build for testing
         env:
           SIMULATOR_UDID: ${{ steps.sim.outputs.udid }}
@@ -177,23 +132,6 @@ jobs:
           echo "Build-for-testing duration: ${duration_seconds}s"
           echo "### PR CI timing" >> "${GITHUB_STEP_SUMMARY}"
           echo "- Build for testing: ${duration_seconds}s" >> "${GITHUB_STEP_SUMMARY}"
-
-      - name: Build adaptive iPad layout
-        env:
-          IPAD_SIMULATOR_NAME: ${{ steps.ipad_sim.outputs.name }}
-        run: |
-          set -euo pipefail
-          start_seconds=${SECONDS}
-          xcodebuild build \
-            -project "${PROJECT_PATH}" \
-            -scheme "${SCHEME}" \
-            -destination "platform=iOS Simulator,name=${IPAD_SIMULATOR_NAME}" \
-            -derivedDataPath "DerivedData-iPad" \
-            -showBuildTimingSummary \
-            CODE_SIGNING_ALLOWED=NO
-          duration_seconds=$((SECONDS - start_seconds))
-          echo "iPad build duration: ${duration_seconds}s"
-          echo "- Adaptive iPad build: ${duration_seconds}s" >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Test without building
         env:
@@ -213,92 +151,6 @@ jobs:
           duration_seconds=$((SECONDS - start_seconds))
           echo "Test-without-building duration: ${duration_seconds}s"
           echo "- Test without building (${TEST_WORKER_COUNT} workers): ${duration_seconds}s" >> "${GITHUB_STEP_SUMMARY}"
-
-      - name: Build signed iPhone UI smoke app
-        id: signed_app
-        env:
-          SIMULATOR_UDID: ${{ steps.sim.outputs.udid }}
-        run: |
-          set -euo pipefail
-          xcodebuild build \
-            -project "${PROJECT_PATH}" \
-            -scheme "${SCHEME}" \
-            -configuration Debug \
-            -destination "platform=iOS Simulator,id=${SIMULATOR_UDID}" \
-            -derivedDataPath "${UI_SMOKE_DERIVED_DATA_PATH}" \
-            -showBuildTimingSummary \
-            DEVELOPMENT_TEAM= \
-            CODE_SIGNING_ALLOWED=YES \
-            CODE_SIGNING_REQUIRED=YES \
-            CODE_SIGN_IDENTITY=-
-
-          app_path="${UI_SMOKE_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/HermesMobile.app"
-          if [[ ! -d "${app_path}" ]]; then
-            echo "Signed simulator app was not produced at ${app_path}" >&2
-            exit 1
-          fi
-          codesign --verify --deep --strict --verbose=2 "${app_path}"
-          echo "path=${app_path}" >> "$GITHUB_OUTPUT"
-
-      - name: Capture iPhone UI smoke screenshots
-        env:
-          APP_PATH: ${{ steps.signed_app.outputs.path }}
-          SIMULATOR_NAME: ${{ steps.sim.outputs.name }}
-          SIMULATOR_UDID: ${{ steps.sim.outputs.udid }}
-        run: |
-          set -euo pipefail
-          mkdir -p "${UI_SMOKE_OUTPUT_PATH}"
-
-          xcrun simctl boot "${SIMULATOR_UDID}" 2>/dev/null || true
-          xcrun simctl bootstatus "${SIMULATOR_UDID}" -b
-          xcrun simctl ui "${SIMULATOR_UDID}" appearance light
-          xcrun simctl status_bar "${SIMULATOR_UDID}" override \
-            --time 9:41 \
-            --batteryState charged \
-            --batteryLevel 100 \
-            --wifiBars 3 \
-            --cellularBars 4
-          xcrun simctl install "${SIMULATOR_UDID}" "${APP_PATH}"
-
-          bundle_id=$(/usr/libexec/PlistBuddy \
-            -c "Print :CFBundleIdentifier" \
-            "${APP_PATH}/Info.plist")
-
-          capture_ui() {
-            local language="$1"
-            local locale="$2"
-            local fixture="$3"
-            local filename="$4"
-            xcrun simctl terminate "${SIMULATOR_UDID}" "${bundle_id}" \
-              2>/dev/null || true
-            xcrun simctl launch \
-              "${SIMULATOR_UDID}" \
-              "${bundle_id}" \
-              -AppleLanguages "(${language})" \
-              -AppleLocale "${locale}" \
-              "${fixture}" | tee -a "${UI_SMOKE_OUTPUT_PATH}/launch.log"
-            sleep 4
-            xcrun simctl io "${SIMULATOR_UDID}" screenshot \
-              "${UI_SMOKE_OUTPUT_PATH}/${filename}"
-          }
-
-          capture_ui en en_US --core-chat-lab core-chat-en.png
-          capture_ui zh-Hans zh_CN --core-chat-lab core-chat-zh-Hans.png
-          capture_ui en en_US --long-chat-lab long-chat.png
-
-          {
-            echo "Simulator: ${SIMULATOR_NAME}"
-            echo "UDID: ${SIMULATOR_UDID}"
-            echo "Bundle: ${bundle_id}"
-            echo "Build: signed Debug iphonesimulator"
-          } > "${UI_SMOKE_OUTPUT_PATH}/metadata.txt"
-
-      - name: Upload iPhone UI smoke artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: iphone-ui-smoke
-          path: ${{ env.UI_SMOKE_OUTPUT_PATH }}
-          if-no-files-found: error
 
       - name: Report slowest tests
         if: always()

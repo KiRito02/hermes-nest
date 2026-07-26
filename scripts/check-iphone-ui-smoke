@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""Guard the signed, iPhone-only UI smoke acceptance path."""
+"""Guard manual signed simulator acceptance and the lean PR gate."""
 
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = (ROOT / ".github/workflows/pr-ci.yml").read_text(encoding="utf-8")
+PR_WORKFLOW = (ROOT / ".github/workflows/pr-ci.yml").read_text(
+    encoding="utf-8"
+)
+ACCEPTANCE_WORKFLOW = (
+    ROOT / ".github/workflows/ios-simulator-acceptance.yml"
+).read_text(encoding="utf-8")
 APP = (ROOT / "HermesMobile/HermesMobileApp.swift").read_text(encoding="utf-8")
 THEME = (ROOT / "HermesMobile/Config/AppTheme.swift").read_text(
     encoding="utf-8"
@@ -80,24 +85,39 @@ require(
 for snippet, description in [
     ("iPhone 17 Pro Max", "preferred reference iPhone"),
     ('echo "udid=${udid}"', "stable simulator UDID output"),
-    ("Build signed iPhone UI smoke app", "separate signed build"),
-    ("DerivedData-UI-Smoke", "separate signed DerivedData"),
+    ("Build signed iPhone acceptance app", "manual signed iPhone build"),
+    ("DerivedData-iPhone-Acceptance", "isolated signed DerivedData"),
     ("CODE_SIGNING_ALLOWED=YES", "enabled simulator signing"),
     ("codesign --verify --deep --strict", "signature verification"),
     ('simctl install "${SIMULATOR_UDID}" "${APP_PATH}"', "signed app install"),
+    ("capture_screenshots:", "optional screenshot input"),
+    ("default: false", "non-blocking acceptance defaults"),
+    ("if: inputs.capture_screenshots", "optional screenshot steps"),
     ("--core-chat-lab core-chat-en.png", "English core chat capture"),
     ("--core-chat-lab core-chat-zh-Hans.png", "Simplified Chinese capture"),
     ("--long-chat-lab long-chat.png", "long chat capture"),
     ("name: iphone-ui-smoke", "uploaded screenshot artifact"),
+    ("run_ipad:", "adaptive iPad input"),
+    ("Signed 13-inch iPad Pro Launch", "manual iPad acceptance job"),
+    ("iPad Pro 13-inch (M5)", "preferred adaptive iPad"),
 ]:
-    require(WORKFLOW, snippet, description)
+    require(ACCEPTANCE_WORKFLOW, snippet, description)
 
-signed_step = WORKFLOW.split(
-    "- name: Build signed iPhone UI smoke app", maxsplit=1
-)[1].split("- name: Capture iPhone UI smoke screenshots", maxsplit=1)[0]
-if "CODE_SIGNING_ALLOWED=NO" in signed_step:
-    raise SystemExit("The installable UI smoke build must never disable signing.")
-if "${{ secrets." in WORKFLOW:
+for forbidden in [
+    "Build signed iPhone acceptance app",
+    "Capture optional iPhone screenshots",
+    "Build adaptive iPad layout",
+    "DerivedData-iPhone-Acceptance",
+]:
+    if forbidden in PR_WORKFLOW:
+        raise SystemExit(
+            f"Required PR CI must not contain manual acceptance work: {forbidden}"
+        )
+if "pull_request:" in ACCEPTANCE_WORKFLOW:
+    raise SystemExit("Signed simulator acceptance must remain manually dispatched.")
+if "CODE_SIGNING_ALLOWED=NO" in ACCEPTANCE_WORKFLOW:
+    raise SystemExit("Installable acceptance builds must never disable signing.")
+if "${{ secrets." in ACCEPTANCE_WORKFLOW:
     raise SystemExit("UI smoke acceptance must remain independent of repository secrets.")
 
-print("iPhone signed UI smoke configuration is valid.")
+print("Manual signed simulator acceptance and lean PR CI are valid.")

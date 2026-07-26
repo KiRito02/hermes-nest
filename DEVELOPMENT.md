@@ -249,11 +249,16 @@ Never install a simulator build produced with
 `CODE_SIGNING_ALLOWED=NO`. It lacks the entitlements required for Keychain
 testing.
 
-### Pull-request iPhone UI smoke
+### Manual simulator acceptance
 
-When app code changes, `PR CI` also creates a separate ad-hoc-signed Debug
-simulator build and installs it on `iPhone 17 Pro Max` (or the nearest
-available iPhone Pro). It launches server-free Debug fixtures and captures:
+Required `PR CI` runs the iPhone compile and full XCTest suite, but does not
+repeat a signed build, boot/install simulators, or capture screenshots. Use
+the manually dispatched **iOS Simulator Acceptance** workflow when UI/runtime
+changes need signed launch evidence.
+
+The manual workflow always builds, installs, and launches a signed Debug App
+on `iPhone 17 Pro Max` (or the nearest available iPhone Pro). Its optional
+`capture_screenshots` input launches server-free Debug fixtures and captures:
 
 - `core-chat-en.png`
 - `core-chat-zh-Hans.png`
@@ -261,8 +266,11 @@ available iPhone Pro). It launches server-free Debug fixtures and captures:
 
 Download them from the workflow run's **Artifacts** section under
 `iphone-ui-smoke`. The fixture contains no Companion URL, device credential,
-NAS secret, or network request. iPad remains an adaptive-layout compile check;
-the automated launch and screenshot acceptance path is iPhone-only.
+NAS secret, or network request.
+
+Enable `run_ipad` only when adaptive layout changed. It independently builds,
+installs, and launches the signed App on an available 13-inch iPad Pro. Neither
+manual option is part of the required PR gate.
 
 Human/CLI equivalents:
 
@@ -371,10 +379,13 @@ The intended owner workflow is:
 
 1. Push an explicitly approved branch.
 2. Manually run the `PR CI` workflow on that branch for macOS build/test.
-   Packaging is added later in the personal-sideload Phase I issue.
-3. After Phase I lands, download the sideload artifact on Windows.
-4. Sign/install it with AltStore or SideStore using the owner's Apple account.
-5. Re-sign when the provisioning period expires.
+3. For UI/runtime changes, manually run `iOS Simulator Acceptance`; enable
+   screenshots or iPad only when useful.
+4. After Phase I lands, download the sideload artifact on Windows.
+5. Sign/install it with AltStore or SideStore using the owner's Apple account.
+6. Re-sign when the provisioning period expires.
+
+Packaging is added later in the personal-sideload Phase I issue.
 
 Do not add App Store Connect secrets or revive inherited TestFlight workflows
 without a new explicit distribution decision.

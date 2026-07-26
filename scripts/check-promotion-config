@@ -43,14 +43,21 @@ require(
     "The Companion response bubble must use the streaming render path.",
 )
 
-workflow = (ROOT / ".github/workflows/pr-ci.yml").read_text(encoding="utf-8")
-require(
-    'preferred = "iPhone 17 Pro Max"' in workflow,
-    "PR CI must prefer the reference iPhone Pro Max simulator.",
+pr_workflow = (ROOT / ".github/workflows/pr-ci.yml").read_text(
+    encoding="utf-8"
 )
 require(
-    "Build adaptive iPad layout" in workflow,
-    "PR CI must compile the adaptive iPad Pro layout.",
+    'preferred = "iPhone 17 Pro Max"' in pr_workflow,
+    "PR CI must prefer the reference iPhone Pro Max simulator.",
+)
+
+acceptance_workflow = (
+    ROOT / ".github/workflows/ios-simulator-acceptance.yml"
+).read_text(encoding="utf-8")
+require(
+    "Signed 13-inch iPad Pro Launch" in acceptance_workflow
+    and "if: inputs.run_ipad" in acceptance_workflow,
+    "Manual acceptance must provide an opt-in adaptive iPad Pro launch.",
 )
 
 print("ProMotion and adaptive-layout configuration: OK")
