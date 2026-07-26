@@ -372,6 +372,7 @@ struct CompanionSessionHistoryView: View {
     @State private var forkedSession: SessionSummary?
     @State private var showsModelPicker = false
     @State private var showsUsage = false
+    @State private var showsAttachmentUnavailable = false
     @State private var draftMessage = ""
     @State private var isUserInteractingWithScroll = false
     @FocusState private var composerIsFocused: Bool
@@ -713,17 +714,8 @@ struct CompanionSessionHistoryView: View {
             modelControls
 
             composerInputLayout {
-                Menu {
-                    Section("Attachments") {
-                        Button {} label: {
-                            Label(
-                                "Images unavailable with Hermes Runs",
-                                systemImage:
-                                    "photo.badge.exclamationmark"
-                            )
-                        }
-                        .disabled(true)
-                    }
+                Button {
+                    showsAttachmentUnavailable = true
                 } label: {
                     Image(systemName: "plus")
                         .frame(width: 32, height: 32)
@@ -737,6 +729,16 @@ struct CompanionSessionHistoryView: View {
                 .accessibilityIdentifier(
                     "companion.attachment.unavailable"
                 )
+                .alert(
+                    "Images unavailable with Hermes Runs",
+                    isPresented: $showsAttachmentUnavailable
+                ) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text(
+                        "Unavailable because the current Hermes Runs API does not advertise image input."
+                    )
+                }
 
                 TextField(
                     "Message Hermes...",
