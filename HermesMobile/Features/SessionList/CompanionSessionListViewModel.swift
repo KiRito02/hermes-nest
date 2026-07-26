@@ -846,13 +846,9 @@ final class CompanionSessionHistoryViewModel {
         persistedSelection: CompanionModelSelection?
     ) -> CompanionModelSelection? {
         let options = inventory.catalogGroups.flatMap(\.models)
-        let persistedSessionModel = session.model?.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ).nilIfEmpty
+        let persistedSessionModel = session.model?.trimmedNonEmptyValue
         let persistedSessionProvider =
-            session.modelProvider?.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            ).nilIfEmpty
+            session.modelProvider?.trimmedNonEmptyValue
         if
             let persistedSelection,
             let persistedOption = options.first(where: {
@@ -872,9 +868,7 @@ final class CompanionSessionHistoryViewModel {
                     : nil
             )
         }
-        if let sessionModel = session.model?.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ).nilIfEmpty {
+        if let sessionModel = session.model?.trimmedNonEmptyValue {
             let matches = options.filter {
                 $0.model == sessionModel
                     && (
@@ -1322,7 +1316,7 @@ final class CompanionSessionHistoryViewModel {
         _ payload: ConversationRunEventData,
         runID: String
     ) {
-        let id = payload.toolCallID?.nonEmptyRunValue
+        let id = payload.toolCallID?.trimmedNonEmptyValue
             ?? "\(runID)-tool-\(nextToolOrdinal)"
         nextToolOrdinal += 1
         if let index = liveToolCalls.firstIndex(where: { $0.id == id }) {
@@ -1349,7 +1343,7 @@ final class CompanionSessionHistoryViewModel {
         runID: String
     ) {
         let index: Int?
-        if let id = payload.toolCallID?.nonEmptyRunValue {
+        if let id = payload.toolCallID?.trimmedNonEmptyValue {
             index = liveToolCalls.firstIndex(where: { $0.id == id })
         } else {
             index = liveToolCalls.lastIndex(where: {
@@ -1366,7 +1360,7 @@ final class CompanionSessionHistoryViewModel {
             return
         }
 
-        let id = payload.toolCallID?.nonEmptyRunValue
+        let id = payload.toolCallID?.trimmedNonEmptyValue
             ?? "\(runID)-tool-\(nextToolOrdinal)"
         nextToolOrdinal += 1
         liveToolCalls.append(
@@ -1441,7 +1435,7 @@ final class CompanionSessionHistoryViewModel {
 }
 
 private extension String {
-    var nonEmptyRunValue: String? {
+    var trimmedNonEmptyValue: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
