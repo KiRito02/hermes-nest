@@ -1,8 +1,8 @@
-# Hermex — Project Intent
+# Hermes Nest — Project Intent
 
 This file is for fast orientation only. `PROJECT_SPEC.md` remains the source of truth for product scope, API behavior, build phases, dependencies, and open decisions.
 
-Hermex is a native iPhone/iPad control surface plus a self-hosted NAS Companion
+Hermes Nest is a native iPhone/iPad control surface plus a self-hosted NAS Companion
 for a Hermes AI agent stack. The App is the interaction/review surface;
 Companion is its only remote endpoint; Hermes Gateway remains the execution
 plane behind Companion on loopback.

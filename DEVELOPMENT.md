@@ -1,6 +1,6 @@
 # Development
 
-Hermex Direct is developed as two cooperating deliverables:
+Hermes Nest is developed as two cooperating deliverables:
 
 - the native iPhone/iPad App;
 - a self-hosted Companion on the owner's NAS.

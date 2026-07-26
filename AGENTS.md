@@ -1,6 +1,6 @@
-# AGENTS.md — working agreement for Hermex
+# AGENTS.md — working agreement for Hermes Nest
 
-Hermex Direct is a native SwiftUI iPhone/iPad app (Xcode target/scheme
+Hermes Nest is a native SwiftUI iPhone/iPad app (Xcode target/scheme
 `HermesMobile`) plus a self-hosted NAS Companion. The App connects only to the
 Companion; the Companion connects over loopback to the Hermes Agent API Server
 started by `hermes gateway` and adds restricted file/upload/built-in-Memory

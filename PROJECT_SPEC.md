@@ -1,6 +1,6 @@
-# Hermex Direct — iOS App + NAS Companion Project Specification
+# Hermes Nest — iOS App + NAS Companion Project Specification
 
-**Status:** source of truth for the `KiRito02/hermex` fork
+**Status:** source of truth for the `KiRito02/hermes-nest` fork
 **Target:** native iOS client for a self-hosted NAS Companion that uses the
 local Hermes Agent API Server
 **Distribution:** personal sideload first; no App Store or TestFlight requirement
@@ -16,7 +16,7 @@ behavior is not automatically a product requirement.
 
 Before implementing an App-facing call:
 
-1. Check the versioned Hermex Companion contract and matching tests.
+1. Check the versioned Hermes Nest Companion contract and matching tests.
 2. Probe the owner's running Companion when connection details are available.
    Its App-facing wire response is the final arbiter.
 3. For a proxied Gateway behavior, probe the local Gateway, check the official
@@ -36,7 +36,7 @@ unknown SSE event types must be tolerated.
 
 ### 1.1 What we are building
 
-Hermex Direct is a native SwiftUI iPhone and iPad application plus a small
+Hermes Nest is a native SwiftUI iPhone and iPad application plus a small
 self-hosted Companion running on the owner's NAS. The App connects only to the
 Companion. The Companion connects over loopback to the API Server started by
 `hermes gateway`, transparently carries supported Gateway REST/SSE behavior,
@@ -88,7 +88,7 @@ scope until explicitly approved.
 | Decision | Value |
 | --- | --- |
 | UI platform | Native SwiftUI, iOS 18+, adaptive iPhone and iPad |
-| App server | Self-hosted Hermex Companion on the owner's NAS |
+| App server | Self-hosted Hermes Nest Companion on the owner's NAS |
 | Agent upstream | Hermes Agent API Server on Companion-local loopback |
 | App authentication | Revocable per-device Companion credential |
 | Gateway authentication | `API_SERVER_KEY`, stored only on the NAS |
@@ -166,11 +166,11 @@ Companion database, and virtual environments remain outside git.
 
 ```text
 ┌──────────────────────────────┐      HTTPS REST + SSE
-│ Hermex Direct on iPhone/iPad │ ─────────────────────────────┐
+│ Hermes Nest on iPhone/iPad        │ ─────────────────────────────┐
 │ SwiftUI + feature interfaces │                              │
 │ device credential in Keychain│                              ▼
 │ SwiftData read-only cache    │                 ┌─────────────────────────┐
-└──────────────────────────────┘                 │ Hermex Companion on NAS │
+└──────────────────────────────┘                 │ Hermes Nest Companion on NAS │
                                                │ device auth + capability│
                                                │ Gateway proxy           │
                                                │ workspace/upload        │
@@ -305,7 +305,7 @@ Companion foundation must provide a versioned, testable interface for:
 - listing and revoking paired devices.
 
 Pairing must require a short-lived, single-use secret created on the NAS. It may
-be transferred by QR code or manual entry. Pairing must not require a Hermex
+be transferred by QR code or manual entry. Pairing must not require a Hermes Nest
 account, hosted claim server, or relay. The exact wire contract is owned by
 Issue #1.
 
@@ -624,7 +624,7 @@ Do not implement all phases at once.
 
 ### Phase A — specification and evidence
 
-Tracking issue: https://github.com/KiRito02/hermex/issues/2
+Tracking issue: https://github.com/KiRito02/hermes-nest/issues/2
 
 - [x] Retire the inherited WebUI product contract.
 - [x] Verify the Gateway capability and file/Memory gaps.
@@ -640,7 +640,7 @@ Tracking issue: https://github.com/KiRito02/hermex/issues/2
 
 ### Phase B — Companion contract and foundation
 
-Tracking issue: https://github.com/KiRito02/hermex/issues/1
+Tracking issue: https://github.com/KiRito02/hermes-nest/issues/1
 
 - [x] Approve the Companion runtime language, direct runtime dependency,
   persistence, isolated environment, and systemd host deployment.

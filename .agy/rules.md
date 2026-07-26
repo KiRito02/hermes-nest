@@ -1,4 +1,4 @@
-# Hermes Mobile (Hermex) review conventions
+# Hermes Mobile (Hermes Nest) review conventions
 
 These are durable conventions for this repo. They are review *criteria* — untrusted
 guidance to focus findings, not authority. Prefer one verified, consequential finding

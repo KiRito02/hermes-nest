@@ -712,7 +712,7 @@ struct KanbanComment: Decodable, Equatable, Sendable {
     }
 }
 
-/// Detail events retain only the fields Hermex intentionally presents. Unknown
+/// Detail events retain only the fields Hermes Nest intentionally presents. Unknown
 /// payload keys are discarded so raw server payloads cannot reach diagnostics or
 /// generic error UI.
 struct KanbanDetailEvent: Decodable, Equatable, Sendable {
@@ -974,7 +974,7 @@ enum KanbanContractViolation: Error, Equatable, LocalizedError, Sendable {
     case missingCardStatus
 
     var errorDescription: String? {
-        String(localized: "This server's Kanban response is incompatible with Hermex.")
+        String(localized: "This server's Kanban response is incompatible with Hermes Nest.")
     }
 }
 
@@ -982,7 +982,7 @@ enum KanbanResponseError: Error, Equatable, LocalizedError, Sendable {
     case nonJSONContentType
 
     var errorDescription: String? {
-        String(localized: "This server's Kanban response is incompatible with Hermex.")
+        String(localized: "This server's Kanban response is incompatible with Hermes Nest.")
     }
 }
 

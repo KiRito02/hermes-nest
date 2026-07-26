@@ -134,7 +134,7 @@ private struct GitBranchPickerSheet: View {
             }
         }
         .alert("New Branch", isPresented: $showsCreatePrompt) {
-            TextField("hermex/my-feature", text: $newBranchName)
+            TextField("hermes-nest/my-feature", text: $newBranchName)
             Button("Cancel", role: .cancel) {}
             Button("Create") {
                 let name = newBranchName.trimmingCharacters(in: .whitespacesAndNewlines)
