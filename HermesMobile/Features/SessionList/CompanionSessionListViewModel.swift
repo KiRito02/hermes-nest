@@ -62,6 +62,7 @@ final class CompanionSessionListViewModel {
             isViewingCachedData = false
             cache(page.sessions, completesList: !hasMore, in: modelContext)
         } catch {
+            guard !(error is CancellationError) else { return }
             if let modelContext, shouldUseCache(for: error),
                let cached = try? CacheStore.cachedSessions(
                    serverURL: companionURL,
@@ -102,6 +103,7 @@ final class CompanionSessionListViewModel {
             errorMessage = nil
             cache(page.sessions, completesList: !hasMore, in: modelContext)
         } catch {
+            guard !(error is CancellationError) else { return }
             errorMessage = error.localizedDescription
         }
     }

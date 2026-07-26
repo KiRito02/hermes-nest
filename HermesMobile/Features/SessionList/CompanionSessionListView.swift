@@ -1,6 +1,9 @@
 import SwiftData
 import SwiftUI
 
+/// Issue #6's read-only tracer bullet reuses the inherited session row
+/// presentation. Issue #7 activates row navigation only after detail/history
+/// routes have their own verified Companion contract.
 @MainActor
 struct CompanionSessionListView: View {
     @Bindable var connectionManager: CompanionConnectionManager
@@ -30,6 +33,8 @@ struct CompanionSessionListView: View {
     }
 
     var body: some View {
+        let displayedSessions = viewModel.matchingSessions(searchText: searchText)
+
         NavigationStack {
             List {
                 if viewModel.isViewingCachedData {
@@ -37,7 +42,7 @@ struct CompanionSessionListView: View {
                         .listRowSeparator(.hidden)
                 }
 
-                ForEach(visibleSessions) { session in
+                ForEach(displayedSessions) { session in
                     SessionRowView(
                         session: session,
                         showsMessageCount: true,
@@ -48,7 +53,7 @@ struct CompanionSessionListView: View {
                         EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8)
                     )
                     .onAppear {
-                        guard session.id == visibleSessions.last?.id else { return }
+                        guard session.id == displayedSessions.last?.id else { return }
                         Task {
                             await viewModel.loadNextPageIfNeeded(
                                 modelContext: modelContext
@@ -120,10 +125,6 @@ struct CompanionSessionListView: View {
         } message: {
             Text("Cached conversations are kept on this device.")
         }
-    }
-
-    private var visibleSessions: [SessionSummary] {
-        viewModel.matchingSessions(searchText: searchText)
     }
 
     @ViewBuilder

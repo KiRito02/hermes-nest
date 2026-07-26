@@ -88,6 +88,7 @@ final class SessionRepositoryTests: APIClientTestCase {
     func testCompanionErrorCodesRemainDistinct() async throws {
         let scenarios: [(Int, String, SessionRepositoryError)] = [
             (401, "device_credential_invalid", .invalidDeviceCredential),
+            (403, "device_revoked", .deviceRevoked),
             (502, "gateway_unauthorized", .gatewayUnauthorized),
             (503, "gateway_unavailable", .gatewayUnavailable),
             (502, "gateway_incompatible", .gatewayIncompatible),
@@ -162,6 +163,59 @@ final class SessionRepositoryTests: APIClientTestCase {
         }
     }
 
+    func testSuccessRequiresJSONMediaTypeAndCompletePaginationShape() async throws {
+        let scenarios: [([String: String], String)] = [
+            (
+                ["Content-Type": "text/html"],
+                """
+                {"object":"list","data":[],"limit":50,"offset":0,"has_more":false}
+                """
+            ),
+            (
+                ["Content-Type": "application/json"],
+                """
+                {"object":"list","data":[],"limit":50,"offset":0}
+                """
+            ),
+            (
+                ["Content-Type": "application/json"],
+                """
+                {"object":"list","data":[],"limit":50,"offset":0,"has_more":"false"}
+                """
+            ),
+        ]
+
+        for (headers, body) in scenarios {
+            let keychain = InMemoryKeychainStore()
+            try keychain.save("device-credential", forKey: .companionDeviceCredential)
+            let session = makeSession { request in
+                let response = try XCTUnwrap(
+                    HTTPURLResponse(
+                        url: try XCTUnwrap(request.url),
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: headers
+                    )
+                )
+                return (response, Data(body.utf8))
+            }
+            let repository = LiveSessionRepository(
+                companionURL: try XCTUnwrap(
+                    URL(string: "https://companion.example.test")
+                ),
+                keychain: keychain,
+                session: session
+            )
+
+            do {
+                _ = try await repository.listSessions(SessionListQuery())
+                XCTFail("Expected unexpected-response error")
+            } catch let error as SessionRepositoryError {
+                XCTAssertEqual(.unexpectedResponse, error)
+            }
+        }
+    }
+
     @MainActor
     func testViewModelPagesWithoutDuplicatingStableSessionIDs() async throws {
         let first = SessionSummary(
@@ -210,6 +264,15 @@ final class SessionRepositoryTests: APIClientTestCase {
         XCTAssertFalse(viewModel.hasMore)
         let queries = await repository.recordedQueries
         XCTAssertEqual([0, 1], queries.compactMap(\.offset))
+    }
+
+    private func makeSession(
+        handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)
+    ) -> URLSession {
+        MockURLProtocol.requestHandler = handler
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        return URLSession(configuration: configuration)
     }
 }
 

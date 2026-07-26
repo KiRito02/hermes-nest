@@ -180,7 +180,7 @@ async def _readiness(request: web.Request) -> web.Response:
 async def _list_sessions(request: web.Request) -> web.Response:
     try:
         _authenticate(request)
-        response = await request.app[GATEWAY_KEY].list_sessions(
+        body = await request.app[GATEWAY_KEY].list_sessions(
             list(request.query.items())
         )
     except RegistryError as error:
@@ -189,8 +189,8 @@ async def _list_sessions(request: web.Request) -> web.Response:
         return _proxy_error_response(error)
 
     return web.Response(
-        body=response.body,
-        status=response.status,
+        body=body,
+        status=200,
         content_type="application/json",
         headers={"Cache-Control": "no-store"},
     )
@@ -277,6 +277,6 @@ def create_app(
     app.router.add_delete(f"{DEVICES_PATH}/{{device_id}}", _revoke_device)
     app.router.add_get(CAPABILITIES_PATH, _capabilities)
     app.router.add_get(READINESS_PATH, _readiness)
-    app.router.add_get(SESSION_LIST_PATH, _list_sessions)
+    app.router.add_get(SESSION_LIST_PATH, _list_sessions, allow_head=False)
     app.on_cleanup.append(_close_registry)
     return app

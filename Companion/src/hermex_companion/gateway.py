@@ -40,12 +40,6 @@ class GatewayReadinessSnapshot:
     version: str | None
 
 
-@dataclass(frozen=True)
-class GatewayProxyResponse:
-    status: int
-    body: bytes
-
-
 class GatewayProxyError(Exception):
     """Bounded App-facing classification for a failed Gateway request."""
 
@@ -108,7 +102,7 @@ class GatewayDiscovery:
     async def list_sessions(
         self,
         query_items: Sequence[tuple[str, str]],
-    ) -> GatewayProxyResponse:
+    ) -> bytes:
         """Forward the verified session-list surface with Gateway-only auth."""
         query = _validated_session_list_query(query_items)
         headers = {
@@ -196,7 +190,7 @@ class GatewayDiscovery:
                 "The Companion could not reach the Hermes Gateway.",
             ) from None
 
-        return GatewayProxyResponse(status=200, body=bytes(body))
+        return bytes(body)
 
     async def _get_json(self, path: str) -> tuple[str, object | None]:
         headers = (

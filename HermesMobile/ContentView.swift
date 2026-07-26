@@ -133,10 +133,8 @@ struct ContentView: View {
     }
 }
 
-/// Phase-B root for the Companion-only connection boundary. The inherited
-/// session UI remains in the source tree for the later verified Gateway-proxy
-/// migration, but it is intentionally not started here: doing so would probe
-/// old WebUI routes against Companion before the session contract exists.
+/// Companion-only root. Each production destination is enabled only after its
+/// versioned Companion/Gateway contract has been verified.
 struct CompanionRootView: View {
     @Bindable var connectionManager: CompanionConnectionManager
 
@@ -194,7 +192,7 @@ struct CompanionRootView: View {
     private func gatewayMessage(for status: String?) -> String {
         switch status {
         case "ok":
-            return String(localized: "Gateway discovery succeeded. Sessions and chat will be enabled in the next verified migration slice.")
+            return String(localized: "Gateway discovery succeeded.")
         case "unavailable":
             return String(localized: "Companion is reachable, but Hermes Gateway is unavailable.")
         case "unauthorized":

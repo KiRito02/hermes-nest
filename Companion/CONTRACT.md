@@ -250,7 +250,8 @@ agent counts, paths, and detailed readiness checks are never returned.
 Gateway-compatible route enabled by this contract slice. Companion removes the
 device `Authorization` header, sends only its NAS-local Gateway bearer
 credential over loopback, and never forwards other App request headers.
-Redirects are not followed.
+Redirects are not followed. `HEAD` is not an alias for this route and returns
+`405` without contacting Gateway.
 
 This contract was verified against Hermes Agent `0.19.0`, upstream commit
 `07e97d2f5dc3d2092cfe693ef07b2527a36cd2d8`, its session API tests, the

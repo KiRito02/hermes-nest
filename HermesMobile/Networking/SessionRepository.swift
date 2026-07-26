@@ -33,6 +33,7 @@ protocol SessionRepository: Sendable {
 enum SessionRepositoryError: LocalizedError, Equatable {
     case missingDeviceCredential
     case invalidDeviceCredential
+    case deviceRevoked
     case companionUnreachable
     case invalidQuery
     case gatewayUnauthorized
@@ -48,6 +49,8 @@ enum SessionRepositoryError: LocalizedError, Equatable {
         switch self {
         case .missingDeviceCredential, .invalidDeviceCredential:
             return String(localized: "This device must pair with Companion again.")
+        case .deviceRevoked:
+            return String(localized: "This device was revoked and must pair with Companion again.")
         case .companionUnreachable:
             return String(localized: "Hermex Companion is unreachable.")
         case .invalidQuery:
@@ -114,11 +117,18 @@ actor LiveSessionRepository: SessionRepository {
         let response: URLResponse
         do {
             (data, response) = try await session.data(for: request)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
         } catch {
             throw SessionRepositoryError.companionUnreachable
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
+            throw SessionRepositoryError.unexpectedResponse
+        }
+        guard httpResponse.mimeType == "application/json" else {
             throw SessionRepositoryError.unexpectedResponse
         }
         guard data.count <= Self.maximumResponseBytes else {
@@ -134,15 +144,21 @@ actor LiveSessionRepository: SessionRepository {
         } catch {
             throw SessionRepositoryError.unexpectedResponse
         }
-        guard payload.object == "list", let rows = payload.data else {
+        guard
+            payload.object == "list",
+            let rows = payload.data,
+            let limit = payload.limit,
+            let offset = payload.offset,
+            let hasMore = payload.hasMore
+        else {
             throw SessionRepositoryError.unexpectedResponse
         }
 
         return SessionPage(
             sessions: rows.compactMap(\.sessionSummary),
-            limit: payload.limit,
-            offset: payload.offset,
-            hasMore: payload.hasMore
+            limit: limit,
+            offset: offset,
+            hasMore: hasMore
         )
     }
 
@@ -201,8 +217,10 @@ actor LiveSessionRepository: SessionRepository {
             try? decoder.decode(CompanionSessionErrorEnvelope.self, from: data)
         )?.error?.code
         switch (statusCode, code) {
-        case (401, "device_credential_invalid"), (403, "device_revoked"):
+        case (401, "device_credential_invalid"):
             return .invalidDeviceCredential
+        case (403, "device_revoked"):
+            return .deviceRevoked
         case (400, "invalid_query"):
             return .invalidQuery
         case (502, "gateway_unauthorized"):
@@ -255,14 +273,14 @@ private struct GatewaySessionListPayload: Decodable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        object = container.decodeLossyStringIfPresent(forKey: .object)
+        object = try? container.decodeIfPresent(String.self, forKey: .object)
         data = try? container.decodeIfPresent(
             [GatewaySessionPayload].self,
             forKey: .data
         )
-        limit = container.decodeLossyIntIfPresent(forKey: .limit)
-        offset = container.decodeLossyIntIfPresent(forKey: .offset)
-        hasMore = container.decodeLossyBoolIfPresent(forKey: .hasMore)
+        limit = try? container.decodeIfPresent(Int.self, forKey: .limit)
+        offset = try? container.decodeIfPresent(Int.self, forKey: .offset)
+        hasMore = try? container.decodeIfPresent(Bool.self, forKey: .hasMore)
     }
 }
 
