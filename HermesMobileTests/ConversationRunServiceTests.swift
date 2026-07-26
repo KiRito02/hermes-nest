@@ -3,6 +3,12 @@ import SwiftData
 @testable import HermesMobile
 
 final class ConversationRunServiceTests: APIClientTestCase {
+    override func tearDown() {
+        RunJSONURLProtocol.reset()
+        RunSSEURLProtocol.reset()
+        super.tearDown()
+    }
+
     func testStartUsesDeviceCredentialAndAuthoritativeHistory() async throws {
         let keychain = InMemoryKeychainStore()
         try keychain.save(
@@ -196,16 +202,14 @@ final class ConversationRunServiceTests: APIClientTestCase {
                 : keepalive
 
                 data: {"event":"message.delta","run_id":"run-1","delta":"First"}
-
-                """,
+                """ + "\n\n",
                 delayNanoseconds: 10_000_000
             ),
             .init(
                 text: """
                 event: future.transport
                 data: {"event":"run.completed","run_id":"run-1","output":"First"}
-
-                """,
+                """ + "\n\n",
                 delayNanoseconds: 250_000_000
             ),
         ])
@@ -608,7 +612,7 @@ final class ConversationRunServiceTests: APIClientTestCase {
             modelContext: modelContext
         )
         XCTAssertTrue(didSend)
-        await waitUntil { viewModel.activeRunID == nil }
+        await waitUntil { viewModel.needsTerminalHistoryRetry }
 
         XCTAssertEqual(.completed, viewModel.runState)
         XCTAssertEqual(
@@ -689,7 +693,9 @@ final class ConversationRunServiceTests: APIClientTestCase {
         let overlappingCallCount = await repository.historyCallCount
         XCTAssertEqual(2, overlappingCallCount)
 
-        await waitUntil { viewModel.activeRunID == nil }
+        await waitUntil {
+            viewModel.activeRunID == nil && viewModel.canSend
+        }
         _ = await overlappingLoad.value
 
         let finalHistoryCallCount = await repository.historyCallCount
@@ -840,9 +846,9 @@ final class ConversationRunServiceTests: APIClientTestCase {
     private func makeSession(
         handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)
     ) -> URLSession {
-        MockURLProtocol.requestHandler = handler
+        RunJSONURLProtocol.configure(handler: handler)
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [MockURLProtocol.self]
+        configuration.protocolClasses = [RunJSONURLProtocol.self]
         return URLSession(
             configuration: configuration,
             delegate: CompanionRedirectBlocker(),
@@ -1131,6 +1137,66 @@ private actor RunServiceStub: ConversationRunServing {
 private struct RunSSEChunk {
     let text: String
     let delayNanoseconds: UInt64
+}
+
+private final class RunJSONURLProtocol: URLProtocol {
+    private static let lock = NSLock()
+    private static var handler:
+        ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    static func configure(
+        handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)
+    ) {
+        lock.lock()
+        self.handler = handler
+        lock.unlock()
+    }
+
+    static func reset() {
+        lock.lock()
+        handler = nil
+        lock.unlock()
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(
+        for request: URLRequest
+    ) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        let handler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+        Self.lock.lock()
+        handler = Self.handler
+        Self.lock.unlock()
+
+        guard let handler else {
+            client?.urlProtocol(
+                self,
+                didFailWithError: URLError(.badServerResponse)
+            )
+            return
+        }
+
+        do {
+            let (response, data) = try handler(request)
+            client?.urlProtocol(
+                self,
+                didReceive: response,
+                cacheStoragePolicy: .notAllowed
+            )
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
 }
 
 private final class RunSSEURLProtocol: URLProtocol {
