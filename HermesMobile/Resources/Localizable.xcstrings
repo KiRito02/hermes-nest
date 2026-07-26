@@ -1,6 +1,30 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Add image" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加图片" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "加入圖片" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "加入圖片" } } } },
+    "Attachments" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "附件" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "附件" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "附件" } } } },
+    "Chats" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "聊天" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "聊天" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "聊天" } } } },
+    "Choose model" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择模型" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "選擇模型" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "選擇模型" } } } },
+    "Choose reasoning effort" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择推理强度" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "選擇推理強度" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "選擇推理強度" } } } },
+    "Choose a chat from the sidebar or start a new conversation with your Hermes Agent." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "从侧边栏选择聊天，或与 Hermes Agent 开始新对话。" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "從側邊欄選擇聊天，或與 Hermes Agent 開始新對話。" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "從側邊欄選擇聊天，或與 Hermes Agent 開始新對話。" } } } },
+    "Context window" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上下文窗口" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "上下文視窗" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "上下文視窗" } } } },
+    "Copy Message" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制消息" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "複製訊息" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "複製訊息" } } } },
+    "Current model" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前模型" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "目前模型" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "目前模型" } } } },
+    "Hermes Runs currently report token usage, but not the exact current prompt size together with this model's context limit. Hermes Nest will not estimate a percentage from cumulative session tokens." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Hermes Runs 目前会报告令牌用量，但不会同时提供当前提示的精确大小和该模型的上下文上限。Hermes Nest 不会使用会话累计令牌估算百分比。" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Hermes Runs 目前會回報權杖用量，但不會同時提供目前提示的精確大小和該模型的上下文上限。Hermes Nest 不會使用工作階段累計權杖估算百分比。" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "Hermes Runs 目前會回報權杖用量，但不會同時提供目前提示的精確大小和該模型的上下文上限。Hermes Nest 不會使用工作階段累計權杖估算百分比。" } } } },
+    "Images unavailable with Hermes Runs" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Hermes Runs 暂不支持图片" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Hermes Runs 暫不支援圖片" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "Hermes Runs 暫不支援圖片" } } } },
+    "Latest response" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最近一次回复" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "最近一次回覆" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "最近一次回覆" } } } },
+    "Message Hermes..." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "给 Hermes 发消息……" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "傳訊息給 Hermes……" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "傳訊息給 Hermes……" } } } },
+    "Model & Usage" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "模型与用量" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "模型與用量" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "模型與用量" } } } },
+    "Model and token usage" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "模型与令牌用量" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "模型與權杖用量" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "模型與權杖用量" } } } },
+    "New chat" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建聊天" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "新增聊天" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "新增聊天" } } } },
+    "Search chats" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "搜索聊天" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "搜尋聊天" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "搜尋聊天" } } } },
+    "Send message" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "发送消息" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "傳送訊息" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "傳送訊息" } } } },
+    "Session totals" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "会话累计" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "工作階段累計" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "工作階段累計" } } } },
+    "Share Message" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分享消息" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "分享訊息" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "分享訊息" } } } },
+    "Shows exact run and session usage. Context occupancy is shown only when Hermes reports it." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示精确的 Run 与会话用量；仅在 Hermes 报告时显示上下文占用。" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "顯示精確的 Run 與工作階段用量；僅在 Hermes 回報時顯示上下文佔用。" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "顯示精確的 Run 與工作階段用量；僅在 Hermes 回報時顯示上下文佔用。" } } } },
+    "These are exact token counts reported by the completed Hermes Run." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这些是已完成 Hermes Run 报告的精确令牌数。" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "這些是已完成 Hermes Run 回報的精確權杖數。" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "這些是已完成 Hermes Run 回報的精確權杖數。" } } } },
+    "Usage" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "用量" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "用量" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "用量" } } } },
+    "Unavailable because the current Hermes Runs API does not advertise image input." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前 Hermes Runs API 未声明支持图片输入，因此不可用。" } }, "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "目前 Hermes Runs API 未宣告支援圖片輸入，因此無法使用。" } }, "zh-HK" : { "stringUnit" : { "state" : "translated", "value" : "目前 Hermes Runs API 未宣告支援圖片輸入，因此無法使用。" } } } },
     "The Board is refreshing." : { "localizations" : { "de" : { "stringUnit" : { "state" : "needs_review", "value" : "Das Board wird aktualisiert." } }, "es" : { "stringUnit" : { "state" : "needs_review", "value" : "El tablero se está actualizando." } }, "fr" : { "stringUnit" : { "state" : "needs_review", "value" : "Le tableau est en cours d’actualisation." } }, "it" : { "stringUnit" : { "state" : "needs_review", "value" : "La bacheca è in fase di aggiornamento." } }, "pl" : { "stringUnit" : { "state" : "needs_review", "value" : "Tablica jest odświeżana." } }, "pt-BR" : { "stringUnit" : { "state" : "needs_review", "value" : "O quadro está sendo atualizado." } }, "nl" : { "stringUnit" : { "state" : "needs_review", "value" : "Het bord wordt vernieuwd." } }, "tr" : { "stringUnit" : { "state" : "needs_review", "value" : "Pano yenileniyor." } }, "ru" : { "stringUnit" : { "state" : "needs_review", "value" : "Доска обновляется." } }, "ja" : { "stringUnit" : { "state" : "needs_review", "value" : "ボードを更新しています。" } }, "zh-Hans" : { "stringUnit" : { "state" : "needs_review", "value" : "看板正在刷新。" } }, "ko" : { "stringUnit" : { "state" : "needs_review", "value" : "보드를 새로 고치는 중입니다." } }, "ar" : { "stringUnit" : { "state" : "needs_review", "value" : "جارٍ تحديث اللوحة." } }, "he" : { "stringUnit" : { "state" : "needs_review", "value" : "הלוח מתרענן." } }, "ur" : { "stringUnit" : { "state" : "needs_review", "value" : "بورڈ ریفریش ہو رہا ہے۔" } }, "zh-Hant" : { "stringUnit" : { "state" : "needs_review", "value" : "看板正在重新整理。" } }, "zh-HK" : { "stringUnit" : { "state" : "needs_review", "value" : "看板正在重新整理。" } } } },
     "The selection is no longer available. Refresh the Board and select the Cards again." : { "localizations" : { "de" : { "stringUnit" : { "state" : "needs_review", "value" : "Die Auswahl ist nicht mehr verfügbar. Aktualisiere das Board und wähle die Karten erneut aus." } }, "es" : { "stringUnit" : { "state" : "needs_review", "value" : "La selección ya no está disponible. Actualiza el tablero y vuelve a seleccionar las tarjetas." } }, "fr" : { "stringUnit" : { "state" : "needs_review", "value" : "La sélection n’est plus disponible. Actualisez le tableau et sélectionnez à nouveau les cartes." } }, "it" : { "stringUnit" : { "state" : "needs_review", "value" : "La selezione non è più disponibile. Aggiorna la bacheca e seleziona di nuovo le schede." } }, "pl" : { "stringUnit" : { "state" : "needs_review", "value" : "Wybór nie jest już dostępny. Odśwież tablicę i ponownie wybierz karty." } }, "pt-BR" : { "stringUnit" : { "state" : "needs_review", "value" : "A seleção não está mais disponível. Atualize o quadro e selecione os cartões novamente." } }, "nl" : { "stringUnit" : { "state" : "needs_review", "value" : "De selectie is niet meer beschikbaar. Vernieuw het bord en selecteer de kaarten opnieuw." } }, "tr" : { "stringUnit" : { "state" : "needs_review", "value" : "Seçim artık kullanılamıyor. Panoyu yenileyin ve Kartları tekrar seçin." } }, "ru" : { "stringUnit" : { "state" : "needs_review", "value" : "Выбранные карточки больше недоступны. Обновите доску и выберите карточки снова." } }, "ja" : { "stringUnit" : { "state" : "needs_review", "value" : "選択項目は利用できなくなりました。ボードを更新して、カードをもう一度選択してください。" } }, "zh-Hans" : { "stringUnit" : { "state" : "needs_review", "value" : "所选内容已不可用。请刷新看板并重新选择卡片。" } }, "ko" : { "stringUnit" : { "state" : "needs_review", "value" : "선택 항목을 더 이상 사용할 수 없습니다. 보드를 새로 고친 후 카드를 다시 선택하세요." } }, "ar" : { "stringUnit" : { "state" : "needs_review", "value" : "لم يعد التحديد متاحًا. حدّث اللوحة وحدد البطاقات مرة أخرى." } }, "he" : { "stringUnit" : { "state" : "needs_review", "value" : "הבחירה אינה זמינה עוד. יש לרענן את הלוח ולבחור שוב את הכרטיסים." } }, "ur" : { "stringUnit" : { "state" : "needs_review", "value" : "انتخاب اب دستیاب نہیں ہے۔ بورڈ ریفریش کریں اور کارڈز دوبارہ منتخب کریں۔" } }, "zh-Hant" : { "stringUnit" : { "state" : "needs_review", "value" : "所選項目已無法使用。請重新整理看板並再次選取卡片。" } }, "zh-HK" : { "stringUnit" : { "state" : "needs_review", "value" : "所選項目已無法使用。請重新整理看板並再次選取卡片。" } } } },
     "The selected Cards will be moved to the archive." : { "localizations" : { "de" : { "stringUnit" : { "state" : "needs_review", "value" : "Die ausgewählten Karten werden ins Archiv verschoben." } }, "es" : { "stringUnit" : { "state" : "needs_review", "value" : "Las tarjetas seleccionadas se moverán al archivo." } }, "fr" : { "stringUnit" : { "state" : "needs_review", "value" : "Les cartes sélectionnées seront placées dans les archives." } }, "it" : { "stringUnit" : { "state" : "needs_review", "value" : "Le schede selezionate verranno spostate nell’archivio." } }, "pl" : { "stringUnit" : { "state" : "needs_review", "value" : "Wybrane karty zostaną przeniesione do archiwum." } }, "pt-BR" : { "stringUnit" : { "state" : "needs_review", "value" : "Os cartões selecionados serão movidos para o arquivo." } }, "nl" : { "stringUnit" : { "state" : "needs_review", "value" : "De geselecteerde kaarten worden naar het archief verplaatst." } }, "tr" : { "stringUnit" : { "state" : "needs_review", "value" : "Seçilen Kartlar arşive taşınacak." } }, "ru" : { "stringUnit" : { "state" : "needs_review", "value" : "Выбранные карточки будут перемещены в архив." } }, "ja" : { "stringUnit" : { "state" : "needs_review", "value" : "選択したカードはアーカイブに移動されます。" } }, "zh-Hans" : { "stringUnit" : { "state" : "needs_review", "value" : "所选卡片将移至归档。" } }, "ko" : { "stringUnit" : { "state" : "needs_review", "value" : "선택한 카드가 보관함으로 이동됩니다." } }, "ar" : { "stringUnit" : { "state" : "needs_review", "value" : "سيتم نقل البطاقات المحددة إلى الأرشيف." } }, "he" : { "stringUnit" : { "state" : "needs_review", "value" : "הכרטיסים שנבחרו יועברו לארכיון." } }, "ur" : { "stringUnit" : { "state" : "needs_review", "value" : "منتخب کارڈز آرکائیو میں منتقل کر دیے جائیں گے۔" } }, "zh-Hant" : { "stringUnit" : { "state" : "needs_review", "value" : "所選卡片將移至封存區。" } }, "zh-HK" : { "stringUnit" : { "state" : "needs_review", "value" : "所選卡片將移至封存區。" } } } },
@@ -31495,214 +31519,214 @@
         }
       }
     },
-    "Enter a valid server URL, for example https://hermes.yourdomain.com or http://<server-tailscale-ip>:8787." : {
+    "Enter a valid server URL, for example https://hermes.yourdomain.com or http://<server-tailscale-ip>:8643." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "أدخل عنوان URL صالحًا للخادم، على سبيل المثال https://hermes.yourdomain.com أو http://<server-tailscale-ip>:8787."
+            "value" : "أدخل عنوان URL صالحًا للخادم، على سبيل المثال https://hermes.yourdomain.com أو http://<server-tailscale-ip>:8643."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Gib eine gültige Server-URL ein, zum Beispiel https://hermes.yourdomain.com oder http://<server-tailscale-ip>:8787."
+            "value" : "Gib eine gültige Server-URL ein, zum Beispiel https://hermes.yourdomain.com oder http://<server-tailscale-ip>:8643."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Introduce una URL de servidor válida, por ejemplo https://hermes.yourdomain.com o http://<server-tailscale-ip>:8787."
+            "value" : "Introduce una URL de servidor válida, por ejemplo https://hermes.yourdomain.com o http://<server-tailscale-ip>:8643."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Saisissez une URL de serveur valide, par exemple https://hermes.votredomaine.com ou http://<ip-tailscale-serveur>:8787."
+            "value" : "Saisissez une URL de serveur valide, par exemple https://hermes.votredomaine.com ou http://<ip-tailscale-serveur>:8643."
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "הזן כתובת URL תקינה של שרת, לדוגמה https://hermes.yourdomain.com או http://<server-tailscale-ip>:8787."
+            "value" : "הזן כתובת URL תקינה של שרת, לדוגמה https://hermes.yourdomain.com או http://<server-tailscale-ip>:8643."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Inserisci un URL server valido, ad esempio https://hermes.tuodominio.com o http://<server-tailscale-ip>:8787."
+            "value" : "Inserisci un URL server valido, ad esempio https://hermes.tuodominio.com o http://<server-tailscale-ip>:8643."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "有効なサーバURLを入力してください。例：https://hermes.yourdomain.com または http://<server-tailscale-ip>:8787。"
+            "value" : "有効なサーバURLを入力してください。例：https://hermes.yourdomain.com または http://<server-tailscale-ip>:8643。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "유효한 서버 URL을 입력하세요. 예: https://hermes.yourdomain.com 또는 http://<server-tailscale-ip>:8787."
+            "value" : "유효한 서버 URL을 입력하세요. 예: https://hermes.yourdomain.com 또는 http://<server-tailscale-ip>:8643."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Voer een geldige server-URL in, bijvoorbeeld https://hermes.yourdomain.com of http://<server-tailscale-ip>:8787."
+            "value" : "Voer een geldige server-URL in, bijvoorbeeld https://hermes.yourdomain.com of http://<server-tailscale-ip>:8643."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Wprowadź prawidłowy URL serwera, na przykład https://hermes.yourdomain.com lub http://<server-tailscale-ip>:8787."
+            "value" : "Wprowadź prawidłowy URL serwera, na przykład https://hermes.yourdomain.com lub http://<server-tailscale-ip>:8643."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Digite uma URL de servidor válida, por exemplo https://hermes.yourdomain.com ou http://<server-tailscale-ip>:8787."
+            "value" : "Digite uma URL de servidor válida, por exemplo https://hermes.yourdomain.com ou http://<server-tailscale-ip>:8643."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Введите корректный URL сервера, например https://hermes.yourdomain.com или http://<server-tailscale-ip>:8787."
+            "value" : "Введите корректный URL сервера, например https://hermes.yourdomain.com или http://<server-tailscale-ip>:8643."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Geçerli bir sunucu URL'si girin, örneğin https://hermes.yourdomain.com veya http://<server-tailscale-ip>:8787."
+            "value" : "Geçerli bir sunucu URL'si girin, örneğin https://hermes.yourdomain.com veya http://<server-tailscale-ip>:8643."
           }
         },
         "ur" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "ایک درست سرور URL درج کریں، مثلاً https://hermes.yourdomain.com یا http://<server-tailscale-ip>:8787۔"
+            "value" : "ایک درست سرور URL درج کریں، مثلاً https://hermes.yourdomain.com یا http://<server-tailscale-ip>:8643۔"
           }
         },
         "zh-HK" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "請輸入有效的伺服器 URL，例如 https://hermes.yourdomain.com 或 http://<server-tailscale-ip>:8787。"
+            "value" : "請輸入有效的伺服器 URL，例如 https://hermes.yourdomain.com 或 http://<server-tailscale-ip>:8643。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "请输入有效的服务器 URL，例如 https://hermes.yourdomain.com 或 http://<server-tailscale-ip>:8787。"
+            "value" : "请输入有效的服务器 URL，例如 https://hermes.yourdomain.com 或 http://<server-tailscale-ip>:8643。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "請輸入有效的伺服器 URL，例如 https://hermes.yourdomain.com 或 http://<server-tailscale-ip>:8787。"
+            "value" : "請輸入有效的伺服器 URL，例如 https://hermes.yourdomain.com 或 http://<server-tailscale-ip>:8643。"
           }
         }
       }
     },
-    "Enter the Tailscale URL your agent returned, for example `http://<tailnet-ip>:8787`." : {
+    "Enter the Tailscale URL your agent returned, for example `http://<tailnet-ip>:8643`." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "أدخل عنوان Tailscale URL الذي أعاده عميلك، على سبيل المثال `http://<tailnet-ip>:8787`."
+            "value" : "أدخل عنوان Tailscale URL الذي أعاده عميلك، على سبيل المثال `http://<tailnet-ip>:8643`."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Gib die Tailscale-URL ein, die dein Agent zurückgegeben hat, zum Beispiel `http://<tailnet-ip>:8787`."
+            "value" : "Gib die Tailscale-URL ein, die dein Agent zurückgegeben hat, zum Beispiel `http://<tailnet-ip>:8643`."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Introduce la URL de Tailscale que devolvió tu agente, por ejemplo `http://<tailnet-ip>:8787`."
+            "value" : "Introduce la URL de Tailscale que devolvió tu agente, por ejemplo `http://<tailnet-ip>:8643`."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Saisissez l'URL Tailscale renvoyée par votre agent, par exemple `http://<ip-tailnet>:8787`."
+            "value" : "Saisissez l'URL Tailscale renvoyée par votre agent, par exemple `http://<ip-tailnet>:8643`."
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "הזן את כתובת ה-URL של Tailscale שהסוכן שלך החזיר, לדוגמה `http://<tailnet-ip>:8787`."
+            "value" : "הזן את כתובת ה-URL של Tailscale שהסוכן שלך החזיר, לדוגמה `http://<tailnet-ip>:8643`."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Inserisci l'URL Tailscale restituito dal tuo agente, ad esempio `http://<tailnet-ip>:8787`."
+            "value" : "Inserisci l'URL Tailscale restituito dal tuo agente, ad esempio `http://<tailnet-ip>:8643`."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "エージェントが返したTailscale URLを入力してください。例：`http://<tailnet-ip>:8787`。"
+            "value" : "エージェントが返したTailscale URLを入力してください。例：`http://<tailnet-ip>:8643`。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "에이전트가 반환한 Tailscale URL을 입력하세요. 예: `http://<tailnet-ip>:8787`."
+            "value" : "에이전트가 반환한 Tailscale URL을 입력하세요. 예: `http://<tailnet-ip>:8643`."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Voer de Tailscale-URL in die uw agent heeft teruggegeven, bijvoorbeeld `http://<tailnet-ip>:8787`."
+            "value" : "Voer de Tailscale-URL in die uw agent heeft teruggegeven, bijvoorbeeld `http://<tailnet-ip>:8643`."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Wprowadź URL Tailscale zwrócony przez agenta, na przykład `http://<tailnet-ip>:8787`."
+            "value" : "Wprowadź URL Tailscale zwrócony przez agenta, na przykład `http://<tailnet-ip>:8643`."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Digite a URL do Tailscale que seu agente retornou, por exemplo `http://<tailnet-ip>:8787`."
+            "value" : "Digite a URL do Tailscale que seu agente retornou, por exemplo `http://<tailnet-ip>:8643`."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Введите URL Tailscale, который вернул ваш агент, например `http://<tailnet-ip>:8787`."
+            "value" : "Введите URL Tailscale, который вернул ваш агент, например `http://<tailnet-ip>:8643`."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Ajanınızın döndürdüğü Tailscale URL'sini girin, örneğin `http://<tailnet-ip>:8787`."
+            "value" : "Ajanınızın döndürdüğü Tailscale URL'sini girin, örneğin `http://<tailnet-ip>:8643`."
           }
         },
         "ur" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "وہ Tailscale URL درج کریں جو آپ کے ایجنٹ نے واپس کیا، مثلاً `http://<tailnet-ip>:8787`۔"
+            "value" : "وہ Tailscale URL درج کریں جو آپ کے ایجنٹ نے واپس کیا، مثلاً `http://<tailnet-ip>:8643`۔"
           }
         },
         "zh-HK" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "請輸入你的代理返回的 Tailscale URL，例如 `http://<tailnet-ip>:8787`。"
+            "value" : "請輸入你的代理返回的 Tailscale URL，例如 `http://<tailnet-ip>:8643`。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "请输入你的智能体返回的 Tailscale URL，例如 `http://<tailnet-ip>:8787`。"
+            "value" : "请输入你的智能体返回的 Tailscale URL，例如 `http://<tailnet-ip>:8643`。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "請輸入你的代理人傳回的 Tailscale URL，例如 `http://<tailnet-ip>:8787`。"
+            "value" : "請輸入你的代理人傳回的 Tailscale URL，例如 `http://<tailnet-ip>:8643`。"
           }
         }
       }

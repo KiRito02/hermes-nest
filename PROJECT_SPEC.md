@@ -102,7 +102,9 @@ scope until explicitly approved.
 | App identity | Owner-specific values supplied through local signing configuration |
 | Hosted control plane | None |
 | Legacy WebUI backend | Unsupported by the Companion-v1 contract |
-| Performance work | Separate track from protocol migration |
+| Performance work | Normally separate from protocol migration; owner-approved Issue #19 combines Core Chat UI, verified usage/images, and long-chat remediation |
+| Visual direction | Hermes Nest identity with a ChatGPT-inspired content hierarchy and interaction model; no copied OpenAI branding or assets |
+| App languages | English source language plus Simplified Chinese (`zh-Hans`) only |
 
 ### 2.1 Locked third-party dependencies
 
@@ -270,6 +272,13 @@ Review each migrated UI slice against `master` with matched fixtures. A visual
 redesign, navigation rewrite, or removal of a supported interaction is separate
 scope requiring owner approval.
 
+The owner approved that separate scope for Issue #19 on 2026-07-26. Its Core
+Chat Experience may intentionally replace the inherited visual hierarchy and
+navigation presentation with a quiet, content-first, ChatGPT-inspired adaptive
+shell while preserving the supported behaviors above. Hermes Nest keeps its own
+name, artwork, colors, and assets; this decision does not authorize copying
+OpenAI branding or proprietary resources.
+
 ---
 
 ## 4. Companion and Gateway contract
@@ -363,6 +372,13 @@ but does not itself load existing SessionDB messages. The production
 coordinator therefore reads the server-authoritative history before start,
 sends that history explicitly, preserves the returned `run_id`, and reloads
 history after terminal reconciliation.
+
+Run status may include verified additive per-run token usage, and session
+resources may include cumulative token/cost fields. Those values are not an
+exact context-window percentage. The App may display context occupancy only
+when a verified contract supplies both the current-context numerator and the
+effective context-window denominator; it must not estimate either from text
+length, cumulative usage, or a model-name lookup.
 
 ### 4.5 Streaming rules
 
@@ -565,9 +581,12 @@ App Store and TestFlight preparation require a separate explicit decision.
 
 ## 7. Chat performance requirements
 
-Performance remediation is intentionally independent from Companion/Gateway
-protocol migration. Backend correctness must not be judged from scroll
-smoothness, and UI optimization must not silently change protocol behavior.
+Performance remediation is normally independent from Companion/Gateway
+protocol migration. Owner-approved Issue #19 is the scoped exception combining
+Core Chat presentation, verified usage/images, and long-chat remediation in one
+user-scenario slice. Even there, backend correctness must not be judged from
+scroll smoothness, and UI optimization must not silently change protocol
+behavior.
 
 ### 7.1 Known risks in the inherited client
 
@@ -810,8 +829,9 @@ the App, and:
 - browse allowed NAS files, upload a file with progress, and make the completed
   upload available to a Hermes turn;
 - view and safely manage built-in `MEMORY.md` and `USER.md`;
-- retain the inherited Sessions/Chat navigation, compact composer, and
-  message/Markdown/reasoning/tool-card presentation for supported behavior;
+- preserve supported Sessions/Chat behavior, compact text-send interaction,
+  direct selection, and Markdown/reasoning/tool-card capability while allowing
+  the owner-approved Issue #19 adaptive visual redesign;
 - use an adaptive layout on the owner's iPhone and iPad;
 - retain a progressive streaming animation without coupling SwiftUI updates to
   every SSE delta;

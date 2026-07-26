@@ -154,6 +154,22 @@ enum LongChatLabFixture {
         index >= 0 && (index + 1).isMultiple(of: 20)
     }
 
+    static func includesReasoning(after index: Int) -> Bool {
+        index >= 0 && (index + 1).isMultiple(of: 24)
+    }
+
+    static func reasoningGroup(after index: Int) -> ReasoningGroup {
+        ReasoningGroup(
+            id: "long-chat-reasoning-\(index)",
+            anchorMessageID: "long-chat-\(index)",
+            text: """
+            Compare the current row identity, mounted transcript window, and \
+            streaming publication cadence before presenting benchmark turn \
+            \(index / 2 + 1).
+            """
+        )
+    }
+
     static func toolGroup(after index: Int) -> ToolCallGroup {
         ToolCallGroup(
             id: "long-chat-tools-\(index)",

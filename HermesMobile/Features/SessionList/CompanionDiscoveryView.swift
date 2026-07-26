@@ -49,6 +49,7 @@ struct CompanionDiscoveryView: View {
 
             content
         }
+        .background(HermesNestDesign.canvas)
         .navigationTitle("Skills & Toolsets")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(
@@ -217,6 +218,7 @@ struct CompanionDiscoveryView: View {
             .frame(maxWidth: 1_120)
             .frame(maxWidth: .infinity)
         }
+        .background(HermesNestDesign.canvas)
         .refreshable {
             await viewModel.load()
         }
@@ -307,10 +309,25 @@ private struct CompanionSkillCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, minHeight: 116, alignment: .topLeading)
         .background(
-            Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 16)
+            HermesNestDesign.sidebar,
+            in: RoundedRectangle(
+                cornerRadius: HermesNestDesign.cardCornerRadius,
+                style: .continuous
+            )
         )
-        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: HermesNestDesign.cardCornerRadius,
+                style: .continuous
+            )
+            .stroke(HermesNestDesign.subtleBorder, lineWidth: 0.5)
+        }
+        .contentShape(
+            RoundedRectangle(
+                cornerRadius: HermesNestDesign.cardCornerRadius,
+                style: .continuous
+            )
+        )
         .accessibilityElement(children: .combine)
         .accessibilityHint("Shows read-only Skill details")
     }
@@ -371,10 +388,25 @@ private struct CompanionToolsetCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
         .background(
-            Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 16)
+            HermesNestDesign.sidebar,
+            in: RoundedRectangle(
+                cornerRadius: HermesNestDesign.cardCornerRadius,
+                style: .continuous
+            )
         )
-        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: HermesNestDesign.cardCornerRadius,
+                style: .continuous
+            )
+            .stroke(HermesNestDesign.subtleBorder, lineWidth: 0.5)
+        }
+        .contentShape(
+            RoundedRectangle(
+                cornerRadius: HermesNestDesign.cardCornerRadius,
+                style: .continuous
+            )
+        )
         .accessibilityElement(children: .combine)
         .accessibilityHint("Shows read-only Toolset details")
     }
@@ -424,6 +456,7 @@ private struct CompanionSkillDetailView: View {
             .frame(maxWidth: 760, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .background(HermesNestDesign.canvas)
         .navigationTitle(skill.name)
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -522,6 +555,7 @@ private struct CompanionToolsetDetailView: View {
             .frame(maxWidth: 760, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .background(HermesNestDesign.canvas)
         .navigationTitle(toolset.displayName)
         .navigationBarTitleDisplayMode(.inline)
     }

@@ -41,6 +41,51 @@ enum AppTheme: String, CaseIterable, Identifiable {
     }
 }
 
+/// Shared visual constants for the Companion-native Hermes Nest experience.
+///
+/// These values intentionally describe hierarchy and rhythm rather than a
+/// vendor-branded skin. Keeping the palette semantic lets the same shell work
+/// in light/dark mode and across iPhone and iPad without per-screen colors.
+enum HermesNestDesign {
+    enum Spacing {
+        static let xSmall: CGFloat = 4
+        static let small: CGFloat = 8
+        static let medium: CGFloat = 12
+        static let large: CGFloat = 16
+        static let xLarge: CGFloat = 24
+    }
+
+    enum Typography {
+        static let screenTitle = Font.title2.weight(.bold)
+        static let sectionTitle = Font.headline
+        static let body = Font.body
+        static let control = Font.caption.weight(.semibold)
+        static let metadata = Font.caption
+    }
+
+    static let transcriptMaximumWidth: CGFloat = 760
+    static let sidebarIdealWidth: CGFloat = 320
+    static let compactCornerRadius: CGFloat = 12
+    static let cardCornerRadius: CGFloat = 18
+    static let composerCornerRadius: CGFloat = 24
+
+    static var canvas: Color {
+        Color(uiColor: .systemBackground)
+    }
+
+    static var sidebar: Color {
+        Color(uiColor: .secondarySystemBackground)
+    }
+
+    static var raisedSurface: Color {
+        Color(uiColor: .tertiarySystemBackground)
+    }
+
+    static var subtleBorder: Color {
+        Color(uiColor: .separator).opacity(0.28)
+    }
+}
+
 struct HeaderLogoColorPreset: Identifiable, Equatable {
     let name: String
     let hex: String
@@ -169,6 +214,82 @@ enum PrimaryActionTintSettings {
     /// setting *and* the control is currently interactive.
     static func usesThemeColor(isEnabled: Bool, controlIsEnabled: Bool) -> Bool {
         isEnabled && controlIsEnabled
+    }
+}
+
+struct ChatActionButtonRGB: Equatable {
+    let red: Double
+    let green: Double
+    let blue: Double
+
+    init(gray: Double) {
+        red = gray
+        green = gray
+        blue = gray
+    }
+
+    var color: Color {
+        Color(red: red, green: green, blue: blue)
+    }
+
+    fileprivate var relativeLuminance: Double {
+        0.2126 * Self.linear(red)
+            + 0.7152 * Self.linear(green)
+            + 0.0722 * Self.linear(blue)
+    }
+
+    private static func linear(_ component: Double) -> Double {
+        if component <= 0.04045 {
+            return component / 12.92
+        }
+        return pow((component + 0.055) / 1.055, 2.4)
+    }
+}
+
+/// Explicit action-button colors keep send/stop affordances legible without
+/// allowing SwiftUI's disabled opacity to wash the icon into its background.
+struct ChatActionButtonPalette: Equatable {
+    let background: ChatActionButtonRGB
+    let foreground: ChatActionButtonRGB
+
+    var contrastRatio: Double {
+        let lighter = max(
+            background.relativeLuminance,
+            foreground.relativeLuminance
+        )
+        let darker = min(
+            background.relativeLuminance,
+            foreground.relativeLuminance
+        )
+        return (lighter + 0.05) / (darker + 0.05)
+    }
+
+    static func resolve(
+        colorScheme: ColorScheme,
+        isEnabled: Bool
+    ) -> ChatActionButtonPalette {
+        switch (colorScheme, isEnabled) {
+        case (.dark, true):
+            ChatActionButtonPalette(
+                background: ChatActionButtonRGB(gray: 1),
+                foreground: ChatActionButtonRGB(gray: 0.05)
+            )
+        case (.dark, false):
+            ChatActionButtonPalette(
+                background: ChatActionButtonRGB(gray: 0.25),
+                foreground: ChatActionButtonRGB(gray: 0.72)
+            )
+        case (_, true):
+            ChatActionButtonPalette(
+                background: ChatActionButtonRGB(gray: 0.05),
+                foreground: ChatActionButtonRGB(gray: 1)
+            )
+        case (_, false):
+            ChatActionButtonPalette(
+                background: ChatActionButtonRGB(gray: 0.86),
+                foreground: ChatActionButtonRGB(gray: 0.36)
+            )
+        }
     }
 }
 

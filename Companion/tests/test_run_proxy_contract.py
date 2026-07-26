@@ -22,7 +22,9 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
         )
         self.final_stream_chunk = (
             b"event: future.transport.type\n"
-            b'data: {"event":"run.completed","run_id":"run-1"}\n\n'
+            b'data: {"event":"run.completed","run_id":"run-1",'
+            b'"usage":{"input_tokens":144,"output_tokens":34,'
+            b'"total_tokens":178}}\n\n'
             b": stream closed\n\n"
         )
 
@@ -103,7 +105,16 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
             await started.json(),
         )
         self.assertEqual(200, status.status)
-        self.assertEqual("session-1", (await status.json())["session_id"])
+        status_body = await status.json()
+        self.assertEqual("session-1", status_body["session_id"])
+        self.assertEqual(
+            {
+                "input_tokens": 144,
+                "output_tokens": 34,
+                "total_tokens": 178,
+            },
+            status_body["usage"],
+        )
         self.assertEqual(200, stopped.status)
         self.assertEqual(
             {"run_id": "run-1", "status": "stopping"},
@@ -455,6 +466,11 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
                 "session_id": "session-1",
                 "created_at": 100.0,
                 "updated_at": 101.0,
+                "usage": {
+                    "input_tokens": 144,
+                    "output_tokens": 34,
+                    "total_tokens": 178,
+                },
                 "future_status_field": {"ignored": True},
             }
         )

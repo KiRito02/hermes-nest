@@ -85,10 +85,10 @@ hermes gateway
 
 The documented Gateway default is `127.0.0.1:8642`. Keep it on loopback.
 Companion is implemented as a dedicated Python 3.11 virtual environment and
-systemd host service. Its exact service commands, listen port, configuration
-names, and App-facing paths are intentionally not documented until Issue #1
-locks and tests them. Do not invent placeholders and later treat them as a
-contract.
+systemd host service. It binds `127.0.0.1:8643` by default; its exact
+configuration and App-facing routes are versioned in
+[`Companion/CONTRACT.md`](Companion/CONTRACT.md). Lucky or Tailscale exposes
+only that Companion listener, never Gateway port `8642`.
 
 Before debugging the App, verify in order:
 
@@ -137,8 +137,8 @@ ss -ltnp | grep 8642
 ## Simulator-only local fallback
 
 On a Mac running Companion and Hermes Agent locally, the simulator may use a
-narrowly scoped Debug-only HTTP Companion URL. The actual port/path is defined
-by Issue #1 and its development configuration.
+narrowly scoped Debug-only HTTP Companion URL such as
+`http://127.0.0.1:8643`.
 
 This is a Debug-only convenience. Physical devices need a reachable HTTPS
 hostname or an intentionally configured private-network route.
@@ -249,6 +249,29 @@ Never install a simulator build produced with
 `CODE_SIGNING_ALLOWED=NO`. It lacks the entitlements required for Keychain
 testing.
 
+### Manual simulator acceptance
+
+Required `PR CI` runs the iPhone compile and full XCTest suite, but does not
+repeat a signed build, boot/install simulators, or capture screenshots. Use
+the manually dispatched **iOS Simulator Acceptance** workflow when UI/runtime
+changes need signed launch evidence.
+
+The manual workflow always builds, installs, and launches a signed Debug App
+on `iPhone 17 Pro Max` (or the nearest available iPhone Pro). Its optional
+`capture_screenshots` input launches server-free Debug fixtures and captures:
+
+- `core-chat-en.png`
+- `core-chat-zh-Hans.png`
+- `long-chat.png`
+
+Download them from the workflow run's **Artifacts** section under
+`iphone-ui-smoke`. The fixture contains no Companion URL, device credential,
+NAS secret, or network request.
+
+Enable `run_ipad` only when adaptive layout changed. It independently builds,
+installs, and launches the signed App on an available 13-inch iPad Pro. Neither
+manual option is part of the required PR gate.
+
 Human/CLI equivalents:
 
 ```bash
@@ -280,8 +303,7 @@ xcodebuild test \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max'
 ```
 
-Compile-only CI may disable signing, but signed simulator/manual validation
-must not:
+The compile-only CI build may disable signing:
 
 ```bash
 xcodebuild build \
@@ -290,6 +312,9 @@ xcodebuild build \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max' \
   CODE_SIGNING_ALLOWED=NO
 ```
+
+Do not install that output. For simulator launch and manual validation, use
+the signed `build_run_sim` flow above or a normal signed Debug build.
 
 Build the adaptive iPad layout with the installed 13-inch iPad Pro simulator
 name reported by `xcrun simctl list devices available`. Simulator checks cover
@@ -354,10 +379,13 @@ The intended owner workflow is:
 
 1. Push an explicitly approved branch.
 2. Manually run the `PR CI` workflow on that branch for macOS build/test.
-   Packaging is added later in the personal-sideload Phase I issue.
-3. After Phase I lands, download the sideload artifact on Windows.
-4. Sign/install it with AltStore or SideStore using the owner's Apple account.
-5. Re-sign when the provisioning period expires.
+3. For UI/runtime changes, manually run `iOS Simulator Acceptance`; enable
+   screenshots or iPad only when useful.
+4. After Phase I lands, download the sideload artifact on Windows.
+5. Sign/install it with AltStore or SideStore using the owner's Apple account.
+6. Re-sign when the provisioning period expires.
+
+Packaging is added later in the personal-sideload Phase I issue.
 
 Do not add App Store Connect secrets or revive inherited TestFlight workflows
 without a new explicit distribution decision.

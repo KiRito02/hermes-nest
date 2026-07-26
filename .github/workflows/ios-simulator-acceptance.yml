@@ -1,0 +1,286 @@
+# Manual simulator acceptance for UI/runtime changes. This workflow is kept
+# outside the required PR gate because signed builds and simulator boot/install
+# dominate CI time. iPhone launch is always checked; screenshots and 13-inch
+# iPad Pro build/launch are opt-in evidence for the changes that need them.
+
+name: iOS Simulator Acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      capture_screenshots:
+        description: Capture English, Simplified Chinese, and long-chat images
+        required: false
+        default: false
+        type: boolean
+      run_ipad:
+        description: Build and launch on a 13-inch iPad Pro simulator
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-simulator-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  iphone:
+    name: Signed iPhone Launch
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    env:
+      PROJECT_PATH: HermesMobile.xcodeproj
+      SCHEME: HermesMobile
+      DERIVED_DATA_PATH: DerivedData-iPhone-Acceptance
+      OUTPUT_PATH: iphone-ui-smoke
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Check acceptance configuration
+        run: |
+          python3 scripts/check-promotion-config
+          python3 scripts/check-iphone-ui-smoke
+
+      - name: Select reference iPhone simulator
+        id: sim
+        run: |
+          set -euo pipefail
+          selection=$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          phones = [
+              (device["name"], device["udid"])
+              for runtime, devices in data["devices"].items()
+              if "iOS" in runtime
+              for device in devices
+              if device.get("isAvailable") and device["name"].startswith("iPhone")
+          ]
+          preferred = "iPhone 17 Pro Max"
+          selected = next((phone for phone in phones if phone[0] == preferred), None)
+          if selected is None:
+              selected = next((phone for phone in phones if " Pro" in phone[0]), None)
+          if selected is None and phones:
+              selected = phones[0]
+          print("\t".join(selected) if selected else "")
+          ')
+          IFS=$'\t' read -r name udid <<< "${selection}"
+          if [[ -z "${name}" || -z "${udid}" ]]; then
+            echo "No available iPhone simulator found:" >&2
+            xcrun simctl list devices available >&2
+            exit 1
+          fi
+          echo "Using simulator: ${name} (${udid})"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          echo "udid=${udid}" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed iPhone acceptance app
+        id: signed_app
+        env:
+          SIMULATOR_UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project "${PROJECT_PATH}" \
+            -scheme "${SCHEME}" \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${SIMULATOR_UDID}" \
+            -derivedDataPath "${DERIVED_DATA_PATH}" \
+            -showBuildTimingSummary \
+            DEVELOPMENT_TEAM= \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGN_IDENTITY=-
+
+          app_path="${DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/HermesMobile.app"
+          if [[ ! -d "${app_path}" ]]; then
+            echo "Signed simulator app was not produced at ${app_path}" >&2
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 "${app_path}"
+          echo "path=${app_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Install and launch on iPhone
+        id: launch
+        env:
+          APP_PATH: ${{ steps.signed_app.outputs.path }}
+          SIMULATOR_UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          set -euo pipefail
+          xcrun simctl boot "${SIMULATOR_UDID}" 2>/dev/null || true
+          xcrun simctl bootstatus "${SIMULATOR_UDID}" -b
+          xcrun simctl install "${SIMULATOR_UDID}" "${APP_PATH}"
+
+          bundle_id=$(/usr/libexec/PlistBuddy \
+            -c "Print :CFBundleIdentifier" \
+            "${APP_PATH}/Info.plist")
+          xcrun simctl launch \
+            "${SIMULATOR_UDID}" \
+            "${bundle_id}" \
+            -AppleLanguages "(en)" \
+            -AppleLocale "en_US" \
+            --core-chat-lab
+          echo "bundle_id=${bundle_id}" >> "$GITHUB_OUTPUT"
+
+      - name: Capture optional iPhone screenshots
+        if: inputs.capture_screenshots
+        env:
+          BUNDLE_ID: ${{ steps.launch.outputs.bundle_id }}
+          SIMULATOR_NAME: ${{ steps.sim.outputs.name }}
+          SIMULATOR_UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${OUTPUT_PATH}"
+          xcrun simctl ui "${SIMULATOR_UDID}" appearance light
+          xcrun simctl status_bar "${SIMULATOR_UDID}" override \
+            --time 9:41 \
+            --batteryState charged \
+            --batteryLevel 100 \
+            --wifiBars 3 \
+            --cellularBars 4
+
+          capture_ui() {
+            local language="$1"
+            local locale="$2"
+            local fixture="$3"
+            local filename="$4"
+            xcrun simctl terminate "${SIMULATOR_UDID}" "${BUNDLE_ID}" \
+              2>/dev/null || true
+            xcrun simctl launch \
+              "${SIMULATOR_UDID}" \
+              "${BUNDLE_ID}" \
+              -AppleLanguages "(${language})" \
+              -AppleLocale "${locale}" \
+              "${fixture}" | tee -a "${OUTPUT_PATH}/launch.log"
+            sleep 4
+            xcrun simctl io "${SIMULATOR_UDID}" screenshot \
+              "${OUTPUT_PATH}/${filename}"
+          }
+
+          capture_ui en en_US --core-chat-lab core-chat-en.png
+          capture_ui zh-Hans zh_CN --core-chat-lab core-chat-zh-Hans.png
+          capture_ui en en_US --long-chat-lab long-chat.png
+
+          {
+            echo "Simulator: ${SIMULATOR_NAME}"
+            echo "UDID: ${SIMULATOR_UDID}"
+            echo "Bundle: ${BUNDLE_ID}"
+            echo "Build: signed Debug iphonesimulator"
+          } > "${OUTPUT_PATH}/metadata.txt"
+
+      - name: Upload optional iPhone screenshots
+        if: inputs.capture_screenshots
+        uses: actions/upload-artifact@v7
+        with:
+          name: iphone-ui-smoke
+          path: ${{ env.OUTPUT_PATH }}
+          if-no-files-found: error
+
+  ipad:
+    name: Signed 13-inch iPad Pro Launch
+    if: inputs.run_ipad
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    env:
+      PROJECT_PATH: HermesMobile.xcodeproj
+      SCHEME: HermesMobile
+      DERIVED_DATA_PATH: DerivedData-iPad-Acceptance
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Select adaptive iPad simulator
+        id: sim
+        run: |
+          set -euo pipefail
+          selection=$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          ipads = [
+              (device["name"], device["udid"])
+              for runtime, devices in data["devices"].items()
+              if "iOS" in runtime
+              for device in devices
+              if device.get("isAvailable") and device["name"].startswith("iPad Pro")
+          ]
+          preferred = [
+              "iPad Pro 13-inch (M5)",
+              "iPad Pro 13-inch (M4)",
+          ]
+          selected = next(
+              (
+                  ipad
+                  for preferred_name in preferred
+                  for ipad in ipads
+                  if ipad[0] == preferred_name
+              ),
+              None,
+          )
+          if selected is None:
+              selected = next((ipad for ipad in ipads if "13-inch" in ipad[0]), None)
+          if selected is None and ipads:
+              selected = ipads[0]
+          print("\t".join(selected) if selected else "")
+          ')
+          IFS=$'\t' read -r name udid <<< "${selection}"
+          if [[ -z "${name}" || -z "${udid}" ]]; then
+            echo "No available iPad Pro simulator found:" >&2
+            xcrun simctl list devices available >&2
+            exit 1
+          fi
+          echo "Using adaptive-layout simulator: ${name} (${udid})"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          echo "udid=${udid}" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed iPad acceptance app
+        id: signed_app
+        env:
+          SIMULATOR_UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project "${PROJECT_PATH}" \
+            -scheme "${SCHEME}" \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${SIMULATOR_UDID}" \
+            -derivedDataPath "${DERIVED_DATA_PATH}" \
+            -showBuildTimingSummary \
+            DEVELOPMENT_TEAM= \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGN_IDENTITY=-
+
+          app_path="${DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/HermesMobile.app"
+          if [[ ! -d "${app_path}" ]]; then
+            echo "Signed simulator app was not produced at ${app_path}" >&2
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 "${app_path}"
+          echo "path=${app_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Install and launch on iPad
+        env:
+          APP_PATH: ${{ steps.signed_app.outputs.path }}
+          SIMULATOR_UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          set -euo pipefail
+          xcrun simctl boot "${SIMULATOR_UDID}" 2>/dev/null || true
+          xcrun simctl bootstatus "${SIMULATOR_UDID}" -b
+          xcrun simctl install "${SIMULATOR_UDID}" "${APP_PATH}"
+
+          bundle_id=$(/usr/libexec/PlistBuddy \
+            -c "Print :CFBundleIdentifier" \
+            "${APP_PATH}/Info.plist")
+          xcrun simctl launch \
+            "${SIMULATOR_UDID}" \
+            "${bundle_id}" \
+            -AppleLanguages "(en)" \
+            -AppleLocale "en_US" \
+            --core-chat-lab

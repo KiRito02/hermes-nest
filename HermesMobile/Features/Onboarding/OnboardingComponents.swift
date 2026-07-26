@@ -177,7 +177,13 @@ struct OnboardingPrimaryButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 10)
             .padding(.vertical, 15)
-            .background(Color(red: 1.0, green: 0.74, blue: 0.10), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(
+                Color(red: 1.0, green: 0.74, blue: 0.10),
+                in: RoundedRectangle(
+                    cornerRadius: HermesNestDesign.compactCornerRadius,
+                    style: .continuous
+                )
+            )
             .opacity(configuration.isPressed ? 0.78 : 1)
     }
 }
@@ -301,9 +307,18 @@ struct OnboardingSecondaryButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 10)
             .padding(.vertical, 15)
-            .background(Color.white.opacity(0.065), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(
+                Color.white.opacity(0.065),
+                in: RoundedRectangle(
+                    cornerRadius: HermesNestDesign.compactCornerRadius,
+                    style: .continuous
+                )
+            )
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(
+                    cornerRadius: HermesNestDesign.compactCornerRadius,
+                    style: .continuous
+                )
                     .stroke(Color.white.opacity(0.1), lineWidth: 1)
             )
             .opacity(configuration.isPressed ? 0.72 : 1)

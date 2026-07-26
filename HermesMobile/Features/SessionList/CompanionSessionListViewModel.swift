@@ -361,6 +361,7 @@ final class CompanionSessionHistoryViewModel {
     private(set) var isLoadingModelOptions = false
     private(set) var isApplyingModelSelection = false
     private(set) var modelSelectionErrorMessage: String?
+    private(set) var latestRunUsage: ConversationRunUsage?
 
     private let repository: any SessionRepository
     private let runService: any ConversationRunServing
@@ -374,6 +375,8 @@ final class CompanionSessionHistoryViewModel {
     private var visibleStartIndex = 0
     private var runTask: Task<Void, Never>?
     private var reconciliationTask: Task<Void, Never>?
+    private var terminalUsageRefreshTask: Task<Void, Never>?
+    private var terminalUsageRefreshRunID: String?
     private var deltaFlushTask: Task<Void, Never>?
     @ObservationIgnored private var deltaBuffer =
         ConversationRunDeltaBuffer()
@@ -463,7 +466,12 @@ final class CompanionSessionHistoryViewModel {
     var selectedModelDisplayName: String {
         selectedModelOption?.model
             ?? selectedModel?.model
+            ?? session.model
             ?? String(localized: "Model")
+    }
+
+    var selectedModelProviderDisplayName: String? {
+        selectedModel?.provider ?? session.modelProvider
     }
 
     var selectedModelSupportsReasoning: Bool {
@@ -779,6 +787,7 @@ final class CompanionSessionHistoryViewModel {
         fastForwardedDelta = ""
         hasRequestedStop = false
         terminalOutputFallback = nil
+        latestRunUsage = nil
         nextToolOrdinal = 0
         runState = .starting
         errorMessage = nil
@@ -1082,8 +1091,14 @@ final class CompanionSessionHistoryViewModel {
                         error: payload.error
                     ) {
                         observedTerminal = true
+                        if let usage = payload.usage {
+                            latestRunUsage = usage
+                        }
                         runState = terminal
                         terminalOutputFallback = payload.output
+                        if payload.usage == nil {
+                            beginTerminalUsageRefresh(runID: runID)
+                        }
                         runTask = nil
                         await finishRun(
                             runID: runID,
@@ -1114,6 +1129,24 @@ final class CompanionSessionHistoryViewModel {
             runID: runID,
             modelContext: modelContext
         )
+    }
+
+    private func beginTerminalUsageRefresh(runID: String) {
+        terminalUsageRefreshTask?.cancel()
+        terminalUsageRefreshRunID = runID
+        terminalUsageRefreshTask = Task { [weak self] in
+            guard let self else { return }
+            let snapshot = try? await runService.status(runID: runID)
+            guard !Task.isCancelled,
+                  terminalUsageRefreshRunID == runID else {
+                return
+            }
+            if let usage = snapshot?.usage {
+                latestRunUsage = usage
+            }
+            terminalUsageRefreshRunID = nil
+            terminalUsageRefreshTask = nil
+        }
     }
 
     private func enqueue(_ delta: String) {
@@ -1210,6 +1243,9 @@ final class CompanionSessionHistoryViewModel {
     }
 
     private func applyRunSnapshot(_ snapshot: ConversationRunSnapshot) {
+        if let usage = snapshot.usage {
+            latestRunUsage = usage
+        }
         switch snapshot.state {
         case .started, .queued, .running:
             if runState != .transportDisconnected,
@@ -1308,6 +1344,9 @@ final class CompanionSessionHistoryViewModel {
         runTask = nil
         reconciliationTask?.cancel()
         reconciliationTask = nil
+        terminalUsageRefreshTask?.cancel()
+        terminalUsageRefreshTask = nil
+        terminalUsageRefreshRunID = nil
         deltaFlushTask?.cancel()
         deltaFlushTask = nil
     }

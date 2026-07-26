@@ -39,7 +39,7 @@ final class ContextWindowIndicatorTests: XCTestCase {
         XCTAssertEqual(ContextWindowFormatter.compactIndicator(from: snapshot), "45% context")
     }
 
-    func testCompactIndicatorWithInputTokensFallback() {
+    func testCompactIndicatorDoesNotTreatCumulativeInputAsCurrentContext() {
         let snapshot = ContextWindowSnapshot(
             contextLength: 128_000,
             thresholdTokens: nil,
@@ -49,7 +49,7 @@ final class ContextWindowIndicatorTests: XCTestCase {
             estimatedCost: nil
         )
 
-        XCTAssertEqual(ContextWindowFormatter.compactIndicator(from: snapshot), "10% context")
+        XCTAssertNil(ContextWindowFormatter.compactIndicator(from: snapshot))
     }
 
     func testReplacingTokensUsedUpdatesLastPromptTokensForIndicator() {

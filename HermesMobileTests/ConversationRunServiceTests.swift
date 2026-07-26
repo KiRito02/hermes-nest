@@ -219,6 +219,92 @@ final class ConversationRunServiceTests: APIClientTestCase {
         XCTAssertNotEqual(.cancelled, stopping.state)
     }
 
+    func testStatusDecodesExactTerminalUsageWithoutInferringContext() async throws {
+        let keychain = InMemoryKeychainStore()
+        try keychain.save(
+            "device-credential",
+            forKey: .companionDeviceCredential
+        )
+        let session = makeSession { request in
+            self.response(
+                status: 200,
+                json: """
+                {
+                  "run_id": "run-usage",
+                  "status": "completed",
+                  "usage": {
+                    "input_tokens": 1234,
+                    "output_tokens": 56,
+                    "total_tokens": 1290,
+                    "future_counter": 99
+                  }
+                }
+                """,
+                request: request
+            )
+        }
+        let service = ConversationRunService(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            keychain: keychain,
+            session: session
+        )
+
+        let snapshot = try await service.status(runID: "run-usage")
+
+        XCTAssertEqual(
+            ConversationRunUsage(
+                inputTokens: 1_234,
+                outputTokens: 56,
+                totalTokens: 1_290
+            ),
+            snapshot.usage
+        )
+    }
+
+    func testStatusToleratesMissingAndMalformedUsageFields() async throws {
+        let keychain = InMemoryKeychainStore()
+        try keychain.save(
+            "device-credential",
+            forKey: .companionDeviceCredential
+        )
+        var requestCount = 0
+        let session = makeSession { request in
+            requestCount += 1
+            let usage = requestCount == 1
+                ? #""usage":{"input_tokens":"42","output_tokens":{},"total_tokens":-1},"#
+                : #""usage":"future-shape","#
+            return self.response(
+                status: 200,
+                json: """
+                {
+                  "run_id": "run-usage",
+                  "status": "completed",
+                  \(usage)
+                  "future_field": true
+                }
+                """,
+                request: request
+            )
+        }
+        let service = ConversationRunService(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            keychain: keychain,
+            session: session
+        )
+
+        let partiallyDecoded = try await service.status(runID: "run-usage")
+        let unknownShape = try await service.status(runID: "run-usage")
+
+        XCTAssertEqual(42, partiallyDecoded.usage?.inputTokens)
+        XCTAssertNil(partiallyDecoded.usage?.outputTokens)
+        XCTAssertNil(partiallyDecoded.usage?.totalTokens)
+        XCTAssertNil(unknownShape.usage)
+    }
+
     func testApprovalPostsCanonicalChoiceToExactExistingRun() async throws {
         let keychain = InMemoryKeychainStore()
         try keychain.save(
@@ -355,6 +441,34 @@ final class ConversationRunServiceTests: APIClientTestCase {
         }
         XCTAssertNil(transportOnly.event)
         XCTAssertEqual("run.completed", transportOnly.semanticEvent)
+    }
+
+    func testParserDecodesUsageFromTerminalEventTolerantly() throws {
+        var parser = ConversationRunSSEParser()
+
+        XCTAssertEqual(
+            [],
+            parser.consume(
+                line: """
+                data: {"event":"run.completed","run_id":"run-1","usage":{"input_tokens":21,"output_tokens":"5","total_tokens":26,"future":true}}
+                """
+            )
+        )
+        guard case .data(let payload) = try XCTUnwrap(
+            parser.consume(line: "").first
+        ) else {
+            XCTFail("Expected terminal data event")
+            return
+        }
+
+        XCTAssertEqual(
+            ConversationRunUsage(
+                inputTokens: 21,
+                outputTokens: 5,
+                totalTokens: 26
+            ),
+            payload.usage
+        )
     }
 
     func testApprovalEventUsesOnlyBoundedVerifiedDisplayFields() throws {
@@ -514,7 +628,12 @@ final class ConversationRunServiceTests: APIClientTestCase {
                     sessionID: "session-1",
                     lastEvent: "run.completed",
                     output: "Done",
-                    errorMessage: nil
+                    errorMessage: nil,
+                    usage: ConversationRunUsage(
+                        inputTokens: 90,
+                        outputTokens: 10,
+                        totalTokens: 100
+                    )
                 )
             ]
         )
@@ -539,6 +658,7 @@ final class ConversationRunServiceTests: APIClientTestCase {
         XCTAssertEqual("session-1", startRequests[0].sessionID)
         XCTAssertEqual(["run-1"], statusRunIDs)
         XCTAssertEqual(.completed, viewModel.runState)
+        XCTAssertEqual(100, viewModel.latestRunUsage?.totalTokens)
     }
 
     @MainActor
@@ -1071,7 +1191,7 @@ final class ConversationRunServiceTests: APIClientTestCase {
                     errorMessage: nil
                 )
             ],
-            statusDelayNanoseconds: 300_000_000
+            statusDelayNanoseconds: 2_000_000_000
         )
         let viewModel = CompanionSessionHistoryViewModel(
             session: session,
@@ -1093,7 +1213,9 @@ final class ConversationRunServiceTests: APIClientTestCase {
         XCTAssertEqual(.stopping, viewModel.runState)
         XCTAssertNil(viewModel.pendingApproval)
 
-        await waitUntil { viewModel.activeRunID == nil }
+        await waitUntil(timeoutNanoseconds: 3_000_000_000) {
+            viewModel.activeRunID == nil
+        }
     }
 
     @MainActor
@@ -1487,6 +1609,123 @@ final class ConversationRunServiceTests: APIClientTestCase {
             viewModel.allMessages.last?.content
         )
         XCTAssertEqual("", viewModel.streamedAssistantText)
+    }
+
+    @MainActor
+    func testTerminalEventPublishesExactLatestRunUsage() async throws {
+        let session = try makeSessionSummary()
+        let repository = RunHistoryRepositoryStub(session: session)
+        let terminal = ConversationRunEvent.data(
+            ConversationRunEventData(
+                transportEvent: nil,
+                event: "run.completed",
+                runID: "run-1",
+                delta: nil,
+                output: "Done",
+                error: nil,
+                timestamp: 2,
+                usage: ConversationRunUsage(
+                    inputTokens: 144,
+                    outputTokens: 34,
+                    totalTokens: 178
+                )
+            )
+        )
+        let runService = RunServiceStub(
+            eventResult: .eventsAfterDelay([terminal], 20_000_000),
+            statuses: []
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: runService,
+            reconciliationDelayNanoseconds: 0
+        )
+        await viewModel.load()
+
+        let didSend = await viewModel.send("Measure")
+        XCTAssertTrue(didSend)
+        await waitUntil { viewModel.activeRunID == nil }
+
+        XCTAssertEqual(
+            ConversationRunUsage(
+                inputTokens: 144,
+                outputTokens: 34,
+                totalTokens: 178
+            ),
+            viewModel.latestRunUsage
+        )
+    }
+
+    @MainActor
+    func testTerminalEventWithoutUsageRefreshesAuthoritativeStatusOnce() async throws {
+        let session = try makeSessionSummary()
+        let repository = RunHistoryRepositoryStub(session: session)
+        let terminal = ConversationRunEvent.data(
+            ConversationRunEventData(
+                transportEvent: nil,
+                event: "run.completed",
+                runID: "run-1",
+                delta: nil,
+                output: "Done",
+                error: nil,
+                timestamp: 2
+            )
+        )
+        let runService = RunServiceStub(
+            eventResult: .eventsAfterDelay([terminal], 20_000_000),
+            statuses: [
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .completed,
+                    sessionID: "session-1",
+                    lastEvent: "run.completed",
+                    output: "Done",
+                    errorMessage: nil,
+                    usage: ConversationRunUsage(
+                        inputTokens: 200,
+                        outputTokens: 50,
+                        totalTokens: 250
+                    )
+                )
+            ],
+            statusDelayNanoseconds: 300_000_000
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: runService,
+            reconciliationDelayNanoseconds: 0
+        )
+        await viewModel.load()
+
+        let didSend = await viewModel.send("Measure")
+        XCTAssertTrue(didSend)
+        await waitUntil {
+            viewModel.activeRunID == nil
+        }
+        XCTAssertNil(viewModel.latestRunUsage)
+        await waitUntil(timeoutNanoseconds: 3_000_000_000) {
+            viewModel.latestRunUsage != nil
+        }
+
+        let statusRunIDs = await runService.statusRunIDs
+        XCTAssertEqual(["run-1"], statusRunIDs)
+        XCTAssertEqual(
+            ConversationRunUsage(
+                inputTokens: 200,
+                outputTokens: 50,
+                totalTokens: 250
+            ),
+            viewModel.latestRunUsage
+        )
+        XCTAssertEqual(.completed, viewModel.runState)
     }
 
     @MainActor
