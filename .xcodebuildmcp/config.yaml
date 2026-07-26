@@ -6,6 +6,6 @@ sessionDefaults:
   projectPath: "./HermesMobile.xcodeproj"
   scheme: "HermesMobile"
   configuration: "Debug"
-  simulatorName: "iPhone 17"
+  simulatorName: "iPhone 17 Pro Max"
   bundleId: "com.uzairansar.hermesmobile"
 sentryDisabled: true

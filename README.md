@@ -115,7 +115,8 @@ The owner's primary machines are Linux/NAS and Windows:
 5. Re-sign/install it with AltStore or SideStore.
 
 Local Xcode development requires macOS. Open `HermesMobile.xcodeproj` and use
-the `HermesMobile` scheme. The reference simulator is iPhone 17.
+the `HermesMobile` scheme. The reference simulator is iPhone 17 Pro Max;
+adaptive layout changes are also checked on a 13-inch iPad Pro simulator.
 
 Full instructions:
 

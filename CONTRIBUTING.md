@@ -12,7 +12,9 @@ read the [Code of Conduct](CODE_OF_CONDUCT.md).
   automatically via Swift Package Manager — the dependency list is locked in
   `PROJECT_SPEC.md`; do not add new ones without maintainer approval.
 - Build and run the **`HermesMobile`** scheme on an iPhone simulator
-  (`iPhone 17` is the reference device; any recent iPhone simulator works).
+  (`iPhone 17 Pro Max` is the reference device; any recent iPhone Pro
+  simulator works). UI changes that affect adaptive layout should also be
+  built and launched on an available 13-inch iPad Pro simulator.
 - To actually use the target architecture you need the self-hosted Hermes Nest
   Companion on the same NAS as a
   [Hermes Agent API Server](https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server).
@@ -25,7 +27,7 @@ read the [Code of Conduct](CODE_OF_CONDUCT.md).
 The full XCTest suite is the repo's green bar — it must pass before any PR:
 
 ```zsh
-xcodebuild test -project HermesMobile.xcodeproj -scheme HermesMobile -destination 'platform=iOS Simulator,name=iPhone 17'
+xcodebuild test -project HermesMobile.xcodeproj -scheme HermesMobile -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max'
 ```
 
 If that simulator name isn't installed, pick a nearby iPhone from
@@ -109,6 +111,11 @@ Hermes Nest has three layers: App, self-hosted Companion, and
      docs, and matching pinned source/tests.
    - **No new third-party dependencies** without approval.
 4. **Run the full test suite** (command above) and make sure it passes.
+   Review depth is proportional to risk: small/configuration changes use
+   focused checks and direct diff review; ordinary feature branches receive
+   one Standards + Spec review at the PR boundary; protocol, authentication,
+   security, persistence, signing, migration, and concurrency changes receive
+   the full dual-axis review.
 5. **Open a PR** against `master` using the PR template — link the issue with
    `Fixes #<number>`, describe what changed and how you tested it. CI must be
    green; automated review bots may comment, and the maintainer reviews and

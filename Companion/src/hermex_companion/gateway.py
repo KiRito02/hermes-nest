@@ -2,12 +2,19 @@
 
 import asyncio
 from dataclasses import dataclass
+import io
 import json
 import re
 from collections.abc import Sequence
 from urllib.parse import urlsplit
 
-from aiohttp import ClientError, ClientSession, ClientTimeout
+from aiohttp import ClientError, ClientResponse, ClientSession, ClientTimeout
+from hermex_companion.run_proxy_contract import (
+    RUN_REQUEST_MAX_BODY_BYTES,
+    is_run_payload,
+    run_events_path,
+    run_request_contract,
+)
 from hermex_companion.session_proxy_contract import (
     GatewayProxyError,
     GatewayProxyResponse,
@@ -44,6 +51,26 @@ class GatewayReadinessSnapshot:
     version: str | None
 
 
+@dataclass
+class GatewayRunEventStream:
+    """Owned upstream response whose bytes must be consumed incrementally."""
+
+    session: ClientSession
+    response: ClientResponse
+
+    async def close(self) -> None:
+        self.response.close()
+        await self.session.close()
+
+
+class GatewayRunHTTPError(Exception):
+    """Sanitized non-success response received before SSE headers."""
+
+    def __init__(self, response: GatewayProxyResponse) -> None:
+        super().__init__(f"Gateway run events returned {response.status}")
+        self.response = response
+
+
 class GatewayDiscovery:
     """Hide Gateway authentication, transport errors, and sanitization."""
 
@@ -61,6 +88,7 @@ class GatewayDiscovery:
             raise ValueError("Gateway URL must be an HTTP loopback URL")
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
+        self._timeout_seconds = timeout
         self._timeout = ClientTimeout(total=timeout)
 
     async def capabilities(self) -> GatewayCapabilitySnapshot:
@@ -161,6 +189,152 @@ class GatewayDiscovery:
             ).encode("utf-8")
         return GatewayProxyResponse(status, response_body)
 
+    async def run_request(
+        self,
+        method: str,
+        *,
+        run_id: str | None = None,
+        action: str | None = None,
+        body: bytes | None = None,
+    ) -> GatewayProxyResponse:
+        """Forward one exact verified Runs JSON resource."""
+        contract = run_request_contract(
+            method,
+            run_id=run_id,
+            action=action,
+        )
+        if body is not None and len(body) > RUN_REQUEST_MAX_BODY_BYTES:
+            raise GatewayProxyError(
+                413,
+                "request_too_large",
+                "The run request exceeded the supported size.",
+            )
+
+        status, response_body, payload = await self._proxy_json_request(
+            method,
+            contract.path,
+            allowed_statuses=(
+                contract.success_statuses | {400, 404, 409, 429}
+            ),
+            body=body,
+        )
+        if status in contract.success_statuses:
+            if not is_run_payload(payload, contract.payload_kind):
+                raise GatewayProxyError(
+                    502,
+                    "gateway_incompatible",
+                    "The Hermes Gateway run response is incompatible.",
+                )
+        else:
+            sanitized_error = sanitized_gateway_error(payload)
+            if sanitized_error is None:
+                raise GatewayProxyError(
+                    502,
+                    "gateway_incompatible",
+                    "The Hermes Gateway error response is incompatible.",
+                )
+            response_body = json.dumps(
+                sanitized_error,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        return GatewayProxyResponse(status, response_body)
+
+    async def open_run_events(self, run_id: str) -> GatewayRunEventStream:
+        """Open the verified SSE resource without reading or rewriting it."""
+        path = run_events_path(run_id)
+        session = ClientSession(
+            timeout=ClientTimeout(
+                total=None,
+                sock_connect=self._timeout_seconds,
+                sock_read=None,
+            )
+        )
+        try:
+            response = await session.get(
+                self._base_url + path,
+                headers={
+                    "Accept": "text/event-stream",
+                    "Accept-Encoding": "identity",
+                    "Authorization": f"Bearer {self._api_key}",
+                    "Cache-Control": "no-cache, no-transform",
+                },
+                allow_redirects=False,
+            )
+            if response.status in {401, 403}:
+                raise GatewayProxyError(
+                    502,
+                    "gateway_unauthorized",
+                    "The Hermes Gateway rejected its NAS-local credential.",
+                )
+            if response.status >= 500:
+                raise GatewayProxyError(
+                    503,
+                    "gateway_unavailable",
+                    "The Hermes Gateway is temporarily unavailable.",
+                )
+            if response.status != 200:
+                if response.status not in {400, 404, 409, 429}:
+                    raise GatewayProxyError(
+                        502,
+                        "gateway_incompatible",
+                        "The Hermes Gateway returned an unsupported response.",
+                    )
+                if response.content_type != "application/json":
+                    raise GatewayProxyError(
+                        502,
+                        "gateway_incompatible",
+                        "The Hermes Gateway returned an unsupported content type.",
+                    )
+                response_body = await read_bounded_session_response(response)
+                try:
+                    payload = json.loads(response_body)
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    raise GatewayProxyError(
+                        502,
+                        "gateway_malformed_response",
+                        "The Hermes Gateway returned malformed JSON.",
+                    ) from None
+                sanitized_error = sanitized_gateway_error(payload)
+                if sanitized_error is None:
+                    raise GatewayProxyError(
+                        502,
+                        "gateway_incompatible",
+                        "The Hermes Gateway error response is incompatible.",
+                    )
+                raise GatewayRunHTTPError(
+                    GatewayProxyResponse(
+                        response.status,
+                        json.dumps(
+                            sanitized_error,
+                            separators=(",", ":"),
+                        ).encode("utf-8"),
+                    )
+                )
+            if response.content_type != "text/event-stream":
+                raise GatewayProxyError(
+                    502,
+                    "gateway_incompatible",
+                    "The Hermes Gateway returned an unsupported content type.",
+                )
+            return GatewayRunEventStream(session, response)
+        except (GatewayProxyError, GatewayRunHTTPError):
+            await session.close()
+            raise
+        except asyncio.TimeoutError:
+            await session.close()
+            raise GatewayProxyError(
+                504,
+                "gateway_timeout",
+                "The Hermes Gateway run stream took too long to connect.",
+            ) from None
+        except (ClientError, OSError):
+            await session.close()
+            raise GatewayProxyError(
+                503,
+                "gateway_transport_failure",
+                "The Companion could not reach the Hermes Gateway.",
+            ) from None
+
     async def _proxy_json_request(
         self,
         method: str,
@@ -176,13 +350,14 @@ class GatewayDiscovery:
         }
         if body is not None:
             headers["Content-Type"] = "application/json"
+        outbound_body = io.BytesIO(body) if body is not None else None
         try:
             async with ClientSession(timeout=self._timeout) as session:
                 async with session.request(
                     method,
                     self._base_url + path,
                     params=query,
-                    data=body,
+                    data=outbound_body,
                     headers=headers,
                     allow_redirects=False,
                 ) as response:
@@ -234,6 +409,9 @@ class GatewayDiscovery:
                 "gateway_transport_failure",
                 "The Companion could not reach the Hermes Gateway.",
             ) from None
+        finally:
+            if outbound_body is not None:
+                outbound_body.close()
         return status, response_body, payload
 
     async def _get_json(self, path: str) -> tuple[str, object | None]:

@@ -357,10 +357,12 @@ The upstream long-running control surface carried through the Companion is:
 | POST | `/v1/runs/{run_id}/stop` | Request safe interruption |
 | POST | `/v1/runs/{run_id}/approval` | Resolve a pending approval |
 
-The exact relationship between persisted session chat and the Runs API must be
-verified on the owner's installed Hermes Agent version before choosing the
-production turn coordinator. Until then, UI state must not assume that
-`session_id` correlation alone guarantees message persistence.
+Hermes Agent 0.19.0 uses explicit `conversation_history` as the turn context.
+The supplied `session_id` correlates the run and persists the resulting turn,
+but does not itself load existing SessionDB messages. The production
+coordinator therefore reads the server-authoritative history before start,
+sends that history explicitly, preserves the returned `run_id`, and reloads
+history after terminal reconciliation.
 
 ### 4.5 Streaming rules
 
@@ -585,6 +587,10 @@ smoothness, and UI optimization must not silently change protocol behavior.
   cadence is independent of raw SSE event frequency.
 - Bound presentation updates to a measured refresh rate and collapse queued
   animation when it falls behind.
+- Unlock the full ProMotion range on supported iPhone Pro hardware. Keep
+  transport/content batching independent from display refresh: SwiftUI and
+  Core Animation own variable-rate rendering up to 120 Hz, while Markdown
+  state publication remains bounded by measured layout cost.
 - Disable or simplify streaming animation while the user scrolls, when Reduce
   Motion is enabled, in background/low-power states, or when the queue exceeds
   its latency budget.
@@ -595,6 +601,9 @@ smoothness, and UI optimization must not silently change protocol behavior.
 - Threshold/debounce scroll geometry updates.
 - Keep auto-scroll suspended while the user is reading older content.
 - Profile changes with Instruments on macOS/device when available.
+- Validate compact layout on the reference iPhone Pro Max simulator, adaptive
+  layout on an iPad Pro simulator, and actual variable-refresh behavior on
+  supported physical ProMotion hardware.
 
 ### 7.3 Acceptance scenarios
 

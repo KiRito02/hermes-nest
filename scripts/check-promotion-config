@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Validate the committed ProMotion and adaptive-layout configuration."""
+
+from pathlib import Path
+import plistlib
+
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise SystemExit(message)
+
+
+with (ROOT / "HermesMobile/Resources/Info.plist").open("rb") as plist_file:
+    app_info = plistlib.load(plist_file)
+
+require(
+    app_info.get("CADisableMinimumFrameDurationOnPhone") is True,
+    "Info.plist must unlock the full iPhone ProMotion frame-rate range.",
+)
+
+mcp_config = (ROOT / ".xcodebuildmcp/config.yaml").read_text(encoding="utf-8")
+require(
+    'simulatorName: "iPhone 17 Pro Max"' in mcp_config,
+    "XcodeBuildMCP must use iPhone 17 Pro Max as the reference simulator.",
+)
+
+project = (ROOT / "HermesMobile.xcodeproj/project.pbxproj").read_text(
+    encoding="utf-8"
+)
+require(
+    'TARGETED_DEVICE_FAMILY = "1,2";' in project,
+    "HermesMobile must continue targeting both iPhone and iPad.",
+)
+
+companion_view = (
+    ROOT / "HermesMobile/Features/SessionList/CompanionSessionListView.swift"
+).read_text(encoding="utf-8")
+require(
+    "isStreaming: viewModel.isRunActive" in companion_view,
+    "The Companion response bubble must use the streaming render path.",
+)
+
+workflow = (ROOT / ".github/workflows/pr-ci.yml").read_text(encoding="utf-8")
+require(
+    'preferred = "iPhone 17 Pro Max"' in workflow,
+    "PR CI must prefer the reference iPhone Pro Max simulator.",
+)
+require(
+    "Build adaptive iPad layout" in workflow,
+    "PR CI must compile the adaptive iPad Pro layout.",
+)
+
+print("ProMotion and adaptive-layout configuration: OK")

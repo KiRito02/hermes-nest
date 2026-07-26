@@ -224,7 +224,8 @@ The repository defaults are in `.xcodebuildmcp/config.yaml`:
 - Project: `HermesMobile.xcodeproj`
 - Scheme: `HermesMobile`
 - Configuration: `Debug`
-- Reference simulator: `iPhone 17`
+- Reference iPhone simulator: `iPhone 17 Pro Max`
+- Secondary adaptive-layout simulator: an available 13-inch `iPad Pro`
 
 For a completed code slice:
 
@@ -239,8 +240,10 @@ Agent/MCP flow:
 - inspect the current defaults before the first build;
 - use `test_sim` for XCTest validation;
 - use `build_run_sim` for a signed Debug simulator install;
-- choose a nearby iPhone simulator if `iPhone 17` is unavailable and report
-  the substitution.
+- choose a nearby iPhone Pro simulator if `iPhone 17 Pro Max` is unavailable
+  and report the substitution;
+- build and launch the changed UI on an available 13-inch iPad Pro before
+  merge when adaptive layout is affected.
 
 Never install a simulator build produced with
 `CODE_SIGNING_ALLOWED=NO`. It lacks the entitlements required for Keychain
@@ -274,7 +277,7 @@ Run the full suite:
 xcodebuild test \
   -project HermesMobile.xcodeproj \
   -scheme HermesMobile \
-  -destination 'platform=iOS Simulator,name=iPhone 17'
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max'
 ```
 
 Compile-only CI may disable signing, but signed simulator/manual validation
@@ -284,9 +287,30 @@ must not:
 xcodebuild build \
   -project HermesMobile.xcodeproj \
   -scheme HermesMobile \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max' \
   CODE_SIGNING_ALLOWED=NO
 ```
+
+Build the adaptive iPad layout with the installed 13-inch iPad Pro simulator
+name reported by `xcrun simctl list devices available`. Simulator checks cover
+layout and behavior; actual ProMotion frame pacing requires supported physical
+iPhone Pro/iPad Pro hardware and should be profiled under normal, Low Power,
+and reduced-motion conditions.
+
+## Review depth
+
+Use review effort in proportion to change risk:
+
+- documentation, configuration, fixtures, and isolated small changes: focused
+  tests plus direct diff/self-review;
+- ordinary issue branches: one Standards + Spec dual-axis review after the
+  implementation is complete, immediately before the push/PR boundary;
+- protocol, authentication, security, persistence, signing, migration, or
+  concurrency work: full dual-axis review, with both axes rerun only if the
+  fixes materially change a high-risk seam.
+
+Do not run the full dual-axis agent workflow after every small fix. CI and
+unresolved PR comments remain independent gates.
 
 ## Swift file-size policy
 
