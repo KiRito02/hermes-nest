@@ -777,7 +777,7 @@ struct CompanionSessionHistoryView: View {
                         Image(systemName: "arrow.up")
                             .frame(width: 32, height: 32)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(CompanionSendButtonStyle())
                     .disabled(
                         draftMessage.trimmingCharacters(
                             in: .whitespacesAndNewlines
@@ -963,6 +963,30 @@ struct CompanionSessionHistoryView: View {
                 composerIsFocused = false
             }
         }
+    }
+}
+
+private struct CompanionSendButtonStyle: ButtonStyle {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        let palette = ChatActionButtonPalette.resolve(
+            colorScheme: colorScheme,
+            isEnabled: isEnabled
+        )
+
+        configuration.label
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(palette.foreground.color)
+            .frame(width: 44, height: 44)
+            .background(palette.background.color, in: Circle())
+            .contentShape(Circle())
+            .scaleEffect(configuration.isPressed && isEnabled ? 0.94 : 1)
+            .animation(
+                .easeOut(duration: 0.12),
+                value: configuration.isPressed
+            )
     }
 }
 

@@ -112,6 +112,54 @@ final class PrimaryActionTintSettingsTests: XCTestCase {
     }
 }
 
+final class ChatActionButtonPaletteTests: XCTestCase {
+    func testActiveSendButtonHasStrongContrastInBothSchemes() {
+        for colorScheme in [ColorScheme.light, .dark] {
+            let palette = ChatActionButtonPalette.resolve(
+                colorScheme: colorScheme,
+                isEnabled: true
+            )
+
+            XCTAssertGreaterThanOrEqual(
+                palette.contrastRatio,
+                7,
+                "\(colorScheme) active send button"
+            )
+        }
+    }
+
+    func testDisabledSendButtonRemainsLegibleInBothSchemes() {
+        for colorScheme in [ColorScheme.light, .dark] {
+            let palette = ChatActionButtonPalette.resolve(
+                colorScheme: colorScheme,
+                isEnabled: false
+            )
+
+            XCTAssertGreaterThanOrEqual(
+                palette.contrastRatio,
+                3,
+                "\(colorScheme) disabled send button"
+            )
+        }
+    }
+
+    func testDisabledSendButtonStillLooksDistinctFromActiveState() {
+        for colorScheme in [ColorScheme.light, .dark] {
+            let active = ChatActionButtonPalette.resolve(
+                colorScheme: colorScheme,
+                isEnabled: true
+            )
+            let disabled = ChatActionButtonPalette.resolve(
+                colorScheme: colorScheme,
+                isEnabled: false
+            )
+
+            XCTAssertNotEqual(active.background, disabled.background)
+            XCTAssertNotEqual(active.foreground, disabled.foreground)
+        }
+    }
+}
+
 final class ChatLayoutDirectionSettingsTests: XCTestCase {
     func testRTLChatLayoutKeyIsStable() {
         XCTAssertEqual(

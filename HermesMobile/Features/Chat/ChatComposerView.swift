@@ -965,11 +965,7 @@ struct MessageComposerView: View {
             return HeaderLogoColor.color(for: headerLogoColorHex)
         }
 
-        if isActionButtonDisabled {
-            return colorScheme == .dark ? Color.white.opacity(0.18) : Color.black.opacity(0.12)
-        }
-
-        return colorScheme == .dark ? .white : .black
+        return actionButtonPalette.background.color
     }
 
     private var actionButtonForeground: Color {
@@ -980,11 +976,14 @@ struct MessageComposerView: View {
             return HeaderLogoColor.prefersDarkForeground(for: headerLogoColorHex) ? .black : .white
         }
 
-        if isActionButtonDisabled {
-            return Color(.secondaryLabel)
-        }
+        return actionButtonPalette.foreground.color
+    }
 
-        return colorScheme == .dark ? .black : .white
+    private var actionButtonPalette: ChatActionButtonPalette {
+        ChatActionButtonPalette.resolve(
+            colorScheme: colorScheme,
+            isEnabled: !isActionButtonDisabled
+        )
     }
 
     private var isComposerExpanded: Bool {

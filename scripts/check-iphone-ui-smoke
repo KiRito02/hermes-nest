@@ -7,6 +7,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = (ROOT / ".github/workflows/pr-ci.yml").read_text(encoding="utf-8")
 APP = (ROOT / "HermesMobile/HermesMobileApp.swift").read_text(encoding="utf-8")
+THEME = (ROOT / "HermesMobile/Config/AppTheme.swift").read_text(
+    encoding="utf-8"
+)
 FIXTURE = (
     ROOT / "HermesMobile/Features/Settings/CoreChatLabView.swift"
 ).read_text(encoding="utf-8")
@@ -62,6 +65,17 @@ if "Menu {" in attachment_entry or ".disabled(true)" in attachment_entry:
     raise SystemExit(
         "The attachment entry must stay visible; an all-disabled Menu is hidden on iOS."
     )
+
+for snippet, description in [
+    ("ChatActionButtonPalette.resolve", "explicit send-button palette"),
+    ("CompanionSendButtonStyle()", "custom high-contrast send style"),
+]:
+    require(SESSION_VIEW, snippet, description)
+require(
+    THEME,
+    "struct ChatActionButtonPalette",
+    "shared light/dark action palette",
+)
 
 for snippet, description in [
     ("iPhone 17 Pro Max", "preferred reference iPhone"),

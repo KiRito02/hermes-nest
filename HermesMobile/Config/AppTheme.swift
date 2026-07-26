@@ -217,6 +217,82 @@ enum PrimaryActionTintSettings {
     }
 }
 
+struct ChatActionButtonRGB: Equatable {
+    let red: Double
+    let green: Double
+    let blue: Double
+
+    init(gray: Double) {
+        red = gray
+        green = gray
+        blue = gray
+    }
+
+    var color: Color {
+        Color(red: red, green: green, blue: blue)
+    }
+
+    fileprivate var relativeLuminance: Double {
+        0.2126 * Self.linear(red)
+            + 0.7152 * Self.linear(green)
+            + 0.0722 * Self.linear(blue)
+    }
+
+    private static func linear(_ component: Double) -> Double {
+        if component <= 0.04045 {
+            return component / 12.92
+        }
+        return pow((component + 0.055) / 1.055, 2.4)
+    }
+}
+
+/// Explicit action-button colors keep send/stop affordances legible without
+/// allowing SwiftUI's disabled opacity to wash the icon into its background.
+struct ChatActionButtonPalette: Equatable {
+    let background: ChatActionButtonRGB
+    let foreground: ChatActionButtonRGB
+
+    var contrastRatio: Double {
+        let lighter = max(
+            background.relativeLuminance,
+            foreground.relativeLuminance
+        )
+        let darker = min(
+            background.relativeLuminance,
+            foreground.relativeLuminance
+        )
+        return (lighter + 0.05) / (darker + 0.05)
+    }
+
+    static func resolve(
+        colorScheme: ColorScheme,
+        isEnabled: Bool
+    ) -> ChatActionButtonPalette {
+        switch (colorScheme, isEnabled) {
+        case (.dark, true):
+            ChatActionButtonPalette(
+                background: ChatActionButtonRGB(gray: 1),
+                foreground: ChatActionButtonRGB(gray: 0.05)
+            )
+        case (.dark, false):
+            ChatActionButtonPalette(
+                background: ChatActionButtonRGB(gray: 0.25),
+                foreground: ChatActionButtonRGB(gray: 0.72)
+            )
+        case (_, true):
+            ChatActionButtonPalette(
+                background: ChatActionButtonRGB(gray: 0.05),
+                foreground: ChatActionButtonRGB(gray: 1)
+            )
+        case (_, false):
+            ChatActionButtonPalette(
+                background: ChatActionButtonRGB(gray: 0.86),
+                foreground: ChatActionButtonRGB(gray: 0.36)
+            )
+        }
+    }
+}
+
 enum AppHaptics {
     static let isEnabledKey = "appHaptics.isEnabled"
 }

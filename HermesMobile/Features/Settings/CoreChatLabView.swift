@@ -44,6 +44,7 @@ struct CoreChatLabView: View {
             onDeleted: { _ in }
         )
     }
+
 }
 
 private enum CoreChatLabFixture {
