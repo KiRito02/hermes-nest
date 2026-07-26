@@ -28,6 +28,18 @@ struct SessionPage: Equatable, Sendable {
 
 protocol SessionRepository: Sendable {
     func listSessions(_ query: SessionListQuery) async throws -> SessionPage
+    func createSession(_ request: SessionCreateRequest) async throws -> SessionSummary
+    func session(id: String) async throws -> SessionSummary
+    func updateSession(
+        id: String,
+        request: SessionUpdateRequest
+    ) async throws -> SessionSummary
+    func deleteSession(id: String) async throws -> Bool
+    func forkSession(
+        id: String,
+        request: SessionForkRequest
+    ) async throws -> SessionSummary
+    func messageHistory(id: String) async throws -> SessionHistory
 }
 
 enum SessionRepositoryError: LocalizedError, Equatable {
@@ -43,6 +55,11 @@ enum SessionRepositoryError: LocalizedError, Equatable {
     case gatewayResponseTooLarge
     case gatewayTimeout
     case gatewayTransportFailure
+    case sessionNotFound
+    case sessionAlreadyExists
+    case invalidSessionID
+    case invalidSessionMetadata
+    case requestTooLarge
     case unexpectedResponse
 
     var errorDescription: String? {
@@ -69,6 +86,16 @@ enum SessionRepositoryError: LocalizedError, Equatable {
             return String(localized: "Hermes Gateway took too long to return sessions.")
         case .gatewayTransportFailure:
             return String(localized: "Companion could not reach Hermes Gateway.")
+        case .sessionNotFound:
+            return String(localized: "This Hermes session no longer exists.")
+        case .sessionAlreadyExists:
+            return String(localized: "A Hermes session with that identity already exists.")
+        case .invalidSessionID:
+            return String(localized: "The Hermes session identity is invalid.")
+        case .invalidSessionMetadata:
+            return String(localized: "Hermes rejected the session metadata.")
+        case .requestTooLarge:
+            return String(localized: "The session request exceeded Companion's size limit.")
         case .unexpectedResponse:
             return String(localized: "Companion returned an unexpected session response.")
         }
@@ -76,12 +103,12 @@ enum SessionRepositoryError: LocalizedError, Equatable {
 }
 
 actor LiveSessionRepository: SessionRepository {
-    private static let maximumResponseBytes = 2 * 1024 * 1024
+    static let maximumResponseBytes = 2 * 1024 * 1024
 
-    private let companionURL: URL
-    private let keychain: any KeychainStoring
-    private let session: URLSession
-    private let decoder: JSONDecoder
+    let companionURL: URL
+    let keychain: any KeychainStoring
+    let session: URLSession
+    let decoder: JSONDecoder
 
     init(
         companionURL: URL,
@@ -99,44 +126,11 @@ actor LiveSessionRepository: SessionRepository {
 
     func listSessions(_ query: SessionListQuery) async throws -> SessionPage {
         let url = try sessionListURL(query)
-        guard
-            let credential = try? keychain.load(.companionDeviceCredential),
-            !credential.isEmpty
-        else {
-            throw SessionRepositoryError.missingDeviceCredential
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.timeoutInterval = 15
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch let error as URLError where error.code == .cancelled {
-            throw CancellationError()
-        } catch {
-            throw SessionRepositoryError.companionUnreachable
-        }
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SessionRepositoryError.unexpectedResponse
-        }
-        guard httpResponse.mimeType == "application/json" else {
-            throw SessionRepositoryError.unexpectedResponse
-        }
-        guard data.count <= Self.maximumResponseBytes else {
-            throw SessionRepositoryError.gatewayResponseTooLarge
-        }
-        guard httpResponse.statusCode == 200 else {
-            throw mapHTTPError(statusCode: httpResponse.statusCode, data: data)
-        }
+        let data = try await sendJSONRequest(
+            url: url,
+            method: "GET",
+            expectedStatusCodes: [200]
+        )
 
         let payload: GatewaySessionListPayload
         do {
@@ -160,6 +154,57 @@ actor LiveSessionRepository: SessionRepository {
             offset: offset,
             hasMore: hasMore
         )
+    }
+
+    func sendJSONRequest(
+        url: URL,
+        method: String,
+        body: Data? = nil,
+        expectedStatusCodes: Set<Int>
+    ) async throws -> Data {
+        guard
+            let credential = try? keychain.load(.companionDeviceCredential),
+            !credential.isEmpty
+        else {
+            throw SessionRepositoryError.missingDeviceCredential
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.httpBody = body
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
+        if body != nil {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
+        } catch {
+            throw SessionRepositoryError.companionUnreachable
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SessionRepositoryError.unexpectedResponse
+        }
+        guard httpResponse.mimeType == "application/json" else {
+            throw SessionRepositoryError.unexpectedResponse
+        }
+        guard data.count <= Self.maximumResponseBytes else {
+            throw SessionRepositoryError.gatewayResponseTooLarge
+        }
+        guard expectedStatusCodes.contains(httpResponse.statusCode) else {
+            throw mapHTTPError(statusCode: httpResponse.statusCode, data: data)
+        }
+        return data
     }
 
     private func sessionListURL(_ query: SessionListQuery) throws -> URL {
@@ -212,7 +257,7 @@ actor LiveSessionRepository: SessionRepository {
         return url
     }
 
-    private func mapHTTPError(statusCode: Int, data: Data) -> SessionRepositoryError {
+    func mapHTTPError(statusCode: Int, data: Data) -> SessionRepositoryError {
         let code = (
             try? decoder.decode(CompanionSessionErrorEnvelope.self, from: data)
         )?.error?.code
@@ -237,6 +282,18 @@ actor LiveSessionRepository: SessionRepository {
             return .gatewayTimeout
         case (503, "gateway_transport_failure"):
             return .gatewayTransportFailure
+        case (404, "session_not_found"):
+            return .sessionNotFound
+        case (409, "session_exists"):
+            return .sessionAlreadyExists
+        case (400, "invalid_session_id"):
+            return .invalidSessionID
+        case (400, "invalid_title"),
+             (400, "invalid_system_prompt"),
+             (400, "unsupported_session_field"):
+            return .invalidSessionMetadata
+        case (413, "request_too_large"):
+            return .requestTooLarge
         default:
             return .unexpectedResponse
         }
@@ -284,7 +341,7 @@ private struct GatewaySessionListPayload: Decodable {
     }
 }
 
-private struct GatewaySessionPayload: Decodable {
+struct GatewaySessionPayload: Decodable {
     let id: String?
     let source: String?
     let model: String?
@@ -348,8 +405,8 @@ private struct GatewaySessionPayload: Decodable {
             rawSource: source,
             sessionSource: source,
             parentSessionId: Self.nonEmpty(parentSessionId),
-            readOnly: true,
-            isReadOnly: true
+            readOnly: false,
+            isReadOnly: false
         )
     }
 

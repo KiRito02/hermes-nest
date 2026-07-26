@@ -244,13 +244,12 @@ Top-level status is `ok` only when Gateway status is `ok`; otherwise it is
 compatible Gateway response supplies them. Gateway PID, configured platforms,
 agent counts, paths, and detailed readiness checks are never returned.
 
-## Gateway-compatible session list
+## Gateway-compatible sessions
 
-`GET /api/sessions` requires device authentication. It is the only
-Gateway-compatible route enabled by this contract slice. Companion removes the
-device `Authorization` header, sends only its NAS-local Gateway bearer
-credential over loopback, and never forwards other App request headers.
-Redirects are not followed. `HEAD` is not an alias for this route and returns
+Every route below requires device authentication. Companion removes the device
+`Authorization` header, sends only its NAS-local Gateway bearer credential over
+loopback, and never forwards other App request headers. Redirects are not
+followed. `HEAD` is not an alias for either supported GET resource and returns
 `405` without contacting Gateway.
 
 This contract was verified against Hermes Agent `0.19.0`, upstream commit
@@ -270,6 +269,22 @@ Each field may occur at most once. Unknown, repeated, or out-of-bounds fields
 return `400 invalid_query` without contacting Gateway. Accepted values and
 their order are forwarded unchanged; Hermes remains responsible for their
 normalization and list semantics.
+
+The exact lifecycle allowlist is:
+
+| Method | Path | Request body |
+| --- | --- | --- |
+| POST | `/api/sessions` | Gateway-compatible JSON object |
+| GET | `/api/sessions/{id}` | none |
+| PATCH | `/api/sessions/{id}` | `title` and/or `end_reason` |
+| DELETE | `/api/sessions/{id}` | none |
+| GET | `/api/sessions/{id}/messages` | none |
+| POST | `/api/sessions/{id}/fork` | Gateway-compatible JSON object |
+
+Resource routes reject all query parameters. JSON bodies must be objects and
+are limited to 16 KiB. Session IDs are a single bounded path segment. Unknown
+methods, suffixes, repeated path segments, implicit HEAD, non-JSON bodies, and
+invalid IDs never reach Gateway.
 
 Success is `200 application/json`. After validating the bounded core shape,
 Companion returns the Gateway JSON bytes without renaming fields:
@@ -297,6 +312,20 @@ Clients tolerate additive outer and session fields. Companion requires the
 documented outer field types and object rows, limits the response to 2 MiB, and
 uses its bounded Gateway timeout.
 
+Lifecycle successes preserve the Gateway status and JSON bytes after validating
+the corresponding `hermes.session`, `hermes.session.deleted`, or message-list
+core shape. Safe Gateway client failures (`400`, `404`, and `409`) also preserve
+their status and a bounded `error.code` / `error.message` envelope so the App
+can distinguish invalid metadata, a missing session, and an identity conflict.
+Unknown error fields are dropped at the Companion boundary.
+
+Hermes Agent 0.19.0 returns message history as
+`{"object":"list","session_id":"...","data":[...]}` and does not implement
+`limit` or `offset` on `/messages`; the owner's live Gateway ignores those
+queries. Companion therefore forwards the complete bounded message response.
+The App presents it in stable local pages without claiming upstream pagination,
+reordering rows, or creating a Companion-owned transcript.
+
 Gateway failures use the common bounded error envelope:
 
 | Status | Code | Meaning |
@@ -309,5 +338,5 @@ Gateway failures use the common bounded error envelope:
 | 504 | `gateway_timeout` | Bounded Gateway request timed out |
 | 503 | `gateway_transport_failure` | Companion could not establish or maintain the loopback request |
 
-Raw Gateway errors, response headers, credentials, loopback addresses, and
-redirect targets are not returned to the App.
+Gateway server/auth/transport details, response headers, credentials, loopback
+addresses, and redirect targets are not returned to the App.

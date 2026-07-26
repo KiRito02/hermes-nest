@@ -10,6 +10,7 @@ final class CompanionSessionListViewModel {
     private(set) var isLoadingNextPage = false
     private(set) var isViewingCachedData = false
     private(set) var errorMessage: String?
+    private(set) var mutationErrorMessage: String?
     private(set) var hasMore = false
 
     private let repository: any SessionRepository
@@ -54,7 +55,11 @@ final class CompanionSessionListViewModel {
 
         do {
             let page = try await repository.listSessions(
-                SessionListQuery(limit: pageSize, offset: 0)
+                SessionListQuery(
+                    limit: pageSize,
+                    offset: 0,
+                    includeChildren: true
+                )
             )
             sessions = Self.visibleUniqueSessions(page.sessions)
             nextOffset = resolvedNextOffset(for: page, fallback: sessions.count)
@@ -94,7 +99,11 @@ final class CompanionSessionListViewModel {
 
         do {
             let page = try await repository.listSessions(
-                SessionListQuery(limit: pageSize, offset: nextOffset)
+                SessionListQuery(
+                    limit: pageSize,
+                    offset: nextOffset,
+                    includeChildren: true
+                )
             )
             sessions = Self.visibleUniqueSessions(sessions + page.sessions)
             nextOffset = resolvedNextOffset(for: page, fallback: nextOffset + pageSize)
@@ -106,6 +115,74 @@ final class CompanionSessionListViewModel {
             guard !(error is CancellationError) else { return }
             errorMessage = error.localizedDescription
         }
+    }
+
+    func createSession(modelContext: ModelContext? = nil) async -> SessionSummary? {
+        mutationErrorMessage = nil
+        do {
+            let created = try await repository.createSession(
+                SessionCreateRequest()
+            )
+            resetPagination()
+            await loadInitial(modelContext: modelContext)
+            return created
+        } catch {
+            guard !(error is CancellationError) else { return nil }
+            mutationErrorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func deleteSession(
+        _ session: SessionSummary,
+        modelContext: ModelContext? = nil
+    ) async -> Bool {
+        guard let sessionID = session.sessionId else { return false }
+        mutationErrorMessage = nil
+        do {
+            guard try await repository.deleteSession(id: sessionID) else {
+                throw SessionRepositoryError.unexpectedResponse
+            }
+            resetPagination()
+            await loadInitial(modelContext: modelContext)
+            sessions.removeAll { $0.sessionId == sessionID }
+            cacheCurrentList(in: modelContext)
+            return true
+        } catch {
+            guard !(error is CancellationError) else { return false }
+            mutationErrorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func reconcileDeletedSession(
+        id: String,
+        modelContext: ModelContext? = nil
+    ) async {
+        resetPagination()
+        await loadInitial(modelContext: modelContext)
+        sessions.removeAll { $0.sessionId == id }
+        cacheCurrentList(in: modelContext)
+    }
+
+    func updateSessionSnapshot(
+        _ session: SessionSummary,
+        modelContext: ModelContext? = nil
+    ) {
+        sessions.removeAll { $0.sessionId == session.sessionId }
+        sessions = Self.visibleUniqueSessions([session] + sessions)
+        cacheSession(session, in: modelContext)
+    }
+
+    func refreshAfterMembershipMutation(
+        modelContext: ModelContext? = nil
+    ) async {
+        resetPagination()
+        await loadInitial(modelContext: modelContext)
+    }
+
+    func clearMutationError() {
+        mutationErrorMessage = nil
     }
 
     private func cache(
@@ -136,11 +213,37 @@ final class CompanionSessionListViewModel {
         }
     }
 
+    private func cacheSession(
+        _ session: SessionSummary,
+        in modelContext: ModelContext?
+    ) {
+        guard let modelContext else { return }
+        try? CacheStore.cacheSession(
+            session,
+            serverURL: companionURL,
+            in: modelContext
+        )
+    }
+
+    private func cacheCurrentList(in modelContext: ModelContext?) {
+        guard let modelContext else { return }
+        try? CacheStore.cacheSessions(
+            sessions,
+            serverURL: companionURL,
+            in: modelContext
+        )
+    }
+
     private func resolvedNextOffset(for page: SessionPage, fallback: Int) -> Int {
         guard let offset = page.offset, let limit = page.limit else {
             return fallback
         }
         return offset + limit
+    }
+
+    private func resetPagination() {
+        nextOffset = 0
+        hasMore = false
     }
 
     private func shouldUseCache(for error: Error) -> Bool {
@@ -173,6 +276,198 @@ final class CompanionSessionListViewModel {
                 return false
             }
             return true
+        }
+    }
+}
+
+@MainActor
+@Observable
+final class CompanionSessionHistoryViewModel {
+    private(set) var session: SessionSummary
+    private(set) var allMessages: [ChatMessage] = []
+    private(set) var isLoading = false
+    private(set) var isViewingCachedData = false
+    private(set) var errorMessage: String?
+    private(set) var mutationErrorMessage: String?
+
+    private let repository: any SessionRepository
+    private let companionURL: URL
+    private let pageSize: Int
+    private var visibleStartIndex = 0
+
+    init(
+        session: SessionSummary,
+        repository: any SessionRepository,
+        companionURL: URL,
+        pageSize: Int = 50
+    ) {
+        self.session = session
+        self.repository = repository
+        self.companionURL = companionURL
+        self.pageSize = max(1, pageSize)
+    }
+
+    var visibleMessages: [ChatMessage] {
+        guard visibleStartIndex < allMessages.count else { return [] }
+        return Array(allMessages[visibleStartIndex...])
+    }
+
+    var hasOlderMessages: Bool {
+        visibleStartIndex > 0
+    }
+
+    func load(modelContext: ModelContext? = nil) async {
+        guard let sessionID = session.sessionId, !isLoading else { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        let cached = cachedMessages(sessionID: sessionID, in: modelContext)
+        if allMessages.isEmpty, !cached.isEmpty {
+            apply(cached)
+            isViewingCachedData = true
+        }
+
+        do {
+            let history = try await repository.messageHistory(id: sessionID)
+            let resolvedSession = try await repository.session(
+                id: history.sessionID
+            )
+            session = resolvedSession
+            apply(history.messages)
+            isViewingCachedData = false
+            cache(
+                history.messages,
+                sessionID: history.sessionID,
+                in: modelContext
+            )
+            cacheSession(resolvedSession, in: modelContext)
+        } catch {
+            guard !(error is CancellationError) else { return }
+            if shouldUseCache(for: error), !cached.isEmpty {
+                apply(cached)
+                isViewingCachedData = true
+            } else {
+                allMessages = []
+                visibleStartIndex = 0
+                isViewingCachedData = false
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func loadOlderMessages() {
+        visibleStartIndex = max(0, visibleStartIndex - pageSize)
+    }
+
+    func rename(
+        to title: String,
+        modelContext: ModelContext? = nil
+    ) async -> Bool {
+        guard let sessionID = session.sessionId else { return false }
+        mutationErrorMessage = nil
+        do {
+            session = try await repository.updateSession(
+                id: sessionID,
+                request: SessionUpdateRequest(title: title)
+            )
+            cacheSession(session, in: modelContext)
+            return true
+        } catch {
+            guard !(error is CancellationError) else { return false }
+            mutationErrorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func fork(modelContext: ModelContext? = nil) async -> SessionSummary? {
+        guard let sessionID = session.sessionId else { return nil }
+        mutationErrorMessage = nil
+        do {
+            let forked = try await repository.forkSession(
+                id: sessionID,
+                request: SessionForkRequest()
+            )
+            cacheSession(forked, in: modelContext)
+            return forked
+        } catch {
+            guard !(error is CancellationError) else { return nil }
+            mutationErrorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func delete() async -> Bool {
+        guard let sessionID = session.sessionId else { return false }
+        mutationErrorMessage = nil
+        do {
+            guard try await repository.deleteSession(id: sessionID) else {
+                throw SessionRepositoryError.unexpectedResponse
+            }
+            return true
+        } catch {
+            guard !(error is CancellationError) else { return false }
+            mutationErrorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func clearMutationError() {
+        mutationErrorMessage = nil
+    }
+
+    private func apply(_ messages: [ChatMessage]) {
+        allMessages = messages
+        visibleStartIndex = max(0, messages.count - pageSize)
+    }
+
+    private func cachedMessages(
+        sessionID: String,
+        in modelContext: ModelContext?
+    ) -> [ChatMessage] {
+        guard let modelContext else { return [] }
+        return (try? CacheStore.cachedMessages(
+            serverURL: companionURL,
+            sessionID: sessionID,
+            in: modelContext
+        )) ?? []
+    }
+
+    private func cache(
+        _ messages: [ChatMessage],
+        sessionID: String,
+        in modelContext: ModelContext?
+    ) {
+        guard let modelContext else { return }
+        try? CacheStore.cacheMessages(
+            messages,
+            serverURL: companionURL,
+            sessionID: sessionID,
+            in: modelContext
+        )
+    }
+
+    private func cacheSession(
+        _ session: SessionSummary,
+        in modelContext: ModelContext?
+    ) {
+        guard let modelContext else { return }
+        try? CacheStore.cacheSession(
+            session,
+            serverURL: companionURL,
+            in: modelContext
+        )
+    }
+
+    private func shouldUseCache(for error: Error) -> Bool {
+        switch error {
+        case SessionRepositoryError.companionUnreachable,
+             SessionRepositoryError.gatewayUnavailable,
+             SessionRepositoryError.gatewayTimeout,
+             SessionRepositoryError.gatewayTransportFailure:
+            return true
+        default:
+            return false
         }
     }
 }

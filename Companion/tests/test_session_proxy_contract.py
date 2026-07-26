@@ -104,9 +104,12 @@ class SessionProxyContractTests(unittest.IsolatedAsyncioTestCase):
         )
 
         headers = {"Authorization": f"Bearer {self.device_credential}"}
-        wrong_method = await self.client.post("/api/sessions", headers=headers)
+        wrong_method = await self.client.put("/api/sessions", headers=headers)
         implicit_head = await self.client.head("/api/sessions", headers=headers)
-        unlisted_path = await self.client.get("/api/sessions/session-1", headers=headers)
+        unlisted_path = await self.client.get(
+            "/api/sessions/session-1/export",
+            headers=headers,
+        )
 
         self.assertEqual(405, wrong_method.status)
         self.assertEqual(405, implicit_head.status)
