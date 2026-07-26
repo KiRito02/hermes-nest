@@ -360,6 +360,7 @@ class SessionLifecycleProxyContractTests(unittest.IsolatedAsyncioTestCase):
                             "session_id": request.match_info["session_id"],
                             "role": "user",
                             "content": "Review it",
+                            "run_id": "run-attachment",
                             "timestamp": 100.0,
                         },
                         {

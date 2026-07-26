@@ -4,9 +4,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import datetime, UTC
 import json
-import os
 import re
-import stat
 from urllib.parse import quote
 
 from aiohttp import web
@@ -43,6 +41,7 @@ from hermex_companion.workspace import (
     MAX_UPLOAD_BYTES,
     WorkspaceAccess,
     WorkspaceError,
+    WorkspaceOpenedFile,
     content_type_for_filename,
 )
 
@@ -353,6 +352,7 @@ async def _workspace_preview(request: web.Request) -> web.Response:
 
 
 async def _workspace_download(request: web.Request) -> web.StreamResponse:
+    opened = None
     try:
         _authenticate(request)
         if set(request.query) != {"path"}:
@@ -361,7 +361,7 @@ async def _workspace_download(request: web.Request) -> web.StreamResponse:
                 "invalid_query",
                 "File download requires exactly one path query value.",
             )
-        path = request.app[WORKSPACE_KEY].download_file(
+        opened = request.app[WORKSPACE_KEY].download_file(
             request.match_info["root_id"],
             request.query["path"],
         )
@@ -377,13 +377,44 @@ async def _workspace_download(request: web.Request) -> web.StreamResponse:
             },
             status=error.status,
         )
-    fallback_name = re.sub(r"[^A-Za-z0-9._-]", "_", path.name) or "download"
-    response = web.FileResponse(path)
+    return await _stream_opened_file(request, opened)
+
+
+async def _stream_opened_file(
+    request: web.Request,
+    opened: WorkspaceOpenedFile,
+    *,
+    display_name: str | None = None,
+    content_type: str | None = None,
+) -> web.StreamResponse:
+    response_name = display_name or opened.name
+    fallback_name = re.sub(
+        r"[^A-Za-z0-9._-]",
+        "_",
+        response_name,
+    ) or "download"
+    response = web.StreamResponse(
+        status=200,
+        headers={
+            "Content-Type": content_type or opened.content_type,
+            "Content-Length": str(opened.size),
+        },
+    )
     response.headers["Content-Disposition"] = (
         f'attachment; filename="{fallback_name}"; '
-        f"filename*=UTF-8''{quote(path.name, safe='')}"
+        f"filename*=UTF-8''{quote(response_name, safe='')}"
     )
-    return response
+    try:
+        await response.prepare(request)
+        while True:
+            chunk = await asyncio.to_thread(opened.handle.read, 256 * 1024)
+            if not chunk:
+                break
+            await response.write(chunk)
+        await response.write_eof()
+        return response
+    finally:
+        opened.close()
 
 
 async def _memory_read(request: web.Request) -> web.Response:
@@ -669,32 +700,21 @@ async def _upload_from_file(request: web.Request) -> web.Response:
                 "Server-file attachment metadata fields are invalid.",
             )
 
-        source_path = request.app[WORKSPACE_KEY].download_file(
+        source_file = request.app[WORKSPACE_KEY].download_file(
             payload["source_root_id"],
             payload["source_path"],
         )
-        source_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-        source_fd = os.open(source_path, source_flags)
-        source_metadata = os.fstat(source_fd)
-        if not stat.S_ISREG(source_metadata.st_mode):
-            os.close(source_fd)
-            raise WorkspaceError(
-                400,
-                "workspace_file_required",
-                "Attachments require a regular file.",
-            )
-        if source_metadata.st_size > MAX_UPLOAD_BYTES:
-            os.close(source_fd)
+        source_handle = source_file.handle
+        if source_file.size > MAX_UPLOAD_BYTES:
             raise WorkspaceError(
                 413,
                 "upload_too_large",
                 f"Files may not exceed {MAX_UPLOAD_BYTES} bytes.",
             )
-        source_handle = os.fdopen(source_fd, "rb", buffering=0)
         upload = request.app[WORKSPACE_KEY].begin_upload(
             payload["destination_root_id"],
             payload["destination_directory"],
-            source_path.name,
+            source_file.name,
         )
         content_type = content_type_for_filename(upload.name)
         attachment_id = request.app[REGISTRY_KEY].reserve_attachment(
@@ -888,7 +908,7 @@ async def _download_consumed_upload(
         ].consumed_attachment_for_download(
             attachment_id=attachment_id,
         )
-        path = request.app[WORKSPACE_KEY].uploaded_file(
+        opened = request.app[WORKSPACE_KEY].uploaded_file(
             record.root_id,
             record.relative_path,
             expected_device=record.file_device,
@@ -906,14 +926,12 @@ async def _download_consumed_upload(
             },
             status=error.status,
         )
-    fallback_name = re.sub(r"[^A-Za-z0-9._-]", "_", record.name) or "download"
-    response = web.FileResponse(path)
-    response.content_type = record.content_type
-    response.headers["Content-Disposition"] = (
-        f'attachment; filename="{fallback_name}"; '
-        f"filename*=UTF-8''{quote(record.name, safe='')}"
+    return await _stream_opened_file(
+        request,
+        opened,
+        display_name=record.name,
+        content_type=record.content_type,
     )
-    return response
 
 
 async def _list_sessions(request: web.Request) -> web.Response:
@@ -1142,11 +1160,25 @@ async def _session_messages(request: web.Request) -> web.Response:
         if not isinstance(message, dict) or message.get("role") != "user":
             continue
         fingerprint = attachment_prompt_fingerprint(message.get("content"))
+        metadata = message.get("metadata")
+        message_run_id = message.get("run_id") or message.get("runId")
+        if not isinstance(message_run_id, str) and isinstance(metadata, dict):
+            message_run_id = metadata.get("run_id") or metadata.get("runId")
+        if not isinstance(message_run_id, str):
+            message_run_id = None
         matching_index = next(
             (
                 index
-                for index, (_, batch_fingerprint, _) in enumerate(batches)
+                for index, (
+                    batch_run_id,
+                    batch_fingerprint,
+                    _,
+                ) in enumerate(batches)
                 if batch_fingerprint == fingerprint
+                and (
+                    message_run_id is None
+                    or batch_run_id == message_run_id
+                )
             ),
             None,
         )
@@ -1282,6 +1314,8 @@ async def _run_request(
                         "path": request.app[WORKSPACE_KEY].agent_reference(
                             record.root_id,
                             record.relative_path,
+                            expected_device=record.file_device,
+                            expected_inode=record.file_inode,
                         ),
                         "content_type": record.content_type,
                         "size": record.size,

@@ -39,6 +39,7 @@ _SENSITIVE_DIRECTORY_NAMES = frozenset(
 )
 DEFAULT_DIRECTORY_PAGE_SIZE = 100
 MAX_DIRECTORY_PAGE_SIZE = 200
+MAX_DIRECTORY_SCAN_ENTRIES = 10_000
 MAX_PREVIEW_BYTES = 256 * 1024
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 _UPLOAD_TEMP_PREFIX = ".hermes-nest-upload-"
@@ -54,8 +55,7 @@ def _is_sensitive_entry(path: Path) -> bool:
     lowered = path.name.casefold()
     return (
         lowered.startswith(_UPLOAD_TEMP_PREFIX)
-        or
-        lowered in _SENSITIVE_ENTRY_NAMES
+        or lowered in _SENSITIVE_ENTRY_NAMES
         or lowered in _SENSITIVE_DIRECTORY_NAMES
     )
 
@@ -84,18 +84,28 @@ class WorkspaceError(Exception):
         self.message = message
 
 
+@dataclass(slots=True)
+class WorkspaceOpenedFile:
+    handle: BinaryIO
+    name: str
+    size: int
+    content_type: str
+
+    def close(self) -> None:
+        self.handle.close()
+
+
 class WorkspaceUpload:
     def __init__(
         self,
         *,
         root_id: str,
-        root_path: Path,
-        directory: Path,
+        directory_fd: int,
+        relative_directory: Path,
         filename: str,
     ) -> None:
         self.root_id = root_id
         self.name = filename
-        relative_directory = directory.relative_to(root_path)
         safe_suffix = Path(filename).suffix
         if (
             len(safe_suffix) > 16
@@ -108,10 +118,12 @@ class WorkspaceUpload:
             / _ATTACHMENT_DIRECTORY_NAME
             / self._storage_name
         ).as_posix()
-        flags = os.O_RDONLY
-        flags |= getattr(os, "O_DIRECTORY", 0)
-        flags |= getattr(os, "O_NOFOLLOW", 0)
-        selected_directory_fd = os.open(directory, flags)
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        selected_directory_fd = directory_fd
         try:
             try:
                 os.mkdir(
@@ -137,6 +149,17 @@ class WorkspaceUpload:
                 flags,
                 dir_fd=selected_directory_fd,
             )
+            opened_metadata = os.fstat(self._directory_fd)
+            if (
+                opened_metadata.st_dev != attachment_metadata.st_dev
+                or opened_metadata.st_ino != attachment_metadata.st_ino
+            ):
+                os.close(self._directory_fd)
+                raise WorkspaceError(
+                    409,
+                    "attachment_storage_unsafe",
+                    "The attachment storage directory changed while opening it.",
+                )
         finally:
             os.close(selected_directory_fd)
         self._temp_name = f"{_UPLOAD_TEMP_PREFIX}{uuid4().hex}.part"
@@ -383,13 +406,7 @@ class WorkspaceAccess:
             )
         return root_path
 
-    def agent_reference(self, root_id: str, relative_path: str) -> str:
-        if self._agent_working_directory is None:
-            raise WorkspaceError(
-                409,
-                "attachment_agent_path_unavailable",
-                "The server has not configured an Agent working directory.",
-            )
+    def _root(self, root_id: str) -> WorkspaceRoot:
         root = next((root for root in self._roots if root.id == root_id), None)
         if root is None:
             raise WorkspaceError(
@@ -397,14 +414,55 @@ class WorkspaceAccess:
                 "workspace_root_not_found",
                 "The requested workspace root is not authorized.",
             )
-        root_path = self._validated_root_path(root)
+        return root
+
+    def _validated_root_fd(self, root: WorkspaceRoot) -> int:
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        descriptor: int | None = None
+        try:
+            descriptor = os.open(root.path, flags)
+            metadata = os.fstat(descriptor)
+        except OSError as error:
+            if descriptor is not None:
+                os.close(descriptor)
+            raise WorkspaceError(
+                409,
+                "workspace_root_changed",
+                "The authorized workspace root is no longer available.",
+            ) from error
+        if (metadata.st_dev, metadata.st_ino) != self._root_identities[root.id]:
+            os.close(descriptor)
+            raise WorkspaceError(
+                409,
+                "workspace_root_changed",
+                "The authorized workspace root changed after Companion started.",
+            )
+        return descriptor
+
+    @staticmethod
+    def _relative_parts(
+        relative_path: str,
+        *,
+        allow_empty: bool,
+        allow_attachment_storage: bool = False,
+    ) -> tuple[str, ...]:
         requested = Path(relative_path)
+        parts = tuple(
+            part
+            for part in requested.parts
+            if part not in {"", "."}
+        )
         if (
-            not relative_path
-            or requested.is_absolute()
+            requested.is_absolute()
+            or (not allow_empty and not parts)
+            or any(part == ".." for part in parts)
             or _has_sensitive_component(
                 requested,
-                allow_attachment_storage=True,
+                allow_attachment_storage=allow_attachment_storage,
             )
         ):
             raise WorkspaceError(
@@ -412,19 +470,132 @@ class WorkspaceAccess:
                 "workspace_path_forbidden",
                 "The requested path is outside the authorized root.",
             )
-        path = (root_path / requested).resolve(strict=True)
-        if path != root_path and root_path not in path.parents:
+        return parts
+
+    def _open_directory(
+        self,
+        root: WorkspaceRoot,
+        relative_path: str,
+    ) -> tuple[int, Path]:
+        parts = self._relative_parts(relative_path, allow_empty=True)
+        descriptor = self._validated_root_fd(root)
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        try:
+            for part in parts:
+                child = os.open(part, flags, dir_fd=descriptor)
+                os.close(descriptor)
+                descriptor = child
+            return descriptor, Path(*parts) if parts else Path(".")
+        except OSError as error:
+            os.close(descriptor)
             raise WorkspaceError(
                 403,
                 "workspace_path_forbidden",
-                "The requested path is outside the authorized root.",
+                "The requested directory could not be opened safely.",
+            ) from error
+
+    def _open_regular_file(
+        self,
+        root: WorkspaceRoot,
+        relative_path: str,
+        *,
+        allow_attachment_storage: bool = False,
+        expected_device: int | None = None,
+        expected_inode: int | None = None,
+    ) -> tuple[int, int, str, os.stat_result, Path]:
+        parts = self._relative_parts(
+            relative_path,
+            allow_empty=False,
+            allow_attachment_storage=allow_attachment_storage,
+        )
+        parent_parts = parts[:-1]
+        parent_fd = self._validated_root_fd(root)
+        file_fd: int | None = None
+        directory_flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        try:
+            for part in parent_parts:
+                child = os.open(part, directory_flags, dir_fd=parent_fd)
+                os.close(parent_fd)
+                parent_fd = child
+            file_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            file_fd = os.open(parts[-1], file_flags, dir_fd=parent_fd)
+            metadata = os.fstat(file_fd)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise OSError("workspace target is not a regular file")
+            if (
+                expected_device is not None
+                and expected_inode is not None
+                and (
+                    metadata.st_dev != expected_device
+                    or metadata.st_ino != expected_inode
+                )
+            ):
+                os.close(file_fd)
+                file_fd = None
+                raise WorkspaceError(
+                    409,
+                    "attachment_file_changed",
+                    "The attachment file changed after publication.",
+                )
+            return (
+                parent_fd,
+                file_fd,
+                parts[-1],
+                metadata,
+                Path(*parts),
             )
-        if not stat.S_ISREG(path.stat().st_mode):
+        except WorkspaceError:
+            os.close(parent_fd)
+            raise
+        except OSError as error:
+            if file_fd is not None:
+                os.close(file_fd)
+            os.close(parent_fd)
+            if isinstance(error, FileNotFoundError):
+                raise WorkspaceError(
+                    404,
+                    "attachment_file_not_found",
+                    "The attachment file is no longer available.",
+                ) from error
             raise WorkspaceError(
-                400,
-                "workspace_file_required",
-                "Attachments require a regular file.",
+                403,
+                "workspace_path_forbidden",
+                "The requested file could not be opened safely.",
+            ) from error
+
+    def agent_reference(
+        self,
+        root_id: str,
+        relative_path: str,
+        *,
+        expected_device: int | None = None,
+        expected_inode: int | None = None,
+    ) -> str:
+        if self._agent_working_directory is None:
+            raise WorkspaceError(
+                409,
+                "attachment_agent_path_unavailable",
+                "The server has not configured an Agent working directory.",
             )
+        root = self._root(root_id)
+        parent_fd, file_fd, _, _, normalized = self._open_regular_file(
+            root,
+            relative_path,
+            allow_attachment_storage=True,
+            expected_device=expected_device,
+            expected_inode=expected_inode,
+        )
+        os.close(file_fd)
+        os.close(parent_fd)
+        path = root.path / normalized
         try:
             relative = path.relative_to(self._agent_working_directory)
         except ValueError:
@@ -440,52 +611,24 @@ class WorkspaceAccess:
         root_id: str,
         relative_path: str,
     ) -> dict[str, object]:
-        root = next((root for root in self._roots if root.id == root_id), None)
-        if root is None:
-            raise WorkspaceError(
-                404,
-                "workspace_root_not_found",
-                "The requested workspace root is not authorized.",
-            )
-        root_path = self._validated_root_path(root)
-        requested = Path(relative_path)
-        if (
-            not relative_path
-            or requested.is_absolute()
-            or _has_sensitive_component(requested)
-        ):
-            raise WorkspaceError(
-                403,
-                "workspace_path_forbidden",
-                "The requested path is outside the authorized root.",
-            )
-        path = (root_path / requested).resolve(strict=True)
-        if path != root_path and root_path not in path.parents:
-            raise WorkspaceError(
-                403,
-                "workspace_path_forbidden",
-                "The requested path is outside the authorized root.",
-            )
-        metadata = path.stat()
-        if not stat.S_ISREG(metadata.st_mode):
-            raise WorkspaceError(
-                400,
-                "workspace_file_required",
-                "File preview requires a regular file.",
-            )
-        with path.open("rb") as handle:
+        root = self._root(root_id)
+        parent_fd, file_fd, name, metadata, normalized = (
+            self._open_regular_file(root, relative_path)
+        )
+        os.close(parent_fd)
+        with os.fdopen(file_fd, "rb") as handle:
             raw = handle.read(MAX_PREVIEW_BYTES + 1)
         truncated = len(raw) > MAX_PREVIEW_BYTES
         preview = raw[:MAX_PREVIEW_BYTES]
-        content_type = content_type_for_filename(path.name)
+        content_type = content_type_for_filename(name)
         try:
             content = preview.decode("utf-8")
         except UnicodeDecodeError:
             content = None
         return {
             "root_id": root.id,
-            "path": path.relative_to(root_path).as_posix(),
-            "name": path.name,
+            "path": normalized.as_posix(),
+            "name": name,
             "kind": "text" if content is not None else "binary",
             "content_type": content_type,
             "size": metadata.st_size,
@@ -493,40 +636,23 @@ class WorkspaceAccess:
             "content": content,
         }
 
-    def download_file(self, root_id: str, relative_path: str) -> Path:
-        root = next((root for root in self._roots if root.id == root_id), None)
-        if root is None:
-            raise WorkspaceError(
-                404,
-                "workspace_root_not_found",
-                "The requested workspace root is not authorized.",
-            )
-        root_path = self._validated_root_path(root)
-        requested = Path(relative_path)
-        if (
-            not relative_path
-            or requested.is_absolute()
-            or _has_sensitive_component(requested)
-        ):
-            raise WorkspaceError(
-                403,
-                "workspace_path_forbidden",
-                "The requested path is outside the authorized root.",
-            )
-        path = (root_path / requested).resolve(strict=True)
-        if path != root_path and root_path not in path.parents:
-            raise WorkspaceError(
-                403,
-                "workspace_path_forbidden",
-                "The requested path is outside the authorized root.",
-            )
-        if not stat.S_ISREG(path.stat().st_mode):
-            raise WorkspaceError(
-                400,
-                "workspace_file_required",
-                "File download requires a regular file.",
-            )
-        return path
+    def download_file(
+        self,
+        root_id: str,
+        relative_path: str,
+    ) -> WorkspaceOpenedFile:
+        root = self._root(root_id)
+        parent_fd, file_fd, name, metadata, _ = self._open_regular_file(
+            root,
+            relative_path,
+        )
+        os.close(parent_fd)
+        return WorkspaceOpenedFile(
+            handle=os.fdopen(file_fd, "rb", buffering=0),
+            name=name,
+            size=metadata.st_size,
+            content_type=content_type_for_filename(name),
+        )
 
     def begin_upload(
         self,
@@ -561,35 +687,14 @@ class WorkspaceAccess:
                 "invalid_upload_filename",
                 "The upload filename is not allowed.",
             )
-        root_path = self._validated_root_path(root)
-        requested = Path(relative_directory)
-        if requested.is_absolute() or any(
-            _is_sensitive_entry(Path(part))
-            for part in requested.parts
-            if part not in {"", "."}
-        ):
-            raise WorkspaceError(
-                403,
-                "workspace_path_forbidden",
-                "The requested path is outside the authorized root.",
-            )
-        directory = (root_path / requested).resolve(strict=True)
-        if directory != root_path and root_path not in directory.parents:
-            raise WorkspaceError(
-                403,
-                "workspace_path_forbidden",
-                "The requested path is outside the authorized root.",
-            )
-        if not stat.S_ISDIR(directory.stat().st_mode):
-            raise WorkspaceError(
-                400,
-                "workspace_directory_required",
-                "Uploads require an existing destination directory.",
-            )
+        directory_fd, normalized_directory = self._open_directory(
+            root,
+            relative_directory,
+        )
         return WorkspaceUpload(
             root_id=root.id,
-            root_path=root_path,
-            directory=directory,
+            directory_fd=directory_fd,
+            relative_directory=normalized_directory,
             filename=filename,
         )
 
@@ -601,6 +706,12 @@ class WorkspaceAccess:
         expected_device: int | None,
         expected_inode: int | None,
     ) -> None:
+        if expected_device is None or expected_inode is None:
+            raise WorkspaceError(
+                409,
+                "attachment_file_changed",
+                "The uploaded file identity is unavailable.",
+            )
         root = next((root for root in self._roots if root.id == root_id), None)
         if root is None or not root.writable:
             raise WorkspaceError(
@@ -608,46 +719,24 @@ class WorkspaceAccess:
                 "workspace_path_forbidden",
                 "The pending attachment path is no longer authorized.",
             )
-        root_path = self._validated_root_path(root)
-        requested = Path(relative_path)
-        if (
-            not relative_path
-            or requested.is_absolute()
-            or _has_sensitive_component(
-                requested,
-                allow_attachment_storage=True,
-            )
-        ):
-            raise WorkspaceError(
-                403,
-                "workspace_path_forbidden",
-                "The pending attachment path is no longer authorized.",
-            )
         try:
-            path = (root_path / requested).resolve(strict=True)
-        except FileNotFoundError:
-            # The user may have removed the staged file directly on the host.
-            # Clearing its pending registry record is still safe and recoverable.
-            return
-        metadata = path.stat()
-        if root_path not in path.parents or not stat.S_ISREG(metadata.st_mode):
-            raise WorkspaceError(
-                403,
-                "workspace_path_forbidden",
-                "The pending attachment path is no longer authorized.",
+            parent_fd, file_fd, name, _, _ = self._open_regular_file(
+                root,
+                relative_path,
+                allow_attachment_storage=True,
+                expected_device=expected_device,
+                expected_inode=expected_inode,
             )
-        if (
-            expected_device is None
-            or expected_inode is None
-            or metadata.st_dev != expected_device
-            or metadata.st_ino != expected_inode
-        ):
-            raise WorkspaceError(
-                409,
-                "attachment_file_changed",
-                "The uploaded file changed after publication and was not removed.",
-            )
-        path.unlink()
+        except WorkspaceError as error:
+            if error.code == "attachment_file_not_found":
+                return
+            raise
+        os.close(file_fd)
+        try:
+            os.unlink(name, dir_fd=parent_fd)
+            os.fsync(parent_fd)
+        finally:
+            os.close(parent_fd)
 
     def uploaded_file(
         self,
@@ -656,56 +745,28 @@ class WorkspaceAccess:
         *,
         expected_device: int | None,
         expected_inode: int | None,
-    ) -> Path:
-        root = next((root for root in self._roots if root.id == root_id), None)
-        if root is None:
-            raise WorkspaceError(
-                404,
-                "workspace_root_not_found",
-                "The attachment root is no longer authorized.",
-            )
-        root_path = self._validated_root_path(root)
-        requested = Path(relative_path)
-        if (
-            not relative_path
-            or requested.is_absolute()
-            or _has_sensitive_component(
-                requested,
-                allow_attachment_storage=True,
-            )
-        ):
-            raise WorkspaceError(
-                403,
-                "workspace_path_forbidden",
-                "The attachment path is no longer authorized.",
-            )
-        try:
-            path = (root_path / requested).resolve(strict=True)
-        except FileNotFoundError:
-            raise WorkspaceError(
-                404,
-                "attachment_file_not_found",
-                "The attachment file is no longer available.",
-            ) from None
-        metadata = path.stat()
-        if root_path not in path.parents or not stat.S_ISREG(metadata.st_mode):
-            raise WorkspaceError(
-                403,
-                "workspace_path_forbidden",
-                "The attachment path is no longer authorized.",
-            )
-        if (
-            expected_device is None
-            or expected_inode is None
-            or metadata.st_dev != expected_device
-            or metadata.st_ino != expected_inode
-        ):
+    ) -> WorkspaceOpenedFile:
+        if expected_device is None or expected_inode is None:
             raise WorkspaceError(
                 409,
                 "attachment_file_changed",
-                "The attachment file changed after publication.",
+                "The attachment file identity is unavailable.",
             )
-        return path
+        root = self._root(root_id)
+        parent_fd, file_fd, name, metadata, _ = self._open_regular_file(
+            root,
+            relative_path,
+            allow_attachment_storage=True,
+            expected_device=expected_device,
+            expected_inode=expected_inode,
+        )
+        os.close(parent_fd)
+        return WorkspaceOpenedFile(
+            handle=os.fdopen(file_fd, "rb", buffering=0),
+            name=name,
+            size=metadata.st_size,
+            content_type=content_type_for_filename(name),
+        )
 
     def list_directory(
         self,
@@ -715,57 +776,55 @@ class WorkspaceAccess:
         limit: int = DEFAULT_DIRECTORY_PAGE_SIZE,
         cursor: int = 0,
     ) -> dict[str, object]:
-        root = next((root for root in self._roots if root.id == root_id), None)
-        if root is None:
-            raise WorkspaceError(
-                404,
-                "workspace_root_not_found",
-                "The requested workspace root is not authorized.",
-            )
-        root_path = self._validated_root_path(root)
-        requested = Path(relative_path)
-        if requested.is_absolute() or any(
-            _is_sensitive_entry(Path(part))
-            for part in requested.parts
-            if part not in {"", "."}
-        ):
-            raise WorkspaceError(
-                403,
-                "workspace_path_forbidden",
-                "The requested path is outside the authorized root.",
-            )
-        directory = (root_path / requested).resolve(strict=True)
-        if directory != root_path and root_path not in directory.parents:
-            raise WorkspaceError(
-                403,
-                "workspace_path_forbidden",
-                "The requested path is outside the authorized root.",
-            )
+        root = self._root(root_id)
+        directory_fd, normalized_directory = self._open_directory(
+            root,
+            relative_path,
+        )
         entries = []
-        for child in directory.iterdir():
-            if _is_sensitive_entry(child) or child.is_symlink():
-                continue
-            try:
-                metadata = child.stat(follow_symlinks=False)
-            except OSError:
-                continue
-            is_directory = stat.S_ISDIR(metadata.st_mode)
-            if not is_directory and not stat.S_ISREG(metadata.st_mode):
-                continue
-            entries.append(
-                {
-                    "name": child.name,
-                    "path": child.relative_to(root_path).as_posix(),
-                    "kind": "directory" if is_directory else "file",
-                    "size": None if is_directory else metadata.st_size,
-                }
-            )
+        try:
+            with os.scandir(directory_fd) as iterator:
+                for scanned, child in enumerate(iterator, start=1):
+                    if scanned > MAX_DIRECTORY_SCAN_ENTRIES:
+                        raise WorkspaceError(
+                            409,
+                            "workspace_directory_too_large",
+                            "The directory exceeds the safe scan limit.",
+                        )
+                    if _is_sensitive_entry(Path(child.name)) or child.is_symlink():
+                        continue
+                    try:
+                        metadata = child.stat(follow_symlinks=False)
+                    except OSError:
+                        continue
+                    is_directory = stat.S_ISDIR(metadata.st_mode)
+                    if not is_directory and not stat.S_ISREG(metadata.st_mode):
+                        continue
+                    child_path = (
+                        Path(child.name)
+                        if normalized_directory == Path(".")
+                        else normalized_directory / child.name
+                    )
+                    entries.append(
+                        {
+                            "name": child.name,
+                            "path": child_path.as_posix(),
+                            "kind": "directory" if is_directory else "file",
+                            "size": None if is_directory else metadata.st_size,
+                        }
+                    )
+        finally:
+            os.close(directory_fd)
         entries.sort(key=lambda entry: (entry["kind"] != "directory", entry["name"]))
         page = entries[cursor:cursor + limit]
         next_offset = cursor + len(page)
         return {
             "root_id": root.id,
-            "path": "" if directory == root_path else directory.relative_to(root_path).as_posix(),
+            "path": (
+                ""
+                if normalized_directory == Path(".")
+                else normalized_directory.as_posix()
+            ),
             "entries": page,
             "next_cursor": str(next_offset) if next_offset < len(entries) else None,
         }

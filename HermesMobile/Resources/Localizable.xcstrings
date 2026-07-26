@@ -12347,7 +12347,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "附件上传失败"
+            "value": "附件处理失败"
           }
         }
       }
@@ -12658,6 +12658,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "服务器文件不可用"
+          }
+        }
+      }
+    },
+    "The attachment could not be downloaded.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法下载该附件。"
           }
         }
       }

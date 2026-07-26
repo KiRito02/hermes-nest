@@ -1,4 +1,5 @@
 import unittest
+import asyncio
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -6,11 +7,73 @@ from tempfile import TemporaryDirectory
 from aiohttp.test_utils import TestClient, TestServer
 from aiohttp import FormData
 
-from hermex_companion.app import create_app
+from hermex_companion.app import (
+    create_app,
+    _upload_file,
+    REGISTRY_KEY,
+    WORKSPACE_KEY,
+)
 from hermex_companion.paths import workspace_config_path
 from hermex_companion.registry import DeviceRegistry, RegistryError
-from hermex_companion.workspace import WorkspaceAccess, WorkspaceRoot
+from hermex_companion.workspace import (
+    MAX_DIRECTORY_SCAN_ENTRIES,
+    WorkspaceAccess,
+    WorkspaceRoot,
+)
 from hermex_companion.workspace import WorkspaceError
+
+
+class FakeMultipartPart:
+    def __init__(
+        self,
+        *,
+        name: str,
+        chunks: list[bytes],
+        filename: str | None = None,
+        block_after_chunks: asyncio.Event | None = None,
+    ) -> None:
+        self.name = name
+        self.filename = filename
+        self._chunks = list(chunks)
+        self._block_after_chunks = block_after_chunks
+
+    async def read_chunk(self, _size: int) -> bytes:
+        if self._chunks:
+            return self._chunks.pop(0)
+        if self._block_after_chunks is not None:
+            self._block_after_chunks.set()
+            await asyncio.Event().wait()
+        return b""
+
+
+class FakeMultipartReader:
+    def __init__(self, parts: list[FakeMultipartPart]) -> None:
+        self._parts = list(parts)
+
+    async def next(self) -> FakeMultipartPart | None:
+        return self._parts.pop(0) if self._parts else None
+
+
+class FakeUploadRequest:
+    def __init__(
+        self,
+        *,
+        registry: DeviceRegistry,
+        workspace: WorkspaceAccess,
+        credential: str,
+        reader: FakeMultipartReader,
+    ) -> None:
+        self.query: dict[str, str] = {}
+        self.content_type = "multipart/form-data"
+        self.headers = {"Authorization": f"Bearer {credential}"}
+        self.app = {
+            REGISTRY_KEY: registry,
+            WORKSPACE_KEY: workspace,
+        }
+        self._reader = reader
+
+    async def multipart(self) -> FakeMultipartReader:
+        return self._reader
 
 
 class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
@@ -315,6 +378,41 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(200, response.status)
             self.assertEqual([], (await response.json())["entries"])
 
+    async def test_in_root_symlink_cannot_alias_a_sensitive_file(self) -> None:
+        await self.client.close()
+        with TemporaryDirectory() as directory:
+            host_path = Path(directory) / "owner-projects"
+            sensitive_path = host_path / ".ssh"
+            sensitive_path.mkdir(parents=True)
+            secret_path = sensitive_path / "id_ed25519"
+            secret_path.write_text("private", encoding="utf-8")
+            (host_path / "notes.txt").symlink_to(secret_path)
+            self.registry = DeviceRegistry(":memory:")
+            secret = self.registry.create_pairing_secret(300)
+            self.credential = self.registry.claim_pairing_secret(
+                secret,
+                "Workspace Test Device",
+            ).credential
+            workspace = WorkspaceAccess(
+                [WorkspaceRoot(id="projects", name="Projects", path=host_path)]
+            )
+            self.client = TestClient(
+                TestServer(create_app(self.registry, workspace=workspace))
+            )
+            await self.client.start_server()
+
+            response = await self.client.get(
+                "/companion/v1/files/roots/projects/download",
+                params={"path": "notes.txt"},
+                headers={"Authorization": f"Bearer {self.credential}"},
+            )
+
+            self.assertEqual(403, response.status)
+            self.assertEqual(
+                "workspace_path_forbidden",
+                (await response.json())["error"]["code"],
+            )
+
     async def test_configured_root_symlink_cannot_be_retargeted_after_startup(
         self,
     ) -> None:
@@ -449,6 +547,21 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(400, response.status)
         self.assertEqual("invalid_query", (await response.json())["error"]["code"])
+
+    def test_directory_scan_rejects_work_beyond_server_bound(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            for index in range(MAX_DIRECTORY_SCAN_ENTRIES + 1):
+                (root / f"{index:05}.txt").touch()
+            workspace = WorkspaceAccess(
+                [WorkspaceRoot(id="projects", name="Projects", path=root)]
+            )
+
+            with self.assertRaisesRegex(
+                WorkspaceError,
+                "safe scan limit",
+            ):
+                workspace.list_directory("projects", limit=1)
 
     async def test_unknown_root_alias_is_not_resolved_as_a_host_path(self) -> None:
         response = await self.client.get(
@@ -1171,6 +1284,75 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(staging.is_dir())
             self.assertEqual([], list(staging.iterdir()))
 
+    async def test_cancelled_upload_handler_cleans_partial_file_and_reservation(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as directory:
+            host_path = Path(directory)
+            workspace = WorkspaceAccess(
+                [
+                    WorkspaceRoot(
+                        id="projects",
+                        name="Projects",
+                        path=host_path,
+                        writable=True,
+                    )
+                ]
+            )
+            blocked = asyncio.Event()
+            reader = FakeMultipartReader(
+                [
+                    FakeMultipartPart(
+                        name="metadata",
+                        chunks=[
+                            json.dumps(
+                                {
+                                    "root_id": "projects",
+                                    "directory": "",
+                                    "session_id": "session-cancelled",
+                                }
+                            ).encode("utf-8")
+                        ],
+                    ),
+                    FakeMultipartPart(
+                        name="file",
+                        filename="cancelled.bin",
+                        chunks=[b"partial bytes"],
+                        block_after_chunks=blocked,
+                    ),
+                ]
+            )
+            request = FakeUploadRequest(
+                registry=self.registry,
+                workspace=workspace,
+                credential=self.credential,
+                reader=reader,
+            )
+            task = asyncio.create_task(_upload_file(request))
+            await asyncio.wait_for(blocked.wait(), timeout=5)
+
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+
+            staging = host_path / ".hermes-nest-attachments"
+            self.assertTrue(staging.is_dir())
+            self.assertEqual([], list(staging.iterdir()))
+            replacement_ids = [
+                self.registry.reserve_attachment(
+                    device_id=self.registry.authenticate(
+                        self.credential
+                    ).id,
+                    session_id="session-cancelled",
+                    root_id="projects",
+                    relative_path=f"replacement-{index}.bin",
+                    name=f"replacement-{index}.bin",
+                    content_type="application/octet-stream",
+                )
+                for index in range(10)
+            ]
+            self.assertEqual(10, len(replacement_ids))
+
     async def test_pending_attachment_queue_is_limited_to_ten_files_per_session(
         self,
     ) -> None:
@@ -1234,6 +1416,52 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
                     )
 
             self.assertEqual([201] * 10 + [409], statuses)
+
+    def test_interrupted_run_claim_recovers_when_registry_reopens(self) -> None:
+        with TemporaryDirectory() as directory:
+            database = Path(directory) / "registry.sqlite3"
+            registry = DeviceRegistry(database)
+            secret = registry.create_pairing_secret(300)
+            device = registry.claim_pairing_secret(
+                secret,
+                "Restart Test Device",
+            )
+            attachment_id = registry.reserve_attachment(
+                device_id=device.id,
+                session_id="session-restart",
+                root_id="projects",
+                relative_path="staged.bin",
+                name="staged.bin",
+                content_type="application/octet-stream",
+            )
+            registry.complete_attachment(attachment_id)
+            claim, _ = registry.claim_ready_attachments(
+                device_id=device.id,
+                session_id="session-restart",
+                attachment_ids=[attachment_id],
+            )
+            self.assertTrue(claim)
+            self.assertEqual(
+                [],
+                registry.list_ready_attachments(
+                    device_id=device.id,
+                    session_id="session-restart",
+                ),
+            )
+            registry.close()
+
+            reopened = DeviceRegistry(database)
+            try:
+                recovered = reopened.list_ready_attachments(
+                    device_id=device.id,
+                    session_id="session-restart",
+                )
+                self.assertEqual(
+                    [attachment_id],
+                    [item.id for item in recovered],
+                )
+            finally:
+                reopened.close()
 
     async def test_pending_attachment_bytes_are_limited_to_two_hundred_mib(
         self,

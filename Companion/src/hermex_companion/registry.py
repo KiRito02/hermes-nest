@@ -93,6 +93,7 @@ class DeviceRegistry:
         if path != ":memory:":
             self._connection.execute("PRAGMA journal_mode = WAL")
         self._initialize_schema()
+        self._recover_interrupted_attachment_claims()
 
     def close(self) -> None:
         self._connection.close()
@@ -753,6 +754,16 @@ class DeviceRegistry:
             file_device=row["file_device"],
             file_inode=row["file_inode"],
         )
+
+    def _recover_interrupted_attachment_claims(self) -> None:
+        self._connection.execute(
+            """
+            UPDATE attachments
+            SET run_claim = NULL
+            WHERE state = 'ready' AND run_claim IS NOT NULL
+            """
+        )
+        self._connection.commit()
 
     def _initialize_schema(self) -> None:
         self._connection.executescript(

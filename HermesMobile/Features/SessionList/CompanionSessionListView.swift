@@ -1371,6 +1371,8 @@ private struct CompanionMessageRow: View, Equatable {
     let toolCallGroups: [ToolCallGroup]
     let transcriptMediaCacheNamespace: String
     let workspaceService: any CompanionWorkspaceServing
+    @State private var attachmentShareItem: SessionExportShareItem?
+    @State private var attachmentPreviewError: String?
 
     static func == (
         lhs: CompanionMessageRow,
@@ -1400,7 +1402,15 @@ private struct CompanionMessageRow: View, Equatable {
                 loadAttachmentImage: loadAttachment,
                 loadAttachmentData: loadAttachment,
                 transcriptMediaCacheNamespace:
-                    transcriptMediaCacheNamespace
+                    transcriptMediaCacheNamespace,
+                onPreviewAttachment: { attachment, localData in
+                    Task {
+                        await prepareAttachmentShare(
+                            attachment,
+                            localData: localData
+                        )
+                    }
+                }
             )
 
             if copyText != nil {
@@ -1426,6 +1436,23 @@ private struct CompanionMessageRow: View, Equatable {
             maxWidth: .infinity,
             alignment: message.role == "user" ? .trailing : .leading
         )
+        .sheet(
+            item: $attachmentShareItem,
+            onDismiss: clearAttachmentShareItem
+        ) { item in
+            SessionExportShareSheet(fileURL: item.fileURL)
+        }
+        .alert(
+            "Attachment failed",
+            isPresented: Binding(
+                get: { attachmentPreviewError != nil },
+                set: { if !$0 { attachmentPreviewError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(attachmentPreviewError ?? "")
+        }
     }
 
     private var actionAlignment: HorizontalAlignment {
@@ -1434,6 +1461,60 @@ private struct CompanionMessageRow: View, Equatable {
 
     private func loadAttachment(_ path: String) async -> Data? {
         try? await workspaceService.downloadAttachment(path: path)
+    }
+
+    private func prepareAttachmentShare(
+        _ attachment: MessageAttachment,
+        localData: Data?
+    ) async {
+        let data: Data?
+        if let localData {
+            data = localData
+        } else if let path = attachment.downloadPath?.nilIfEmpty {
+            data = try? await workspaceService.downloadAttachment(path: path)
+        } else {
+            data = nil
+        }
+        guard let data else {
+            attachmentPreviewError = String(
+                localized: "The attachment could not be downloaded."
+            )
+            return
+        }
+        let rawName = attachment.name?.nilIfEmpty ?? "attachment"
+        let safeName = rawName
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "\\", with: "_")
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "hermes-nest-preview-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        let fileURL = directory.appendingPathComponent(
+            safeName,
+            isDirectory: false
+        )
+        do {
+            try await Task.detached(priority: .userInitiated) {
+                try FileManager.default.createDirectory(
+                    at: directory,
+                    withIntermediateDirectories: true
+                )
+                try data.write(to: fileURL, options: [.atomic])
+            }.value
+            attachmentShareItem = SessionExportShareItem(fileURL: fileURL)
+        } catch {
+            try? FileManager.default.removeItem(at: directory)
+            attachmentPreviewError = error.localizedDescription
+        }
+    }
+
+    private func clearAttachmentShareItem() {
+        guard let item = attachmentShareItem else { return }
+        try? FileManager.default.removeItem(
+            at: item.fileURL.deletingLastPathComponent()
+        )
+        attachmentShareItem = nil
     }
 
     private var copyText: String? {

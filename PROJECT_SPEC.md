@@ -434,10 +434,12 @@ The Companion first release supports:
 - making a completed upload available to a subsequent Hermes turn without
   pretending the Gateway supports `file`, `input_file`, or `file_id`.
 
-All paths are canonicalized after symlink resolution and checked against an
-allowed root. Sensitive files and directories are denied even if nested under
-an allowed root. The first release does not include arbitrary delete, recursive
-mutation, shell access, or Git mutation.
+All path components are walked from an already validated allowed-root
+descriptor without following symbolic links; file bytes are read from the
+validated descriptor rather than reopening an App-supplied path. Sensitive
+files and directories are denied even if nested under an allowed root.
+Directory enumeration stops at 10,000 raw entries. The first release does not
+include arbitrary delete, recursive mutation, shell access, or Git mutation.
 
 Uploads stream into a sibling temporary file, enforce 50 MiB per file,
 10 pending files per device/session, and 200 MiB pending bytes per
@@ -448,6 +450,8 @@ The Companion-only
 `attachment_ids` field is resolved to Agent-working-directory-relative paths
 server-side and stripped before Gateway forwarding. Roots outside the
 configured Agent working directory are browse/download-only.
+Interrupted pre-Run attachment claims are released when the single Companion
+process restarts.
 
 ### 4.8 Companion built-in Memory management
 
@@ -462,7 +466,8 @@ The Companion first release supports controlled management of Hermes built-in
 
 Raw filesystem overwrite is not the Memory interface. External Memory providers
 are not implied by built-in Memory support and require separate capability
-adapters.
+adapters. The Companion rejects a built-in Memory file larger than 4,000,000
+bytes before loading its content.
 
 ### 4.9 Explicitly unsupported in Companion v1
 

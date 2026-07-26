@@ -22,6 +22,7 @@ ENTRY_DELIMITER = "\n§\n"
 DEFAULT_MEMORY_CHAR_LIMIT = 2200
 DEFAULT_USER_CHAR_LIMIT = 1375
 MAX_MEMORY_OPERATIONS = 50
+MAX_MEMORY_FILE_BYTES = 4 * 1_000_000
 
 
 class MemoryError(Exception):
@@ -239,9 +240,24 @@ class MemoryAccess:
             metadata = os.fstat(descriptor)
             if not stat.S_ISREG(metadata.st_mode):
                 raise OSError("Memory target is not a regular file")
+            if metadata.st_size > MAX_MEMORY_FILE_BYTES:
+                raise MemoryError(
+                    409,
+                    "memory_file_too_large",
+                    "The built-in Memory file exceeds the safe read limit.",
+                )
             with os.fdopen(descriptor, "r", encoding="utf-8") as handle:
                 descriptor = -1
-                return handle.read()
+                content = handle.read(MAX_MEMORY_FILE_BYTES + 1)
+                if len(content.encode("utf-8")) > MAX_MEMORY_FILE_BYTES:
+                    raise MemoryError(
+                        409,
+                        "memory_file_too_large",
+                        "The built-in Memory file exceeds the safe read limit.",
+                    )
+                return content
+        except MemoryError:
+            raise
         except (OSError, UnicodeDecodeError) as error:
             raise MemoryError(
                 409,

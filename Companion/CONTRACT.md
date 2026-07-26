@@ -326,7 +326,9 @@ Agent working directory. Roots outside it remain browse/download-only.
 `GET /companion/v1/files/roots/{root_id}/entries` accepts `path`, a page
 `limit` from 1 through 200, and an opaque numeric `cursor`. Directories sort
 before files. A response contains `root_id`, the alias-relative `path`,
-bounded `entries`, and `next_cursor`.
+bounded `entries`, and `next_cursor`. Companion refuses a directory containing
+more than 10,000 raw entries instead of performing unbounded enumeration and
+sorting.
 
 `GET /companion/v1/files/roots/{root_id}/preview?path=...` returns at most
 256 KiB of UTF-8 text or binary metadata. `GET .../download?path=...` streams
@@ -359,7 +361,9 @@ field. Companion resolves Agent-working-directory-relative paths server-side
 and removes `attachment_ids` before forwarding to Gateway. Absolute paths
 and randomized internal storage paths never reach the App or user-visible
 history. A pending attachment is claimed before Gateway start, so concurrent
-Runs cannot submit the same attachment twice.
+Runs cannot submit the same attachment twice. If the single Companion process
+stops after claiming but before completing a Run, its startup recovery releases
+that interrupted claim so the ready attachment is usable again.
 
 `GET /companion/v1/uploads?session_id=...` restores the device's pending
 queue. `DELETE /companion/v1/uploads/{attachment_id}` removes only an
@@ -392,7 +396,10 @@ publish through fsync plus atomic replacement. A stale revision returns
 `POST /companion/v1/memory/{target}/reset` requires the current revision and
 the exact confirmation `RESET MEMORY` or `RESET USER`.
 Memory files and their sibling lock files are opened without following
-symbolic links and must remain regular files.
+symbolic links and must remain regular files. Reads are rejected before loading
+content when a built-in Memory file exceeds the 4,000,000-byte safety bound;
+the profile's configured character limit remains the user-visible content
+limit.
 
 ## Gateway-compatible sessions
 

@@ -412,8 +412,8 @@ private struct GridAttachmentCell: View {
     let size: CGFloat
 
     private var resolvedPath: String? {
-        // The server saves uploads to the workspace root. Use the explicit
-        // path when available; for older sessions fall back to filename.
+        // Companion history supplies an opaque authenticated download route.
+        // Older providers may still expose an explicit path or only a name.
         if let downloadPath = attachment.downloadPath,
            !downloadPath.isEmpty {
             return downloadPath

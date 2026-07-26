@@ -8,7 +8,11 @@ import unittest
 from aiohttp.test_utils import TestClient, TestServer
 
 from hermex_companion.app import create_app
-from hermex_companion.memory import MemoryAccess, MemoryError
+from hermex_companion.memory import (
+    MAX_MEMORY_FILE_BYTES,
+    MemoryAccess,
+    MemoryError,
+)
 from hermex_companion.registry import DeviceRegistry
 
 
@@ -300,6 +304,16 @@ class MemoryContractTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(MemoryError, "lock"):
                 memory.read("memory")
             self.assertEqual("secret", outside.read_text(encoding="utf-8"))
+
+    def test_memory_read_rejects_file_over_bounded_byte_limit(self) -> None:
+        with TemporaryDirectory() as directory:
+            memory_directory = Path(directory)
+            with (memory_directory / "MEMORY.md").open("wb") as handle:
+                handle.truncate(MAX_MEMORY_FILE_BYTES + 1)
+            memory = MemoryAccess(memory_directory)
+
+            with self.assertRaisesRegex(MemoryError, "safe read limit"):
+                memory.read("memory")
 
     def test_concurrent_writers_serialize_and_one_rejects_stale_revision(
         self,

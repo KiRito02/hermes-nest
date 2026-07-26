@@ -2,6 +2,30 @@ import XCTest
 @testable import HermesMobile
 
 final class CompanionConnectionServiceTests: APIClientTestCase {
+    func testMessageAttachmentDecodesOpaqueCompanionDownloadPath() throws {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+
+        let attachment = try decoder.decode(
+            MessageAttachment.self,
+            from: Data(
+                """
+                {
+                  "name": "photo.png",
+                  "download_path": "/companion/v1/uploads/id-1/content",
+                  "mime": "image/png"
+                }
+                """.utf8
+            )
+        )
+
+        XCTAssertNil(attachment.path)
+        XCTAssertEqual(
+            "/companion/v1/uploads/id-1/content",
+            attachment.downloadPath
+        )
+    }
+
     func testRequestBodyReaderSupportsDataAndStreamRepresentations() throws {
         let expected = Data(#"{"device_name":"Owner iPad"}"#.utf8)
         let url = try XCTUnwrap(URL(string: "https://companion.example.test"))
