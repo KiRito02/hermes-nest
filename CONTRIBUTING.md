@@ -1,4 +1,4 @@
-# Contributing to Hermex
+# Contributing to Hermes Nest
 
 Thanks for your interest in contributing! This document covers local setup,
 running tests, code signing for contributors, and the PR workflow. Please also
@@ -13,7 +13,7 @@ read the [Code of Conduct](CODE_OF_CONDUCT.md).
   `PROJECT_SPEC.md`; do not add new ones without maintainer approval.
 - Build and run the **`HermesMobile`** scheme on an iPhone simulator
   (`iPhone 17` is the reference device; any recent iPhone simulator works).
-- To actually use the target architecture you need the self-hosted Hermex
+- To actually use the target architecture you need the self-hosted Hermes Nest
   Companion on the same NAS as a
   [Hermes Agent API Server](https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server).
   The App connects to Companion; Companion connects to `hermes gateway` over
@@ -76,7 +76,7 @@ independently useful, it deserves its own PR.
 
 ## App bug or server bug?
 
-Hermex Direct has three layers: App, self-hosted Companion, and
+Hermes Nest has three layers: App, self-hosted Companion, and
 [Hermes Agent](https://github.com/NousResearch/hermes-agent). Before filing:
 
 - Capture the HTTP status/content type and a sanitized response from the same
@@ -126,5 +126,5 @@ the owner explicitly changes that decision.
 
 ## Questions
 
-Open an issue in [this fork](https://github.com/KiRito02/hermex/issues) if
+Open an issue in [this fork](https://github.com/KiRito02/hermes-nest/issues) if
 something here is unclear or wrong — documentation fixes are welcome too.

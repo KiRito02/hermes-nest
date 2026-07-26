@@ -1,4 +1,4 @@
-# Hermex Companion Live-Smoke Checklist
+# Hermes Nest Companion Live-Smoke Checklist
 
 Owner-run smoke for the App → Companion → loopback Gateway contract.
 

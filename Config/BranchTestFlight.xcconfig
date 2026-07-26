@@ -9,5 +9,5 @@
 // - com.uzairansar.hermesmobile.branch.liveactivitywidget
 
 APP_IDENTIFIER_SUFFIX = .branch
-APP_DISPLAY_NAME = Hermex Branch
+APP_DISPLAY_NAME = Hermes Nest Branch
 APP_URL_SCHEME_SUFFIX = -branch

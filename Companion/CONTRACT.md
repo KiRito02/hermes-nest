@@ -1,4 +1,4 @@
-# Hermex Companion Contract
+# Hermes Nest Companion Contract
 
 This document and the contract tests under `tests/` define the versioned
 App-facing Companion interface. Companion-native routes use

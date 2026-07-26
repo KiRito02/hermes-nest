@@ -4,8 +4,8 @@ Issues and PRDs for this repo live as GitHub issues. Use the `gh` CLI for issue 
 
 ## Repository
 
-- GitHub repo: `KiRito02/hermex`
-- Remote: `https://github.com/KiRito02/hermex.git`
+- GitHub repo: `KiRito02/hermes-nest`
+- Remote: `https://github.com/KiRito02/hermes-nest.git`
 - Upstream source fork: `uzairansaruzi/hermex`
 
 Infer the writable repository from `git remote -v`; issue mutations belong on

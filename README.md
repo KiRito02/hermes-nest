@@ -1,18 +1,16 @@
 <div align="center">
 
-<img src="docs/assets/readme/hermex-icon.png" alt="Hermex app icon" width="96" />
+<img src="docs/assets/readme/hermex-icon.png" alt="Hermes Nest app icon" width="96" />
 
-# Hermex Direct
+# Hermes Nest
 
-**A native iOS client and self-hosted NAS Companion for Hermes Agent.**
-
-Personal fork · direct NAS connection · no hosted relay
+**Forked from [uzairansaruzi/hermex](https://github.com/uzairansaruzi/hermex).**
 
 [![iOS 18+](https://img.shields.io/badge/iOS-18%2B-000000?logo=apple&logoColor=white)](https://developer.apple.com/ios/)
 [![Swift](https://img.shields.io/badge/Swift-5.9%2B-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](LICENSE)
 
-[Roadmap](PROJECT_SPEC.md) · [Issue tracker](https://github.com/KiRito02/hermex/issues) · [Development](DEVELOPMENT.md)
+[Roadmap](PROJECT_SPEC.md) · [Issue tracker](https://github.com/KiRito02/hermes-nest/issues) · [Development](DEVELOPMENT.md)
 
 </div>
 
@@ -24,14 +22,14 @@ yet. Do not treat the current branch as a finished client or Companion.
 
 - Product direction: App → self-hosted Companion → loopback Hermes Gateway.
 - First implementation slice:
-  [Issue #1 — Companion pairing, capabilities, and Gateway connection](https://github.com/KiRito02/hermex/issues/1).
+  [Issue #1 — Companion pairing, capabilities, and Gateway connection](https://github.com/KiRito02/hermes-nest/issues/1).
 - Distribution target: personal sideload, not App Store/TestFlight.
 - Current development branch changes remain local until explicitly approved
   for push.
 
 ## Goal
 
-Hermex Direct connects an iPhone or iPad to a small Companion running on the
+Hermes Nest connects an iPhone or iPad to a small Companion running on the
 owner's NAS. Companion keeps the Gateway key local, calls
 [Hermes Agent](https://github.com/NousResearch/hermes-agent) on loopback, and
 adds restricted file/upload/built-in-Memory capabilities.
@@ -141,7 +139,7 @@ This fork is based on the open-source
 [Hermex](https://github.com/uzairansaruzi/hermex) iOS application and preserves
 its MIT license and third-party notices.
 
-Hermex Direct uses
+Hermes Nest uses
 [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)
 behind its self-hosted Companion. It is an independent personal client and is
 not an official Nous Research, HermesPilot, or upstream Hermex release.

@@ -1,4 +1,4 @@
-"""App-facing Hermex Companion HTTP interface."""
+"""App-facing Hermes Nest Companion HTTP interface."""
 
 from collections.abc import Awaitable, Callable
 from datetime import datetime, UTC

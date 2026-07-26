@@ -1,6 +1,6 @@
-# Hermex Companion
+# Hermes Nest Companion
 
-Hermex Companion is the App's only network endpoint. It listens on
+Hermes Nest Companion is the App's only network endpoint. It listens on
 `127.0.0.1:8643` by default, authenticates each iPhone/iPad with a revocable
 device credential, and connects to Hermes Agent API Server on
 `127.0.0.1:8642`. The Gateway `API_SERVER_KEY` stays on the NAS.
@@ -97,7 +97,7 @@ Keep both Hermes Gateway (`127.0.0.1:8642`) and Companion
 (`127.0.0.1:8643`) on loopback.
 
 - Primary: configure Lucky to terminate a system-trusted HTTPS certificate and
-  proxy the Hermex hostname only to `http://127.0.0.1:8643`.
+  proxy the public Companion hostname only to `http://127.0.0.1:8643`.
 - Alternative: use Tailscale Serve or a valid tailnet certificate to expose
   Companion over HTTPS.
 

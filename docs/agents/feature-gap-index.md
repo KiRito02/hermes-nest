@@ -1,4 +1,4 @@
-# Hermex Companion Capability Roadmap
+# Hermes Nest Companion Capability Roadmap
 
 This is the thin roadmap for migrating the inherited Hermex SwiftUI client from
 `hermes-webui` to the self-hosted Companion and loopback Gateway architecture.
@@ -28,7 +28,7 @@ Issue/PR, not this index.
 
 | Capability | Status | Priority | Safety | Tracking / note |
 | --- | --- | :---: | :---: | --- |
-| Companion pairing, device auth, health, capabilities | in-progress | P0 | secret | [#1](https://github.com/KiRito02/hermex/issues/1) |
+| Companion pairing, device auth, health, capabilities | in-progress | P0 | secret | [#1](https://github.com/KiRito02/hermes-nest/issues/1) |
 | Loopback Gateway proxy and capability merge | roadmap | P0 | secret | Preserve Gateway identity and SSE semantics |
 | Session list/create/detail/update/delete/fork/messages | roadmap | P0 | write | Verify advertised session endpoints and pagination first |
 | Persisted streaming turn | roadmap | P0 | exec | Choose session chat vs Runs coordination from live evidence |

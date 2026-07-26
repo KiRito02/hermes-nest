@@ -29,7 +29,7 @@ struct OnboardingConnectPage: View {
                         .font(.title3.weight(.bold))
                         .foregroundStyle(.white)
 
-                    Text("Enter the HTTPS URL that Lucky or Tailscale proxies to Hermex Companion, then enter a one-time pairing secret created on your NAS.")
+                    Text("Enter the HTTPS URL that Lucky or Tailscale proxies to Hermes Nest Companion, then enter a one-time pairing secret created on your NAS.")
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.5))
                         .fixedSize(horizontal: false, vertical: true)
@@ -39,7 +39,7 @@ struct OnboardingConnectPage: View {
                     OnboardingField(systemImage: "link", title: String(localized: "Companion URL")) {
                         ZStack(alignment: .leading) {
                             if viewModel.companionURLString.isEmpty {
-                                Text(verbatim: "https://hermex.example.com")
+                                Text(verbatim: "https://hermes-nest.example.com")
                                     .foregroundStyle(.white.opacity(0.38))
                                     .allowsHitTesting(false)
                             }

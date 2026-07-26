@@ -1,5 +1,5 @@
 [Unit]
-Description=Hermex Companion
+Description=Hermes Nest Companion
 Documentation=file://@COMPANION_DIR@/README.md
 Wants=network-online.target
 After=network-online.target hermes-gateway.service

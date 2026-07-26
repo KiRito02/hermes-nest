@@ -60,7 +60,7 @@ struct KanbanStatusFocusView: View {
                 )
             case .incompatibleContract:
                 unavailableContent(
-                    title: String(localized: "This server's Kanban response is incompatible with Hermex."),
+                    title: String(localized: "This server's Kanban response is incompatible with Hermes Nest."),
                     detail: String(localized: "No Kanban changes were made."),
                     systemImage: "exclamationmark.triangle"
                 )
@@ -849,7 +849,7 @@ private struct KanbanBoardManagementView: View {
                     boardRow(board)
                 }
             } footer: {
-                Text("Browsing a Board stays local to Hermex. Making a Board active changes shared server state.")
+                Text("Browsing a Board stays local to Hermes Nest. Making a Board active changes shared server state.")
             }
         }
         .navigationTitle("Manage")
@@ -888,7 +888,7 @@ private struct KanbanBoardManagementView: View {
                 Task { await model.archiveBoard(slug: board.slug ?? "") }
             }
         } message: { _ in
-            Text("Hermex cannot restore an archived Board in-app.")
+            Text("Hermes Nest cannot restore an archived Board in-app.")
         }
         .alert(
             "Make Active Board",

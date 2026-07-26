@@ -18,7 +18,7 @@ protocol KeychainStoring {
 struct KeychainStore: KeychainStoring {
     enum Key: String {
         case serverURL = "server_url"
-        // Hermex Direct stores only its Companion address and revocable
+        // Hermes Nest Direct stores only its Companion address and revocable
         // per-device identity. The Hermes Gateway API key never enters the App.
         case companionURL = "companion_url"
         case companionDeviceID = "companion_device_id"

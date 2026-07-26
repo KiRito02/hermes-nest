@@ -279,7 +279,7 @@ private struct CompanionFoundationStatusView: View {
                     Task { await connectionManager.forgetConnection() }
                 }
             } message: {
-                Text("Hermex will ask Companion to revoke this device, then remove its local Keychain credential. Cached conversations are kept.")
+                Text("Hermes Nest will ask Companion to revoke this device, then remove its local Keychain credential. Cached conversations are kept.")
             }
         }
     }

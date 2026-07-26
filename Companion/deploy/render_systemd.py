@@ -34,7 +34,7 @@ def identity(raw_value: str) -> str:
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(
-        description="Render the Hermex Companion systemd unit without owner-local values in git."
+        description="Render the Hermes Nest Companion systemd unit without owner-local values in git."
     )
     result.add_argument("--service-user", required=True, type=identity)
     result.add_argument("--service-group", required=True, type=identity)

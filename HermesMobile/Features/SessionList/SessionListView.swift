@@ -1206,7 +1206,7 @@ struct HermesHeaderLogo: View {
         .aspectRatio(Self.aspectRatio, contentMode: .fit)
         .compositingGroup()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("HERMEX")
+        .accessibilityLabel("HERMES NEST")
     }
 }
 
@@ -1381,7 +1381,7 @@ private struct PendingNewChatView: View {
 
     private var pendingComposer: some View {
         HStack(alignment: .bottom, spacing: 10) {
-            TextField("Message Hermex", text: $draftMessage, axis: .vertical)
+            TextField("Message Hermes Nest", text: $draftMessage, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...5)
                 .focused($composerIsFocused)

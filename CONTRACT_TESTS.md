@@ -3,7 +3,7 @@
 This file is retained only as a migration marker.
 
 The former `hermes-webui` SHA pins, route watcher, cookie-auth smoke, and
-WebUI Docker contract plan are not compatibility sources for Hermex Direct.
+WebUI Docker contract plan are not compatibility sources for Hermes Nest.
 Their workflows, scripts, and pin files were removed during the earlier
 Gateway migration.
 

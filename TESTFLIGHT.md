@@ -2,7 +2,7 @@
 
 This file is retained only as a migration marker.
 
-The `KiRito02/hermex` fork targets personal sideloading. App Store Connect,
+The `KiRito02/hermes-nest` fork targets personal sideloading. App Store Connect,
 internal/external TestFlight uploads, the upstream maintainer's Team ID, and
 the inherited TestFlight bundle identities are not active workflows.
 

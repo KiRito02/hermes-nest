@@ -65,7 +65,7 @@ final class OnboardingViewModel {
         )
         if paired {
             pairingSecret = ""
-            connectionMessage = String(localized: "This device is paired with Hermex Companion.")
+            connectionMessage = String(localized: "This device is paired with Hermes Nest Companion.")
         } else {
             errorMessage = connectionManager.lastErrorMessage
         }

@@ -117,7 +117,7 @@ final class ListenRemoteControlController: ListenRemoteControlControlling {
     func update(_ snapshot: ListenNowPlayingSnapshot) {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [
             MPMediaItemPropertyTitle: snapshot.title,
-            MPMediaItemPropertyArtist: "Hermex",
+            MPMediaItemPropertyArtist: "Hermes Nest",
             MPMediaItemPropertyPlaybackDuration: max(0, snapshot.duration),
             MPNowPlayingInfoPropertyElapsedPlaybackTime: max(0, snapshot.elapsedTime),
             MPNowPlayingInfoPropertyPlaybackRate: snapshot.isPlaying ? snapshot.speed.rawValue : 0,
@@ -415,7 +415,7 @@ final class ChatViewModel {
     // arriving after stop/switch carries a stale ID and is dropped instead of
     // starting audio the user no longer wants.
     private var activeListenRequestID: UUID?
-    private var listenPlaybackTitle = String(localized: "Hermex response")
+    private var listenPlaybackTitle = String(localized: "Hermes Nest response")
     private(set) var listenPlaybackPhase: ListenPlaybackPhase = .idle
     private(set) var listenPlaybackElapsedTime: TimeInterval = 0
     private(set) var listenPlaybackDuration: TimeInterval = 0
@@ -3533,7 +3533,7 @@ final class ChatViewModel {
         stopListening()
         // The audio session is NOT activated here: `/api/tts` can be slow or
         // unreachable, and activating the non-mixable playback session before the
-        // fetch would silence other audio while Hermex has nothing to play (review
+        // fetch would silence other audio while Hermes Nest has nothing to play (review
         // on #35). Activation happens at the two playback-start points instead —
         // `startServerAudioPlayback` and `speakWithOnDeviceSynthesizer`.
         listeningMessageID = context.messageID
@@ -4550,7 +4550,7 @@ final class ChatViewModel {
     }
 
     private func beginListenPlaybackPreparation(for context: MessageActionContext) {
-        listenPlaybackTitle = String(localized: "Hermex response \(context.visibleIndex + 1)")
+        listenPlaybackTitle = String(localized: "Hermes Nest response \(context.visibleIndex + 1)")
         listenPlaybackPhase = .loading
         listenPlaybackElapsedTime = 0
         listenPlaybackDuration = 0
@@ -4573,7 +4573,7 @@ final class ChatViewModel {
     private func speakWithOnDeviceSynthesizer(_ text: String) {
         // Route speech to the speaker (not the receiver/earpiece) immediately before
         // speech starts — not when the Listen tap lands — so a slow `/api/tts` fetch
-        // never interrupts other audio while Hermex is silent (review on #35).
+        // never interrupts other audio while Hermes Nest is silent (review on #35).
         // Released again in `finishListening()` once playback ends. See #252.
         listenAudioSession.activate()
         let speechSynthesizer = speechSynthesizerForListening()

@@ -84,7 +84,7 @@ final class OnboardingFlowTests: XCTestCase {
     func testAgentSetupPromptUsesCompanionAndKeepsGatewaySecretOnNAS() {
         let prompt = OnboardingFlowPolicy.agentSetupPrompt
 
-        XCTAssertTrue(prompt.contains("Hermex Companion"))
+        XCTAssertTrue(prompt.contains("Hermes Nest Companion"))
         XCTAssertTrue(prompt.contains("127.0.0.1:8642"))
         XCTAssertTrue(prompt.contains("API_SERVER_KEY"))
         XCTAssertTrue(prompt.contains("Lucky HTTPS"))

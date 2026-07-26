@@ -87,9 +87,9 @@ enum CompanionConnectionError: LocalizedError, Equatable {
         case .insecureTransport:
             return String(localized: "Use an HTTPS Companion URL. Plain HTTP is allowed only for local simulator development.")
         case .companionUnreachable:
-            return String(localized: "Hermex Companion is unreachable. Check Lucky or Tailscale HTTPS and confirm the Companion service is running.")
+            return String(localized: "Hermes Nest Companion is unreachable. Check Lucky or Tailscale HTTPS and confirm the Companion service is running.")
         case .incompatibleCompanion:
-            return String(localized: "This Hermex Companion version is not compatible with the app.")
+            return String(localized: "This Hermes Nest Companion version is not compatible with the app.")
         case .invalidDeviceCredential:
             return String(localized: "This device credential is no longer valid. Create a new pairing secret on the NAS.")
         case .deviceRevoked:
@@ -103,7 +103,7 @@ enum CompanionConnectionError: LocalizedError, Equatable {
         case .invalidRequest:
             return String(localized: "Check the Companion URL, pairing secret, and device name.")
         case .unexpectedResponse:
-            return String(localized: "Hermex Companion returned an unexpected response.")
+            return String(localized: "Hermes Nest Companion returned an unexpected response.")
         }
     }
 }

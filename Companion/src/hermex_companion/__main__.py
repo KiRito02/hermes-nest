@@ -1,4 +1,4 @@
-"""Run the Hermex Companion HTTP process."""
+"""Run the Hermes Nest Companion HTTP process."""
 
 import argparse
 from collections.abc import Sequence
@@ -18,7 +18,7 @@ DEFAULT_GATEWAY_URL = "http://127.0.0.1:8642"
 
 
 def _serve_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run Hermex Companion")
+    parser = argparse.ArgumentParser(description="Run Hermes Nest Companion")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", default=DEFAULT_PORT, type=int)
     return parser

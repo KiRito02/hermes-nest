@@ -62,7 +62,7 @@ struct OnboardingWelcomePage: View {
                         .shadow(color: Color(red: 1.0, green: 0.62, blue: 0.08).opacity(0.35), radius: 24, y: 10)
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Hermex")
+                .accessibilityLabel("Hermes Nest")
 
                 Spacer(minLength: 32)
 
@@ -74,7 +74,7 @@ struct OnboardingWelcomePage: View {
                         .minimumScaleFactor(0.86)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text("Connect securely to Hermex Companion on your NAS.")
+                    Text("Connect securely to Hermes Nest Companion on your NAS.")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.58))
                         .fixedSize(horizontal: false, vertical: true)
