@@ -751,6 +751,8 @@ final class ConversationRunServiceTests: APIClientTestCase {
         XCTAssertTrue(didSend)
         await waitUntil {
             viewModel.runState == .waitingForApproval
+                && viewModel.pendingApproval == nil
+                && viewModel.approvalContextUnavailable
         }
 
         XCTAssertNil(viewModel.pendingApproval)
