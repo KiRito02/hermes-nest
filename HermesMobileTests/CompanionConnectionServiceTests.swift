@@ -87,7 +87,7 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
                               "device_auth": true,
                               "device_revocation": true,
                               "gateway_discovery": true,
-                              "gateway_proxy": false
+                              "gateway_proxy": true
                             },
                             "endpoints": {
                               "health": {
@@ -102,10 +102,15 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
                               "object": "hermes.api_server.capabilities",
                               "platform": "hermes-agent",
                               "features": {
-                                "sessions": true,
+                                "session_resources": true,
                                 "session_continuity_header": "X-Hermes-Session-Id"
                               },
-                              "endpoints": {}
+                              "endpoints": {
+                                "sessions": {
+                                  "method": "GET",
+                                  "path": "/api/sessions"
+                                }
+                              }
                             },
                             "future_gateway_field": 42
                           },
@@ -134,7 +139,7 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
         XCTAssertEqual(connection.deviceID, "device-1")
         XCTAssertEqual(connection.capabilities.gateway?.status, "ok")
         XCTAssertEqual(
-            connection.capabilities.gateway?.capabilities?.features?["sessions"],
+            connection.capabilities.gateway?.capabilities?.features?["session_resources"],
             .bool(true)
         )
         XCTAssertEqual(
@@ -181,7 +186,7 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
                           "device_auth": true,
                           "device_revocation": true,
                           "gateway_discovery": true,
-                          "gateway_proxy": false
+                          "gateway_proxy": true
                         },
                         "endpoints": {
                           "health": {

@@ -170,13 +170,20 @@ struct CompanionRootView: View {
                     gatewayStatus: nil
                 )
             case .connected(let connection):
-                CompanionFoundationStatusView(
-                    connectionManager: connectionManager,
-                    companionURL: connection.companionURL,
-                    title: String(localized: "Companion connected"),
-                    message: gatewayMessage(for: connection.capabilities.gateway?.status),
-                    gatewayStatus: connection.capabilities.gateway?.status
-                )
+                if connection.capabilities.gateway?.status == "ok" {
+                    CompanionSessionListView(
+                        connectionManager: connectionManager,
+                        connection: connection
+                    )
+                } else {
+                    CompanionFoundationStatusView(
+                        connectionManager: connectionManager,
+                        companionURL: connection.companionURL,
+                        title: String(localized: "Companion connected"),
+                        message: gatewayMessage(for: connection.capabilities.gateway?.status),
+                        gatewayStatus: connection.capabilities.gateway?.status
+                    )
+                }
             }
         }
         .task {

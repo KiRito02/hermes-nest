@@ -2,7 +2,7 @@
 
 This document and the contract tests under `tests/` define the versioned
 App-facing Companion interface. Companion-native routes use
-`/companion/v1`; verified Gateway-compatible routes may later be forwarded
+`/companion/v1`; verified Gateway-compatible routes are forwarded
 without moving into this namespace.
 
 ## Conventions
@@ -158,7 +158,7 @@ capability snapshot when Gateway is reachable, authorized, and compatible.
       "device_auth": true,
       "device_revocation": true,
       "gateway_discovery": true,
-      "gateway_proxy": false
+      "gateway_proxy": true
     },
     "endpoints": {
       "health": {
@@ -243,3 +243,70 @@ Top-level status is `ok` only when Gateway status is `ok`; otherwise it is
 `unauthorized`, or `incompatible`. Platform and version are `null` unless a
 compatible Gateway response supplies them. Gateway PID, configured platforms,
 agent counts, paths, and detailed readiness checks are never returned.
+
+## Gateway-compatible session list
+
+`GET /api/sessions` requires device authentication. It is the only
+Gateway-compatible route enabled by this contract slice. Companion removes the
+device `Authorization` header, sends only its NAS-local Gateway bearer
+credential over loopback, and never forwards other App request headers.
+Redirects are not followed.
+
+This contract was verified against Hermes Agent `0.19.0`, upstream commit
+`07e97d2f5dc3d2092cfe693ef07b2527a36cd2d8`, its session API tests, the
+official API Server documentation, and the owner's running loopback Gateway.
+
+The supported query fields are:
+
+| Field | Bounds |
+| --- | --- |
+| `limit` | ASCII integer from 0 through 200 |
+| `offset` | ASCII integer from 0 through 1,000,000 |
+| `source` | At most 128 characters and no control characters |
+| `include_children` | `0`, `1`, `false`, `no`, `off`, `on`, `true`, or `yes`, case-insensitive |
+
+Each field may occur at most once. Unknown, repeated, or out-of-bounds fields
+return `400 invalid_query` without contacting Gateway. Accepted values and
+their order are forwarded unchanged; Hermes remains responsible for their
+normalization and list semantics.
+
+Success is `200 application/json`. After validating the bounded core shape,
+Companion returns the Gateway JSON bytes without renaming fields:
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "<session-id>",
+      "title": "Example",
+      "source": "api_server",
+      "message_count": 3,
+      "started_at": 1721000000.0,
+      "last_active": 1721000100.0
+    }
+  ],
+  "limit": 50,
+  "offset": 0,
+  "has_more": false
+}
+```
+
+Clients tolerate additive outer and session fields. Companion requires the
+documented outer field types and object rows, limits the response to 2 MiB, and
+uses its bounded Gateway timeout.
+
+Gateway failures use the common bounded error envelope:
+
+| Status | Code | Meaning |
+| --- | --- | --- |
+| 502 | `gateway_unauthorized` | Gateway rejected the NAS-local credential |
+| 503 | `gateway_unavailable` | Gateway returned a server failure |
+| 502 | `gateway_incompatible` | Unsupported status, media type, or success shape |
+| 502 | `gateway_malformed_response` | Success body was not valid JSON |
+| 502 | `gateway_response_too_large` | Response exceeded 2 MiB |
+| 504 | `gateway_timeout` | Bounded Gateway request timed out |
+| 503 | `gateway_transport_failure` | Companion could not establish or maintain the loopback request |
+
+Raw Gateway errors, response headers, credentials, loopback addresses, and
+redirect targets are not returned to the App.
