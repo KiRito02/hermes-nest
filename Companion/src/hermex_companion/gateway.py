@@ -5,10 +5,17 @@ from dataclasses import dataclass
 import io
 import json
 import re
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from urllib.parse import urlsplit
 
 from aiohttp import ClientError, ClientResponse, ClientSession, ClientTimeout
+from hermex_companion.discovery_proxy_contract import (
+    SKILLS_PATH,
+    TOOLSETS_PATH,
+    is_skills_payload,
+    is_toolsets_payload,
+    read_bounded_discovery_response,
+)
 from hermex_companion.model_proxy_contract import (
     MODEL_OPTIONS_PATH,
     MODEL_OPTIONS_TIMEOUT_SECONDS,
@@ -166,6 +173,38 @@ class GatewayDiscovery:
                 502,
                 "gateway_incompatible",
                 "The Hermes Gateway model-options shape is incompatible.",
+            )
+        return response_body
+
+    async def skills(self) -> bytes:
+        """Forward the verified read-only installed-Skills inventory."""
+        _, response_body, payload = await self._proxy_json_request(
+            "GET",
+            SKILLS_PATH,
+            allowed_statuses=frozenset({200}),
+            response_reader=read_bounded_discovery_response,
+        )
+        if not is_skills_payload(payload):
+            raise GatewayProxyError(
+                502,
+                "gateway_incompatible",
+                "The Hermes Gateway Skills shape is incompatible.",
+            )
+        return response_body
+
+    async def toolsets(self) -> bytes:
+        """Forward the verified read-only API Server Toolsets inventory."""
+        _, response_body, payload = await self._proxy_json_request(
+            "GET",
+            TOOLSETS_PATH,
+            allowed_statuses=frozenset({200}),
+            response_reader=read_bounded_discovery_response,
+        )
+        if not is_toolsets_payload(payload):
+            raise GatewayProxyError(
+                502,
+                "gateway_incompatible",
+                "The Hermes Gateway Toolsets shape is incompatible.",
             )
         return response_body
 
@@ -417,6 +456,9 @@ class GatewayDiscovery:
         query: Sequence[tuple[str, str]] = (),
         body: bytes | None = None,
         timeout: ClientTimeout | None = None,
+        response_reader: Callable[[ClientResponse], Awaitable[bytes]] = (
+            read_bounded_session_response
+        ),
     ) -> tuple[int, bytes, object]:
         headers = {
             "Accept": "application/json",
@@ -462,7 +504,7 @@ class GatewayDiscovery:
                             "The Hermes Gateway returned an unsupported content type.",
                         )
                     status = response.status
-                    response_body = await read_bounded_session_response(response)
+                    response_body = await response_reader(response)
                     try:
                         payload = json.loads(response_body)
                     except (UnicodeDecodeError, json.JSONDecodeError):

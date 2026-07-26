@@ -8,6 +8,10 @@ import json
 from aiohttp import web
 
 from hermex_companion import COMPANION_VERSION, CONTRACT_VERSION
+from hermex_companion.discovery_proxy_contract import (
+    SKILLS_PATH,
+    TOOLSETS_PATH,
+)
 from hermex_companion.gateway import (
     GatewayDiscovery,
     GatewayProxyError,
@@ -160,6 +164,8 @@ async def _capabilities(request: web.Request) -> web.Response:
                     "run_approval_proxy": True,
                     "model_options_proxy": True,
                     "session_model_lock_proxy": True,
+                    "skills_proxy": True,
+                    "toolsets_proxy": True,
                 },
                 "endpoints": {
                     "health": {"method": "GET", "path": HEALTH_PATH},
@@ -186,6 +192,8 @@ async def _capabilities(request: web.Request) -> web.Response:
                         "method": "POST",
                         "path": f"{SESSION_LIST_PATH}/{{session_id}}/model",
                     },
+                    "skills": {"method": "GET", "path": SKILLS_PATH},
+                    "toolsets": {"method": "GET", "path": TOOLSETS_PATH},
                 },
             },
             "gateway": {
@@ -244,6 +252,39 @@ async def _model_options(request: web.Request) -> web.Response:
         _authenticate(request)
         body = await request.app[GATEWAY_KEY].model_options(
             list(request.query.items())
+        )
+    except RegistryError as error:
+        return _error_response(error)
+    except GatewayProxyError as error:
+        return _proxy_error_response(error)
+
+    return web.Response(
+        body=body,
+        status=200,
+        content_type="application/json",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+async def _discovery_list(request: web.Request) -> web.Response:
+    try:
+        _authenticate(request)
+        if request.query:
+            raise GatewayProxyError(
+                400,
+                "invalid_query",
+                "Discovery requests do not accept query parameters.",
+            )
+        if request.can_read_body:
+            raise GatewayProxyError(
+                400,
+                "invalid_request",
+                "Discovery requests do not accept a request body.",
+            )
+        body = (
+            await request.app[GATEWAY_KEY].skills()
+            if request.path == SKILLS_PATH
+            else await request.app[GATEWAY_KEY].toolsets()
         )
     except RegistryError as error:
         return _error_response(error)
@@ -608,6 +649,8 @@ def create_app(
     app.router.add_get(CAPABILITIES_PATH, _capabilities)
     app.router.add_get(READINESS_PATH, _readiness)
     app.router.add_get(MODEL_OPTIONS_PATH, _model_options, allow_head=False)
+    app.router.add_get(SKILLS_PATH, _discovery_list, allow_head=False)
+    app.router.add_get(TOOLSETS_PATH, _discovery_list, allow_head=False)
     app.router.add_get(SESSION_LIST_PATH, _list_sessions, allow_head=False)
     app.router.add_post(SESSION_LIST_PATH, _create_session)
     app.router.add_get(

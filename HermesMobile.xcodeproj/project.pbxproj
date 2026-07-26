@@ -40,6 +40,9 @@
 		C00100000000000000000001 /* CompanionConnectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00100000000000000000011 /* CompanionConnectionService.swift */; };
 		C00100000000000000000002 /* CompanionConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00100000000000000000012 /* CompanionConnectionManager.swift */; };
 		C00100000000000000000003 /* CompanionConnectionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00100000000000000000013 /* CompanionConnectionServiceTests.swift */; };
+		D01600000000000000000001 /* CompanionDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D01600000000000000000011 /* CompanionDiscoveryService.swift */; };
+		D01600000000000000000002 /* CompanionDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D01600000000000000000012 /* CompanionDiscoveryView.swift */; };
+		D01600000000000000000003 /* CompanionDiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D01600000000000000000013 /* CompanionDiscoveryTests.swift */; };
 		E00600000000000000000001 /* SessionRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00600000000000000000011 /* SessionRepository.swift */; };
 		E00600000000000000000002 /* CompanionSessionListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00600000000000000000012 /* CompanionSessionListViewModel.swift */; };
 		E00600000000000000000003 /* CompanionSessionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00600000000000000000013 /* CompanionSessionListView.swift */; };
@@ -389,6 +392,9 @@
 		C00100000000000000000011 /* CompanionConnectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionConnectionService.swift; sourceTree = "<group>"; };
 		C00100000000000000000012 /* CompanionConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionConnectionManager.swift; sourceTree = "<group>"; };
 		C00100000000000000000013 /* CompanionConnectionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionConnectionServiceTests.swift; sourceTree = "<group>"; };
+		D01600000000000000000011 /* CompanionDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionDiscoveryService.swift; sourceTree = "<group>"; };
+		D01600000000000000000012 /* CompanionDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionDiscoveryView.swift; sourceTree = "<group>"; };
+		D01600000000000000000013 /* CompanionDiscoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionDiscoveryTests.swift; sourceTree = "<group>"; };
 		E00600000000000000000011 /* SessionRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRepository.swift; sourceTree = "<group>"; };
 		E00600000000000000000012 /* CompanionSessionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionSessionListViewModel.swift; sourceTree = "<group>"; };
 		E00600000000000000000013 /* CompanionSessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionSessionListView.swift; sourceTree = "<group>"; };
@@ -779,6 +785,7 @@
 				10CA110C0DE000000000C002 /* LocalizationCatalogTests.swift */,
 				1A2B3C4D5E6F7000000000BC /* APIClientTests.swift */,
 				C00100000000000000000013 /* CompanionConnectionServiceTests.swift */,
+				D01600000000000000000013 /* CompanionDiscoveryTests.swift */,
 				E00600000000000000000014 /* SessionRepositoryTests.swift */,
 				E00800000000000000000012 /* ConversationRunServiceTests.swift */,
 				B5A1000000000000000000A1 /* ServerRegistryTests.swift */,
@@ -890,6 +897,7 @@
 			children = (
 				1A2B3C4D5E6F7000000000B2 /* APIClient.swift */,
 				C00100000000000000000011 /* CompanionConnectionService.swift */,
+				D01600000000000000000011 /* CompanionDiscoveryService.swift */,
 				E00600000000000000000011 /* SessionRepository.swift */,
 				E00700000000000000000011 /* SessionRepository+Lifecycle.swift */,
 				E00800000000000000000011 /* ConversationRunService.swift */,
@@ -1012,6 +1020,7 @@
 			children = (
 				E00600000000000000000013 /* CompanionSessionListView.swift */,
 				E00600000000000000000012 /* CompanionSessionListViewModel.swift */,
+				D01600000000000000000012 /* CompanionDiscoveryView.swift */,
 				1A2B3C4D5E6F7000000000B7 /* SessionListView.swift */,
 				1A2B3C4D5E6F7000000000D2 /* SessionRowView.swift */,
 				1A2B3C4D5E6F7000000000D3 /* SessionListViewModel.swift */,
@@ -1464,6 +1473,7 @@
 				A04500000000000000000003 /* AgentLiveActivityManager.swift in Sources */,
 				1A2B3C4D5E6F7000000000A2 /* APIClient.swift in Sources */,
 				C00100000000000000000001 /* CompanionConnectionService.swift in Sources */,
+				D01600000000000000000001 /* CompanionDiscoveryService.swift in Sources */,
 				E00600000000000000000001 /* SessionRepository.swift in Sources */,
 				E00700000000000000000001 /* SessionRepository+Lifecycle.swift in Sources */,
 				E00800000000000000000001 /* ConversationRunService.swift in Sources */,
@@ -1612,6 +1622,7 @@
 				1A2B3C4D5E6F7000000000D1 /* SessionListViewModel.swift in Sources */,
 				E00600000000000000000002 /* CompanionSessionListViewModel.swift in Sources */,
 				E00600000000000000000003 /* CompanionSessionListView.swift in Sources */,
+				D01600000000000000000002 /* CompanionDiscoveryView.swift in Sources */,
 				A04300000000000000000001 /* SessionListComponents.swift in Sources */,
 				A10900000000000000000001 /* SessionNavigationState.swift in Sources */,
 				A04300000000000000000002 /* SessionListActionConfirmations.swift in Sources */,
@@ -1661,6 +1672,7 @@
 				10CA110C0DE000000000C001 /* LocalizationCatalogTests.swift in Sources */,
 				1A2B3C4D5E6F7000000000AC /* APIClientTests.swift in Sources */,
 				C00100000000000000000003 /* CompanionConnectionServiceTests.swift in Sources */,
+				D01600000000000000000003 /* CompanionDiscoveryTests.swift in Sources */,
 				E00600000000000000000004 /* SessionRepositoryTests.swift in Sources */,
 				E00800000000000000000002 /* ConversationRunServiceTests.swift in Sources */,
 				B5A1000000000000000000A0 /* ServerRegistryTests.swift in Sources */,

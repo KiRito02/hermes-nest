@@ -68,6 +68,27 @@ struct CompanionCapabilities: Codable, Equatable, Sendable {
         }
         return true
     }
+
+    var supportsSkillsAndToolsetsDiscovery: Bool {
+        guard
+            gateway?.status == "ok",
+            companion?.features?["skills_proxy"] == .bool(true),
+            companion?.features?["toolsets_proxy"] == .bool(true),
+            companion?.endpoints?["skills"]?.method == "GET",
+            companion?.endpoints?["skills"]?.path == "/v1/skills",
+            companion?.endpoints?["toolsets"]?.method == "GET",
+            companion?.endpoints?["toolsets"]?.path == "/v1/toolsets",
+            let capabilities = gateway?.capabilities,
+            capabilities.features?["skills_api"] == .bool(true),
+            capabilities.endpoints?["skills"]?.method == "GET",
+            capabilities.endpoints?["skills"]?.path == "/v1/skills",
+            capabilities.endpoints?["toolsets"]?.method == "GET",
+            capabilities.endpoints?["toolsets"]?.path == "/v1/toolsets"
+        else {
+            return false
+        }
+        return true
+    }
 }
 
 struct CompanionCapabilityBlock: Codable, Equatable, Sendable {
