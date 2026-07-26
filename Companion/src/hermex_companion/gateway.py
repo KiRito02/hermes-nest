@@ -9,6 +9,13 @@ from collections.abc import Sequence
 from urllib.parse import urlsplit
 
 from aiohttp import ClientError, ClientResponse, ClientSession, ClientTimeout
+from hermex_companion.model_proxy_contract import (
+    MODEL_OPTIONS_PATH,
+    MODEL_OPTIONS_TIMEOUT_SECONDS,
+    is_model_lock_payload,
+    is_model_options_payload,
+    validated_model_options_query,
+)
 from hermex_companion.run_proxy_contract import (
     RUN_REQUEST_MAX_BODY_BYTES,
     is_run_payload,
@@ -140,6 +147,65 @@ class GatewayDiscovery:
                 "The Hermes Gateway session-list shape is incompatible.",
             )
         return response_body
+
+    async def model_options(
+        self,
+        query_items: Sequence[tuple[str, str]],
+    ) -> bytes:
+        """Forward the verified native Hermes model-picker inventory."""
+        query = validated_model_options_query(query_items)
+        _, response_body, payload = await self._proxy_json_request(
+            "GET",
+            MODEL_OPTIONS_PATH,
+            allowed_statuses=frozenset({200}),
+            query=query,
+            timeout=ClientTimeout(total=MODEL_OPTIONS_TIMEOUT_SECONDS),
+        )
+        if not is_model_options_payload(payload):
+            raise GatewayProxyError(
+                502,
+                "gateway_incompatible",
+                "The Hermes Gateway model-options shape is incompatible.",
+            )
+        return response_body
+
+    async def lock_session_model(
+        self,
+        session_id: str,
+        body: bytes,
+    ) -> GatewayProxyResponse:
+        """Persist one verified model selection on an existing session."""
+        session_path = session_request_contract(
+            "GET",
+            session_id=session_id,
+            action=None,
+        ).path
+        status, response_body, payload = await self._proxy_json_request(
+            "POST",
+            f"{session_path}/model",
+            allowed_statuses=frozenset({200, 400, 404, 409}),
+            body=body,
+        )
+        if status == 200:
+            if not is_model_lock_payload(payload, session_id=session_id):
+                raise GatewayProxyError(
+                    502,
+                    "gateway_incompatible",
+                    "The Hermes Gateway model-lock response is incompatible.",
+                )
+        else:
+            sanitized_error = sanitized_gateway_error(payload)
+            if sanitized_error is None:
+                raise GatewayProxyError(
+                    502,
+                    "gateway_incompatible",
+                    "The Hermes Gateway error response is incompatible.",
+                )
+            response_body = json.dumps(
+                sanitized_error,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        return GatewayProxyResponse(status, response_body)
 
     async def session_request(
         self,
@@ -350,6 +416,7 @@ class GatewayDiscovery:
         allowed_statuses: frozenset[int] | set[int],
         query: Sequence[tuple[str, str]] = (),
         body: bytes | None = None,
+        timeout: ClientTimeout | None = None,
     ) -> tuple[int, bytes, object]:
         headers = {
             "Accept": "application/json",
@@ -359,7 +426,9 @@ class GatewayDiscovery:
             headers["Content-Type"] = "application/json"
         outbound_body = io.BytesIO(body) if body is not None else None
         try:
-            async with ClientSession(timeout=self._timeout) as session:
+            async with ClientSession(
+                timeout=timeout or self._timeout
+            ) as session:
                 async with session.request(
                     method,
                     self._base_url + path,
@@ -408,7 +477,7 @@ class GatewayDiscovery:
             raise GatewayProxyError(
                 504,
                 "gateway_timeout",
-                "The Hermes Gateway session request timed out.",
+                "The Hermes Gateway request timed out.",
             ) from None
         except (ClientError, OSError):
             raise GatewayProxyError(

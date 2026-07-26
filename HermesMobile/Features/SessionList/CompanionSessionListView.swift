@@ -99,6 +99,8 @@ struct CompanionSessionListView: View {
                     companionURL: connection.companionURL,
                     supportsRunApprovals:
                         connection.capabilities.supportsRunApprovals,
+                    supportsModelSelection:
+                        connection.capabilities.supportsModelSelection,
                     onUpdated: { session in
                         viewModel.updateSessionSnapshot(
                             session,
@@ -267,6 +269,7 @@ private struct CompanionSessionHistoryView: View {
     let repository: any SessionRepository
     let companionURL: URL
     let supportsRunApprovals: Bool
+    let supportsModelSelection: Bool
     let onUpdated: (SessionSummary) -> Void
     let onForked: () -> Void
     let onDeleted: (String) -> Void
@@ -278,6 +281,7 @@ private struct CompanionSessionHistoryView: View {
     @State private var renameTitle = ""
     @State private var isConfirmingDelete = false
     @State private var forkedSession: SessionSummary?
+    @State private var showsModelPicker = false
     @State private var draftMessage = ""
     @FocusState private var composerIsFocused: Bool
 
@@ -286,6 +290,7 @@ private struct CompanionSessionHistoryView: View {
         repository: any SessionRepository,
         companionURL: URL,
         supportsRunApprovals: Bool,
+        supportsModelSelection: Bool,
         onUpdated: @escaping (SessionSummary) -> Void,
         onForked: @escaping () -> Void,
         onDeleted: @escaping (String) -> Void
@@ -293,6 +298,7 @@ private struct CompanionSessionHistoryView: View {
         self.repository = repository
         self.companionURL = companionURL
         self.supportsRunApprovals = supportsRunApprovals
+        self.supportsModelSelection = supportsModelSelection
         self.onUpdated = onUpdated
         self.onForked = onForked
         self.onDeleted = onDeleted
@@ -301,7 +307,8 @@ private struct CompanionSessionHistoryView: View {
                 session: session,
                 repository: repository,
                 companionURL: companionURL,
-                supportsRunApprovals: supportsRunApprovals
+                supportsRunApprovals: supportsRunApprovals,
+                supportsModelSelection: supportsModelSelection
             )
         )
     }
@@ -461,6 +468,7 @@ private struct CompanionSessionHistoryView: View {
                 repository: repository,
                 companionURL: companionURL,
                 supportsRunApprovals: supportsRunApprovals,
+                supportsModelSelection: supportsModelSelection,
                 onUpdated: onUpdated,
                 onForked: onForked,
                 onDeleted: onDeleted
@@ -508,6 +516,7 @@ private struct CompanionSessionHistoryView: View {
             if viewModel.allMessages.isEmpty {
                 await viewModel.load(modelContext: modelContext)
             }
+            await viewModel.loadModelOptions()
         }
         .refreshable {
             await viewModel.load(modelContext: modelContext)
@@ -547,6 +556,11 @@ private struct CompanionSessionHistoryView: View {
         } message: {
             Text("This removes the session from Hermes. Deletion cannot be undone.")
         }
+        .sheet(isPresented: $showsModelPicker) {
+            CompanionModelPickerView(viewModel: viewModel)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     private var companionComposer: some View {
@@ -561,6 +575,12 @@ private struct CompanionSessionHistoryView: View {
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("companion.run.status")
+            }
+
+            if !viewModel.modelGroups.isEmpty
+                || viewModel.isLoadingModelOptions
+                || viewModel.modelSelectionErrorMessage != nil {
+                modelControls
             }
 
             HStack(alignment: .bottom, spacing: 10) {
@@ -626,6 +646,100 @@ private struct CompanionSessionHistoryView: View {
         .background(.ultraThinMaterial)
     }
 
+    @ViewBuilder
+    private var modelControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let error = viewModel.modelSelectionErrorMessage {
+                HStack(spacing: 8) {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .lineLimit(2)
+                    Spacer(minLength: 8)
+                    if viewModel.modelGroups.isEmpty {
+                        Button("Retry") {
+                            Task {
+                                await viewModel.loadModelOptions(refresh: true)
+                            }
+                        }
+                        .font(.caption.weight(.semibold))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if !viewModel.modelGroups.isEmpty
+                || viewModel.modelSelectionErrorMessage == nil {
+                HStack(spacing: 8) {
+                    Button {
+                        showsModelPicker = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            if viewModel.isLoadingModelOptions {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "cpu")
+                            }
+                            Text(viewModel.selectedModelDisplayName)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Image(systemName: "chevron.down")
+                                .font(.caption2.weight(.semibold))
+                        }
+                        .font(.caption.weight(.semibold))
+                        .frame(minHeight: 32)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(
+                        !viewModel.canChangeModel
+                            || viewModel.modelGroups.isEmpty
+                    )
+                    .accessibilityLabel("Choose model")
+                    .accessibilityIdentifier("companion.model.picker")
+
+                    if viewModel.selectedModelSupportsReasoning {
+                        Menu {
+                            ForEach(
+                                CompanionReasoningEffort.allCases,
+                                id: \.self
+                            ) { effort in
+                                Button {
+                                    Task {
+                                        await viewModel.selectReasoning(effort)
+                                    }
+                                } label: {
+                                    if viewModel.selectedModel?
+                                        .reasoningEffort == effort {
+                                        Label(
+                                            effort.displayName,
+                                            systemImage: "checkmark"
+                                        )
+                                    } else {
+                                        Text(effort.displayName)
+                                    }
+                                }
+                            }
+                        } label: {
+                            Label(
+                                viewModel.selectedReasoningDisplayName,
+                                systemImage: "brain"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .frame(minHeight: 32)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!viewModel.canChangeModel)
+                        .accessibilityLabel("Choose reasoning effort")
+                        .accessibilityIdentifier("companion.reasoning.picker")
+                    }
+
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+
     private func sendDraft() {
         let draft = draftMessage
         Task {
@@ -637,6 +751,111 @@ private struct CompanionSessionHistoryView: View {
                 composerIsFocused = false
             }
         }
+    }
+}
+
+@MainActor
+private struct CompanionModelPickerView: View {
+    @Bindable var viewModel: CompanionSessionHistoryViewModel
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(filteredGroups) { group in
+                    Section(group.name) {
+                        ForEach(group.models) { option in
+                            Button {
+                                Task {
+                                    if await viewModel.selectModel(option) {
+                                        dismiss()
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(
+                                        systemName: isSelected(option)
+                                            ? "checkmark.circle.fill"
+                                            : "circle"
+                                    )
+                                    .foregroundStyle(
+                                        isSelected(option)
+                                            ? Color.accentColor
+                                            : Color.secondary
+                                    )
+
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(option.model)
+                                            .foregroundStyle(.primary)
+                                            .lineLimit(2)
+                                        HStack(spacing: 6) {
+                                            Text(option.provider)
+                                            if option.supportsReasoning {
+                                                Label(
+                                                    "Reasoning",
+                                                    systemImage: "brain"
+                                                )
+                                            }
+                                        }
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    }
+                                    Spacer(minLength: 0)
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!viewModel.canChangeModel)
+                        }
+                    }
+                }
+            }
+            .overlay {
+                if filteredGroups.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                }
+            }
+            .navigationTitle("Choose Model")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, prompt: "Search models")
+            .refreshable {
+                await viewModel.loadModelOptions(refresh: true)
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private var filteredGroups: [CompanionModelGroup] {
+        let query = searchText.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !query.isEmpty else { return viewModel.modelGroups }
+        return viewModel.modelGroups.compactMap { group in
+            let models = group.models.filter {
+                $0.model.localizedCaseInsensitiveContains(query)
+                    || $0.provider.localizedCaseInsensitiveContains(query)
+                    || $0.providerName.localizedCaseInsensitiveContains(query)
+            }
+            guard !models.isEmpty else { return nil }
+            return CompanionModelGroup(
+                provider: group.provider,
+                name: group.name,
+                models: models
+            )
+        }
+    }
+
+    private func isSelected(_ option: CompanionModelOption) -> Bool {
+        viewModel.selectedModel?.model == option.model
+            && viewModel.selectedModel?.provider == option.provider
     }
 }
 

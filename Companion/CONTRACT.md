@@ -159,7 +159,9 @@ capability snapshot when Gateway is reachable, authorized, and compatible.
       "device_auth": true,
       "device_revocation": true,
       "gateway_discovery": true,
-      "gateway_proxy": true
+      "gateway_proxy": true,
+      "model_options_proxy": true,
+      "session_model_lock_proxy": true
     },
     "endpoints": {
       "health": {
@@ -185,6 +187,14 @@ capability snapshot when Gateway is reachable, authorized, and compatible.
       "readiness": {
         "method": "GET",
         "path": "/companion/v1/readiness"
+      },
+      "model_options": {
+        "method": "GET",
+        "path": "/api/model/options"
+      },
+      "session_model_lock": {
+        "method": "POST",
+        "path": "/api/sessions/{session_id}/model"
       }
     }
   },
@@ -327,6 +337,90 @@ queries. Companion therefore forwards the complete bounded message response.
 The App presents it in stable local pages without claiming upstream pagination,
 reordering rows, or creating a Companion-owned transcript.
 
+## Gateway-compatible model selection
+
+Every route below requires device authentication. Companion replaces the App
+device bearer with its NAS-local Gateway bearer, strips other App headers, and
+does not follow redirects:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/model/options` | Read the native Hermes provider/model picker inventory |
+| POST | `/api/sessions/{id}/model` | Persist a model and reasoning lock on one existing session |
+
+This surface was implemented from Hermes Agent `main` commit
+`d9f1043c3337818b1f29224a7deb5bbb17402370` and accepted against the owner's
+upgraded `main` commit
+`37a27664cc11a33d36739fafe864d1d084370c47`. The latter contains the former,
+with no intervening changes to the API Server file or corresponding Gateway
+tests. Its source and tests verify both routes; the official API Server
+documentation additionally verifies model options and per-Run overrides, but
+does not yet document the session model-lock route or acknowledgement.
+
+Live acceptance at `37a27664` verified the advertised capability and exact
+route, a bounded model inventory through Companion, and a disposable
+session-lock acknowledgement with matching session/model/provider identity.
+The disposable session was then deleted. The CLI still reports product version
+`0.19.0`, so capability advertisement rather than that version string gates
+the App controls.
+
+Model options accept no query or exactly one `refresh` boolean. The accepted
+spellings are `0`, `1`, `false`, `no`, `off`, `on`, `true`, and `yes`,
+case-insensitive. The success body retains the Gateway's additive picker
+metadata after validating the stable provider identity and model-list fields.
+Responses are capped at 2 MiB; this inventory route has a 30-second timeout
+because an explicit refresh may probe provider catalogs:
+
+```json
+{
+  "providers": [
+    {
+      "slug": "openrouter",
+      "name": "OpenRouter",
+      "models": ["anthropic/claude-sonnet-4.6"],
+      "authenticated": true,
+      "capabilities": {
+        "anthropic/claude-sonnet-4.6": {
+          "fast": false,
+          "reasoning": true
+        }
+      }
+    }
+  ],
+  "model": "anthropic/claude-sonnet-4.6",
+  "provider": "openrouter"
+}
+```
+
+The App offers only authenticated providers with non-empty model lists.
+Unconfigured provider skeletons remain decodable but are not presented as
+runnable choices.
+
+The session model-lock request has an exact Companion allowlist. `model` and
+`provider` are required bounded strings. `model_options` is optional; when
+present it may contain only a consistent Hermes reasoning pair:
+
+```json
+{
+  "model": "anthropic/claude-sonnet-4.6",
+  "provider": "openrouter",
+  "model_options": {
+    "reasoning": {"enabled": true, "effort": "high"},
+    "reasoning_effort": "high"
+  }
+}
+```
+
+Effort is one of `none`, `minimal`, `low`, `medium`, `high`, or `xhigh`;
+`enabled` must be false only for `none`. Companion rejects credential,
+base-URL, service-tier, unknown, or inconsistent fields before Gateway. A
+successful Gateway acknowledgement is
+`hermes.session.model_lock`, carries the same session identity, and returns a
+runtime model/provider matching the selection. The App changes its visible
+selection only after this acknowledgement, then sends the same model,
+provider, and reasoning options on subsequent Runs. The persisted lock remains
+authoritative if another client later resumes the Hermes session.
+
 ## Gateway-compatible Runs
 
 Every route below requires device authentication and accepts no query
@@ -338,7 +432,10 @@ implicit HEAD, and invalid IDs never reach Gateway.
 This contract was verified against Hermes Agent `0.19.0`, upstream commit
 `07e97d2f5dc3d2092cfe693ef07b2527a36cd2d8`, its Runs tests and source, the
 official API Server documentation, and disposable runs on the owner's loopback
-Gateway.
+Gateway. The optional `model`, `provider`, and `model_options` request override
+shown below is additionally pinned to Hermes Agent `main` commit
+`d9f1043c3337818b1f29224a7deb5bbb17402370` and was live-accepted on descendant
+commit `37a27664cc11a33d36739fafe864d1d084370c47`.
 
 The exact allowlist is:
 
@@ -360,13 +457,19 @@ existing server-authoritative conversation can be supplied:
   "conversation_history": [
     {"role": "user", "content": "Earlier question"},
     {"role": "assistant", "content": "Earlier answer"}
-  ]
+  ],
+  "model": "anthropic/claude-sonnet-4.6",
+  "provider": "openrouter",
+  "model_options": {
+    "reasoning": {"enabled": true, "effort": "high"},
+    "reasoning_effort": "high"
+  }
 }
 ```
 
-Optional verified Gateway fields such as `instructions`, `model`, and
-`previous_response_id` pass through unchanged. Companion does not synthesize
-history, run IDs, or session IDs. Hermes Agent 0.19.0 uses explicit
+Optional verified Gateway fields such as `instructions`, `model`, `provider`,
+`model_options`, and `previous_response_id` pass through unchanged. Companion
+does not synthesize history, run IDs, or session IDs. Hermes Agent 0.19.0 uses explicit
 `conversation_history` as turn context; `session_id` alone correlates and
 persists the run but does not load the existing SessionDB transcript. The App
 therefore reads current history before start and sends it explicitly.

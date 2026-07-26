@@ -14,6 +14,10 @@ from hermex_companion.gateway import (
     GatewayRunHTTPError,
     SESSION_LIST_PATH,
 )
+from hermex_companion.model_proxy_contract import (
+    MODEL_OPTIONS_PATH,
+    validate_model_lock_payload,
+)
 from hermex_companion.run_proxy_contract import (
     RUN_REQUEST_MAX_BODY_BYTES,
     RUNS_PATH,
@@ -154,6 +158,8 @@ async def _capabilities(request: web.Request) -> web.Response:
                     "gateway_discovery": True,
                     "gateway_proxy": True,
                     "run_approval_proxy": True,
+                    "model_options_proxy": True,
+                    "session_model_lock_proxy": True,
                 },
                 "endpoints": {
                     "health": {"method": "GET", "path": HEALTH_PATH},
@@ -171,6 +177,14 @@ async def _capabilities(request: web.Request) -> web.Response:
                     "run_approval": {
                         "method": "POST",
                         "path": f"{RUNS_PATH}/{{run_id}}/approval",
+                    },
+                    "model_options": {
+                        "method": "GET",
+                        "path": MODEL_OPTIONS_PATH,
+                    },
+                    "session_model_lock": {
+                        "method": "POST",
+                        "path": f"{SESSION_LIST_PATH}/{{session_id}}/model",
                     },
                 },
             },
@@ -220,6 +234,67 @@ async def _list_sessions(request: web.Request) -> web.Response:
     return web.Response(
         body=body,
         status=200,
+        content_type="application/json",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+async def _model_options(request: web.Request) -> web.Response:
+    try:
+        _authenticate(request)
+        body = await request.app[GATEWAY_KEY].model_options(
+            list(request.query.items())
+        )
+    except RegistryError as error:
+        return _error_response(error)
+    except GatewayProxyError as error:
+        return _proxy_error_response(error)
+
+    return web.Response(
+        body=body,
+        status=200,
+        content_type="application/json",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+async def _lock_session_model(request: web.Request) -> web.Response:
+    try:
+        _authenticate(request)
+        if request.query:
+            raise GatewayProxyError(
+                400,
+                "invalid_query",
+                "Session model locks do not accept query parameters.",
+            )
+        if request.content_type != "application/json":
+            raise GatewayProxyError(
+                415,
+                "invalid_content_type",
+                "Session model locks must use application/json.",
+            )
+        body = await request.read()
+        try:
+            payload = json.loads(body)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise GatewayProxyError(
+                400,
+                "invalid_json",
+                "The model selection body must be valid JSON.",
+            ) from None
+        validate_model_lock_payload(payload)
+        response = await request.app[GATEWAY_KEY].lock_session_model(
+            request.match_info["session_id"],
+            body,
+        )
+    except RegistryError as error:
+        return _error_response(error)
+    except GatewayProxyError as error:
+        return _proxy_error_response(error)
+
+    return web.Response(
+        body=response.body,
+        status=response.status,
         content_type="application/json",
         headers={"Cache-Control": "no-store"},
     )
@@ -532,6 +607,7 @@ def create_app(
     app.router.add_delete(f"{DEVICES_PATH}/{{device_id}}", _revoke_device)
     app.router.add_get(CAPABILITIES_PATH, _capabilities)
     app.router.add_get(READINESS_PATH, _readiness)
+    app.router.add_get(MODEL_OPTIONS_PATH, _model_options, allow_head=False)
     app.router.add_get(SESSION_LIST_PATH, _list_sessions, allow_head=False)
     app.router.add_post(SESSION_LIST_PATH, _create_session)
     app.router.add_get(
@@ -555,6 +631,10 @@ def create_app(
     app.router.add_post(
         f"{SESSION_LIST_PATH}/{{session_id}}/fork",
         _fork_session,
+    )
+    app.router.add_post(
+        f"{SESSION_LIST_PATH}/{{session_id}}/model",
+        _lock_session_model,
     )
     app.router.add_post(RUNS_PATH, _start_run)
     app.router.add_get(

@@ -42,6 +42,32 @@ struct CompanionCapabilities: Codable, Equatable, Sendable {
         }
         return true
     }
+
+    var supportsModelSelection: Bool {
+        guard
+            gateway?.status == "ok",
+            companion?.features?["model_options_proxy"] == .bool(true),
+            companion?.features?["session_model_lock_proxy"] == .bool(true),
+            companion?.endpoints?["model_options"]?.method == "GET",
+            companion?.endpoints?["model_options"]?.path
+                == "/api/model/options",
+            companion?.endpoints?["session_model_lock"]?.method == "POST",
+            companion?.endpoints?["session_model_lock"]?.path
+                == "/api/sessions/{session_id}/model",
+            let capabilities = gateway?.capabilities,
+            capabilities.features?["model_options"] == .bool(true),
+            capabilities.features?["session_model_lock"] == .bool(true),
+            capabilities.endpoints?["model_options"]?.method == "GET",
+            capabilities.endpoints?["model_options"]?.path
+                == "/api/model/options",
+            capabilities.endpoints?["session_model_lock"]?.method == "POST",
+            capabilities.endpoints?["session_model_lock"]?.path
+                == "/api/sessions/{session_id}/model"
+        else {
+            return false
+        }
+        return true
+    }
 }
 
 struct CompanionCapabilityBlock: Codable, Equatable, Sendable {
@@ -78,6 +104,681 @@ struct CompanionGatewayRuntimeCapability: Codable, Equatable, Sendable {
     let mode: String?
     let toolExecution: String?
     let splitRuntime: Bool?
+}
+
+enum CompanionReasoningEffort:
+    String,
+    CaseIterable,
+    Codable,
+    Equatable,
+    Hashable,
+    Sendable
+{
+    case none
+    case minimal
+    case low
+    case medium
+    case high
+    case xhigh
+
+    var displayName: String {
+        switch self {
+        case .none: return String(localized: "Off")
+        case .minimal: return String(localized: "Minimal")
+        case .low: return String(localized: "Low")
+        case .medium: return String(localized: "Medium")
+        case .high: return String(localized: "High")
+        case .xhigh: return String(localized: "XHigh")
+        }
+    }
+}
+
+struct CompanionModelSelection: Equatable, Sendable {
+    let model: String
+    let provider: String
+    let reasoningEffort: CompanionReasoningEffort?
+}
+
+struct CompanionModelOption: Identifiable, Equatable, Sendable {
+    var id: String {
+        "\(provider)/\(model)"
+    }
+
+    let model: String
+    let provider: String
+    let providerName: String
+    let supportsReasoning: Bool
+}
+
+struct CompanionModelGroup: Identifiable, Equatable, Sendable {
+    var id: String {
+        provider
+    }
+
+    let provider: String
+    let name: String
+    let models: [CompanionModelOption]
+}
+
+struct CompanionModelInventory: Decodable, Equatable, Sendable {
+    let providers: [CompanionModelProvider]?
+    let model: String?
+    let provider: String?
+
+    enum CodingKeys: String, CodingKey {
+        case providers
+        case model
+        case provider
+    }
+
+    init(
+        providers: [CompanionModelProvider]?,
+        model: String?,
+        provider: String?
+    ) {
+        self.providers = providers
+        self.model = model
+        self.provider = provider
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        providers = (
+            try? container.decodeIfPresent(
+                [LossyCompanionModelProvider].self,
+                forKey: .providers
+            )
+        )?.compactMap(\.value)
+        model = container.decodeLossyStringIfPresent(forKey: .model)
+        provider = container.decodeLossyStringIfPresent(forKey: .provider)
+    }
+
+    var catalogGroups: [CompanionModelGroup] {
+        var seenProviders: Set<String> = []
+        var groups: [CompanionModelGroup] = []
+        for provider in providers ?? [] {
+            guard
+                provider.authenticated == true,
+                let slug = provider.slug?.trimmedNonEmpty,
+                slug.count <= 80,
+                seenProviders.insert(slug.lowercased()).inserted,
+                let rawModels = provider.modelIDs
+            else {
+                continue
+            }
+            var seenModels: Set<String> = []
+            let models = rawModels.filter {
+                $0.count <= 200 && seenModels.insert($0).inserted
+            }
+            guard
+                !models.isEmpty
+            else {
+                continue
+            }
+            let providerName = provider.name?.trimmedNonEmpty ?? slug
+            groups.append(
+                CompanionModelGroup(
+                    provider: slug,
+                    name: providerName,
+                    models: models.map {
+                        CompanionModelOption(
+                            model: $0,
+                            provider: slug,
+                            providerName: providerName,
+                            supportsReasoning:
+                                provider.supportsReasoning(model: $0)
+                        )
+                    }
+                )
+            )
+        }
+        return groups
+    }
+
+    var currentSelection: CompanionModelSelection? {
+        guard
+            let model = model?.trimmedNonEmpty,
+            let provider = provider?.trimmedNonEmpty
+        else {
+            return nil
+        }
+        return CompanionModelSelection(
+            model: model,
+            provider: provider,
+            reasoningEffort: nil
+        )
+    }
+}
+
+struct CompanionModelProvider: Decodable, Equatable, Sendable {
+    let slug: String?
+    let name: String?
+    let models: [JSONValue]?
+    let authenticated: Bool?
+    let capabilities: [String: JSONValue]?
+
+    enum CodingKeys: String, CodingKey {
+        case slug
+        case name
+        case models
+        case authenticated
+        case capabilities
+    }
+
+    init(
+        slug: String?,
+        name: String?,
+        models: [JSONValue]?,
+        authenticated: Bool?,
+        capabilities: [String: JSONValue]?
+    ) {
+        self.slug = slug
+        self.name = name
+        self.models = models
+        self.authenticated = authenticated
+        self.capabilities = capabilities
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        slug = container.decodeLossyStringIfPresent(forKey: .slug)
+        name = container.decodeLossyStringIfPresent(forKey: .name)
+        models = try? container.decodeIfPresent(
+            [JSONValue].self,
+            forKey: .models
+        )
+        authenticated = try? container.decodeIfPresent(
+            Bool.self,
+            forKey: .authenticated
+        )
+        capabilities = try? container.decodeIfPresent(
+            [String: JSONValue].self,
+            forKey: .capabilities
+        )
+    }
+
+    var modelIDs: [String]? {
+        models?.compactMap {
+            guard case .string(let value) = $0 else { return nil }
+            return value.trimmedNonEmpty
+        }
+    }
+
+    func supportsReasoning(model: String) -> Bool {
+        guard
+            case .object(let capability) = capabilities?[model],
+            case .bool(let supported) = capability["reasoning"]
+        else {
+            return false
+        }
+        return supported
+    }
+}
+
+struct CompanionModelLockAcknowledgement:
+    Decodable,
+    Equatable,
+    Sendable
+{
+    let object: String?
+    let sessionID: String?
+    let runtime: CompanionModelRuntime?
+
+    enum CodingKeys: String, CodingKey {
+        case object
+        case sessionID = "session_id"
+        case runtime
+    }
+
+    init(
+        object: String?,
+        sessionID: String?,
+        runtime: CompanionModelRuntime?
+    ) {
+        self.object = object
+        self.sessionID = sessionID
+        self.runtime = runtime
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        object = container.decodeLossyStringIfPresent(forKey: .object)
+        sessionID = container.decodeLossyStringIfPresent(
+            forKey: .sessionID
+        )
+        runtime = try? container.decodeIfPresent(
+            CompanionModelRuntime.self,
+            forKey: .runtime
+        )
+    }
+
+    var selection: CompanionModelSelection? {
+        guard
+            let model = runtime?.model?.trimmedNonEmpty,
+            let provider = runtime?.provider?.trimmedNonEmpty
+        else {
+            return nil
+        }
+        return CompanionModelSelection(
+            model: model,
+            provider: provider,
+            reasoningEffort: nil
+        )
+    }
+}
+
+struct CompanionModelRuntime: Decodable, Equatable, Sendable {
+    let provider: String?
+    let model: String?
+    let modelLock: String?
+
+    enum CodingKeys: String, CodingKey {
+        case provider
+        case model
+        case modelLock = "model_lock"
+    }
+
+    init(
+        provider: String?,
+        model: String?,
+        modelLock: String?
+    ) {
+        self.provider = provider
+        self.model = model
+        self.modelLock = modelLock
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        provider = container.decodeLossyStringIfPresent(forKey: .provider)
+        model = container.decodeLossyStringIfPresent(forKey: .model)
+        modelLock = container.decodeLossyStringIfPresent(
+            forKey: .modelLock
+        )
+    }
+}
+
+private struct LossyCompanionModelProvider: Decodable {
+    let value: CompanionModelProvider?
+
+    init(from decoder: Decoder) throws {
+        value = try? CompanionModelProvider(from: decoder)
+    }
+}
+
+protocol CompanionModelServing: Sendable {
+    func fetchOptions(refresh: Bool) async throws -> CompanionModelInventory
+    func lock(
+        _ selection: CompanionModelSelection,
+        sessionID: String
+    ) async throws -> CompanionModelLockAcknowledgement
+}
+
+protocol CompanionModelSelectionStoring: Sendable {
+    func load(
+        companionURL: URL,
+        sessionID: String
+    ) async -> CompanionModelSelection?
+    func save(
+        _ selection: CompanionModelSelection,
+        companionURL: URL,
+        sessionID: String
+    ) async
+}
+
+actor CompanionModelSelectionStore: CompanionModelSelectionStoring {
+    private static let keyPrefix =
+        "hermesNest.companionModelSelection."
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    func load(
+        companionURL: URL,
+        sessionID: String
+    ) -> CompanionModelSelection? {
+        guard
+            let value = defaults.dictionary(
+                forKey: Self.key(
+                    companionURL: companionURL,
+                    sessionID: sessionID
+                )
+            ) as? [String: String],
+            let model = value["model"]?.trimmedNonEmpty,
+            let provider = value["provider"]?.trimmedNonEmpty
+        else {
+            return nil
+        }
+        let reasoningEffort = value["reasoning_effort"].flatMap {
+            CompanionReasoningEffort(rawValue: $0)
+        }
+        return CompanionModelSelection(
+            model: model,
+            provider: provider,
+            reasoningEffort: reasoningEffort
+        )
+    }
+
+    func save(
+        _ selection: CompanionModelSelection,
+        companionURL: URL,
+        sessionID: String
+    ) {
+        var value = [
+            "model": selection.model,
+            "provider": selection.provider,
+        ]
+        value["reasoning_effort"] = selection.reasoningEffort?.rawValue
+        defaults.set(
+            value,
+            forKey: Self.key(
+                companionURL: companionURL,
+                sessionID: sessionID
+            )
+        )
+    }
+
+    private static func key(
+        companionURL: URL,
+        sessionID: String
+    ) -> String {
+        let scope = "\(companionURL.absoluteString)|\(sessionID)"
+        return keyPrefix + Data(scope.utf8).base64EncodedString()
+    }
+}
+
+enum CompanionModelServiceError: LocalizedError, Equatable {
+    case missingDeviceCredential
+    case invalidSelection
+    case invalidSessionID
+    case noAvailableModels
+    case companionUnreachable
+    case deviceCredentialInvalid
+    case deviceRevoked
+    case gatewayUnavailable
+    case gatewayIncompatible
+    case unexpectedResponse
+
+    var errorDescription: String? {
+        switch self {
+        case .missingDeviceCredential, .deviceCredentialInvalid:
+            return String(localized: "This device must pair with Companion again.")
+        case .invalidSelection:
+            return String(localized: "Choose a valid Hermes model and provider.")
+        case .invalidSessionID:
+            return String(localized: "The Hermes session identity is invalid.")
+        case .noAvailableModels:
+            return String(localized: "No authenticated Hermes model providers are available.")
+        case .companionUnreachable:
+            return String(localized: "Hermes Nest Companion is unreachable.")
+        case .deviceRevoked:
+            return String(localized: "This device was revoked and must pair again.")
+        case .gatewayUnavailable:
+            return String(localized: "Hermes Gateway is temporarily unavailable.")
+        case .gatewayIncompatible:
+            return String(localized: "Upgrade Hermes Gateway to use native model selection.")
+        case .unexpectedResponse:
+            return String(localized: "Companion returned unexpected model data.")
+        }
+    }
+}
+
+actor CompanionModelService: CompanionModelServing {
+    static let maximumResponseBytes = 2 * 1024 * 1024
+
+    private let companionURL: URL
+    private let keychain: any KeychainStoring
+    private let session: URLSession
+    private let decoder = JSONDecoder()
+    private let encoder = JSONEncoder()
+
+    init(
+        companionURL: URL,
+        keychain: any KeychainStoring = KeychainStore(),
+        session: URLSession? = nil
+    ) {
+        self.companionURL = companionURL
+        self.keychain = keychain
+        self.session = session ?? Self.makeSession()
+    }
+
+    func fetchOptions(
+        refresh: Bool = false
+    ) async throws -> CompanionModelInventory {
+        var components = URLComponents(
+            url: companionURL
+                .appendingPathComponent("api", isDirectory: true)
+                .appendingPathComponent("model", isDirectory: true)
+                .appendingPathComponent("options", isDirectory: false),
+            resolvingAgainstBaseURL: false
+        )
+        if refresh {
+            components?.queryItems = [
+                URLQueryItem(name: "refresh", value: "true")
+            ]
+        }
+        guard let url = components?.url else {
+            throw CompanionModelServiceError.unexpectedResponse
+        }
+        let inventory: CompanionModelInventory = try await send(
+            url: url,
+            method: "GET",
+            body: Optional<CompanionModelLockBody>.none
+        )
+        guard !inventory.catalogGroups.isEmpty else {
+            throw CompanionModelServiceError.noAvailableModels
+        }
+        return inventory
+    }
+
+    func lock(
+        _ selection: CompanionModelSelection,
+        sessionID: String
+    ) async throws -> CompanionModelLockAcknowledgement {
+        guard
+            selection.model.trimmedNonEmpty != nil,
+            selection.model.count <= 200,
+            selection.provider.trimmedNonEmpty != nil,
+            selection.provider.count <= 80
+        else {
+            throw CompanionModelServiceError.invalidSelection
+        }
+        let sessionID = try Self.validatedSessionID(sessionID)
+        let url = companionURL
+            .appendingPathComponent("api", isDirectory: true)
+            .appendingPathComponent("sessions", isDirectory: true)
+            .appendingPathComponent(sessionID, isDirectory: true)
+            .appendingPathComponent("model", isDirectory: false)
+        let acknowledgement: CompanionModelLockAcknowledgement =
+            try await send(
+                url: url,
+                method: "POST",
+                body: CompanionModelLockBody(selection: selection)
+            )
+        guard
+            acknowledgement.object == "hermes.session.model_lock",
+            acknowledgement.sessionID == sessionID,
+            acknowledgement.selection?.model == selection.model,
+            acknowledgement.selection?.provider == selection.provider
+        else {
+            throw CompanionModelServiceError.unexpectedResponse
+        }
+        return acknowledgement
+    }
+
+    private func send<Response: Decodable, Body: Encodable>(
+        url: URL,
+        method: String,
+        body: Body?
+    ) async throws -> Response {
+        guard
+            let credential = try? keychain.load(
+                .companionDeviceCredential
+            ),
+            !credential.isEmpty
+        else {
+            throw CompanionModelServiceError.missingDeviceCredential
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 30
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(
+            "Bearer \(credential)",
+            forHTTPHeaderField: "Authorization"
+        )
+        if let body {
+            do {
+                request.httpBody = try encoder.encode(body)
+            } catch {
+                throw CompanionModelServiceError.invalidSelection
+            }
+            request.setValue(
+                "application/json",
+                forHTTPHeaderField: "Content-Type"
+            )
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw CompanionModelServiceError.companionUnreachable
+        }
+        guard
+            data.count <= Self.maximumResponseBytes,
+            let response = response as? HTTPURLResponse
+        else {
+            throw CompanionModelServiceError.unexpectedResponse
+        }
+        guard response.statusCode == 200 else {
+            throw Self.mapHTTPError(
+                statusCode: response.statusCode,
+                data: data
+            )
+        }
+        guard response.mimeType == "application/json" else {
+            throw CompanionModelServiceError.unexpectedResponse
+        }
+        do {
+            return try decoder.decode(Response.self, from: data)
+        } catch {
+            throw CompanionModelServiceError.unexpectedResponse
+        }
+    }
+
+    private static func validatedSessionID(
+        _ value: String
+    ) throws -> String {
+        guard
+            !value.isEmpty,
+            value.count <= 256,
+            !value.contains("/"),
+            !value.contains("\\"),
+            !value.unicodeScalars.contains(where: {
+                CharacterSet.controlCharacters.contains($0)
+            })
+        else {
+            throw CompanionModelServiceError.invalidSessionID
+        }
+        return value
+    }
+
+    private static func mapHTTPError(
+        statusCode: Int,
+        data: Data
+    ) -> CompanionModelServiceError {
+        let code = (
+            try? JSONDecoder().decode(
+                CompanionErrorEnvelope.self,
+                from: data
+            )
+        )?.error?.code
+        switch (statusCode, code) {
+        case (401, "device_credential_invalid"):
+            return .deviceCredentialInvalid
+        case (403, "device_revoked"):
+            return .deviceRevoked
+        case (400, _):
+            return .invalidSelection
+        case (502, "gateway_incompatible"),
+             (502, "gateway_malformed_response"):
+            return .gatewayIncompatible
+        case (503, _), (504, _):
+            return .gatewayUnavailable
+        default:
+            return .unexpectedResponse
+        }
+    }
+
+    private nonisolated static func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpCookieStorage = nil
+        configuration.httpCookieAcceptPolicy = .never
+        configuration.httpShouldSetCookies = false
+        configuration.requestCachePolicy =
+            .reloadIgnoringLocalCacheData
+        return URLSession(
+            configuration: configuration,
+            delegate: CompanionRedirectBlocker(),
+            delegateQueue: nil
+        )
+    }
+}
+
+private struct CompanionModelLockBody: Encodable {
+    let model: String
+    let provider: String
+    let modelOptions: HermesModelOptionsBody?
+
+    init(selection: CompanionModelSelection) {
+        model = selection.model
+        provider = selection.provider
+        modelOptions = selection.reasoningEffort.map {
+            HermesModelOptionsBody(reasoningEffort: $0)
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case model
+        case provider
+        case modelOptions = "model_options"
+    }
+}
+
+struct HermesModelOptionsBody: Encodable {
+    let reasoningEffort: CompanionReasoningEffort
+    let reasoning: HermesReasoningBody
+
+    init(reasoningEffort: CompanionReasoningEffort) {
+        self.reasoningEffort = reasoningEffort
+        reasoning = HermesReasoningBody(
+            enabled: reasoningEffort != .none,
+            effort: reasoningEffort
+        )
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case reasoningEffort = "reasoning_effort"
+        case reasoning
+    }
+}
+
+struct HermesReasoningBody: Encodable {
+    let enabled: Bool
+    let effort: CompanionReasoningEffort
+}
+
+private extension String {
+    var trimmedNonEmpty: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }
 
 struct CompanionConnection: Equatable, Sendable {
