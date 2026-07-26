@@ -160,6 +160,16 @@ class WorkspaceUpload:
                     "attachment_storage_unsafe",
                     "The attachment storage directory changed while opening it.",
                 )
+            if (
+                opened_metadata.st_uid != os.geteuid()
+                or stat.S_IMODE(opened_metadata.st_mode) & 0o077
+            ):
+                os.close(self._directory_fd)
+                raise WorkspaceError(
+                    409,
+                    "attachment_storage_unsafe",
+                    "The attachment storage directory must be private to the Companion service identity.",
+                )
         finally:
             os.close(selected_directory_fd)
         self._temp_name = f"{_UPLOAD_TEMP_PREFIX}{uuid4().hex}.part"

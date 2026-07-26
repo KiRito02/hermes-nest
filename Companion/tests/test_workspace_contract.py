@@ -928,6 +928,29 @@ class WorkspaceContractTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual([], (await empty.json())["uploads"])
 
+    def test_upload_rejects_preexisting_shared_attachment_storage(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            storage = root / ".hermes-nest-attachments"
+            storage.mkdir()
+            storage.chmod(0o777)
+            workspace = WorkspaceAccess(
+                [
+                    WorkspaceRoot(
+                        id="projects",
+                        name="Projects",
+                        path=root,
+                        writable=True,
+                    )
+                ]
+            )
+
+            with self.assertRaisesRegex(
+                WorkspaceError,
+                "private to the Companion",
+            ):
+                workspace.begin_upload("projects", "", "notes.txt")
+
     async def test_authorized_server_file_can_be_staged_for_a_turn(self) -> None:
         await self.client.close()
         with TemporaryDirectory() as directory:

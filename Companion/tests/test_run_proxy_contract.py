@@ -36,6 +36,10 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
 
         gateway_app = web.Application(client_max_size=3 * 1024 * 1024)
         gateway_app.router.add_post("/v1/runs", self._gateway_start)
+        gateway_app.router.add_get(
+            "/api/sessions/{session_id}/messages",
+            self._gateway_messages,
+        )
         gateway_app.router.add_get("/v1/runs/{run_id}", self._gateway_status)
         gateway_app.router.add_get(
             "/v1/runs/{run_id}/events",
@@ -246,6 +250,10 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
                 'filename="notes.txt"',
                 downloaded.headers["Content-Disposition"],
             )
+            consumed = self.registry.list_consumed_attachments(
+                session_id="session-attachments",
+            )
+            self.assertEqual(12, consumed[0].prior_message_id)
 
     async def test_attachment_is_claimed_before_concurrent_gateway_start(
         self,
@@ -716,6 +724,29 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
         return web.json_response(
             {"run_id": "run-1", "status": "started"},
             status=202,
+        )
+
+    async def _gateway_messages(self, request: web.Request) -> web.Response:
+        await self._record(request)
+        return web.json_response(
+            {
+                "object": "list",
+                "session_id": request.match_info["session_id"],
+                "data": [
+                    {
+                        "id": 11,
+                        "session_id": request.match_info["session_id"],
+                        "role": "user",
+                        "content": "Earlier",
+                    },
+                    {
+                        "id": 12,
+                        "session_id": request.match_info["session_id"],
+                        "role": "assistant",
+                        "content": "Earlier reply",
+                    },
+                ],
+            }
         )
 
     async def _gateway_status(self, request: web.Request) -> web.Response:

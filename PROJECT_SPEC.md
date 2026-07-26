@@ -454,7 +454,9 @@ An attachment claim left by a Companion process stop fails closed after
 restart. Gateway Runs have no verified idempotency key, so automatically
 releasing an ambiguous claim could submit the same attachment twice.
 Authoritative history binds consumed attachment batches to Gateway
-user-message IDs in per-session turn order, including when prompts repeat.
+user-message IDs in per-session turn order and only after the pre-Run maximum
+Gateway message ID, including when prompts repeat or an identical prompt has no
+attachment.
 
 ### 4.8 Companion built-in Memory management
 

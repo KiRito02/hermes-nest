@@ -64,6 +64,7 @@ class ConsumedAttachmentRecord:
     prompt_fingerprint: str
     consumption_order: int | None
     message_id: str | None
+    prior_message_id: int | None
 
 
 def attachment_prompt_fingerprint(content: object) -> str:
@@ -618,6 +619,7 @@ class DeviceRegistry:
         claim: str,
         run_id: str,
         prompt_fingerprint: str,
+        prior_message_id: int | None = None,
     ) -> None:
         if not claim:
             return
@@ -644,7 +646,7 @@ class DeviceRegistry:
                 UPDATE attachments
                 SET state = 'consumed', consumed_at = ?, run_id = ?,
                     prompt_fingerprint = ?, consumption_order = ?,
-                    run_claim = NULL
+                    prior_message_id = ?, run_claim = NULL
                 WHERE run_claim = ? AND state = 'ready'
                 """,
                 (
@@ -652,6 +654,7 @@ class DeviceRegistry:
                     run_id,
                     prompt_fingerprint,
                     consumption_order,
+                    prior_message_id,
                     claim,
                 ),
             )
@@ -674,6 +677,7 @@ class DeviceRegistry:
         attachment_ids: list[str],
         run_id: str,
         prompt_fingerprint: str,
+        prior_message_id: int | None = None,
     ) -> None:
         if not attachment_ids:
             return
@@ -685,7 +689,8 @@ class DeviceRegistry:
                 f"""
                 UPDATE attachments
                 SET state = 'consumed', consumed_at = ?, run_id = ?,
-                    prompt_fingerprint = ?, consumption_order = ?
+                    prompt_fingerprint = ?, consumption_order = ?,
+                    prior_message_id = ?
                 WHERE device_id = ?
                   AND session_id = ?
                   AND state = 'ready'
@@ -696,6 +701,7 @@ class DeviceRegistry:
                     run_id,
                     prompt_fingerprint,
                     consumption_order,
+                    prior_message_id,
                     device_id,
                     session_id,
                     *attachment_ids,
@@ -720,7 +726,8 @@ class DeviceRegistry:
         rows = self._connection.execute(
             """
             SELECT id, root_id, relative_path, name, content_type, size,
-                   run_id, prompt_fingerprint, consumption_order, message_id
+                   run_id, prompt_fingerprint, consumption_order, message_id,
+                   prior_message_id
             FROM attachments
             WHERE session_id = ?
               AND state = 'consumed'
@@ -746,6 +753,7 @@ class DeviceRegistry:
                 prompt_fingerprint=row["prompt_fingerprint"],
                 consumption_order=row["consumption_order"],
                 message_id=row["message_id"],
+                prior_message_id=row["prior_message_id"],
             )
             for row in rows
         ]
@@ -855,6 +863,7 @@ class DeviceRegistry:
                 prompt_fingerprint TEXT,
                 consumption_order INTEGER,
                 message_id TEXT,
+                prior_message_id INTEGER,
                 file_device INTEGER,
                 file_inode INTEGER
             );
@@ -862,7 +871,7 @@ class DeviceRegistry:
             CREATE INDEX IF NOT EXISTS attachments_pending
             ON attachments (device_id, session_id, state);
 
-            PRAGMA user_version = 7;
+            PRAGMA user_version = 8;
             """
         )
         attachment_columns = {
@@ -898,6 +907,10 @@ class DeviceRegistry:
         if "message_id" not in attachment_columns:
             self._connection.execute(
                 "ALTER TABLE attachments ADD COLUMN message_id TEXT"
+            )
+        if "prior_message_id" not in attachment_columns:
+            self._connection.execute(
+                "ALTER TABLE attachments ADD COLUMN prior_message_id INTEGER"
             )
         self._connection.commit()
 

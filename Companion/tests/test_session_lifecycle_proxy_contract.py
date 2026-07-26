@@ -250,9 +250,9 @@ class SessionLifecycleProxyContractTests(unittest.IsolatedAsyncioTestCase):
         self.gateway_mode = "duplicate_attachment_history"
         device = self.registry.authenticate(self.device_credential)
         attachment_ids = []
-        for name, run_id in (
-            ("first.txt", "run-z"),
-            ("second.txt", "run-a"),
+        for name, run_id, prior_message_id in (
+            ("first.txt", "run-z", 41),
+            ("second.txt", "run-a", 43),
         ):
             attachment_id = self.registry.reserve_attachment(
                 device_id=device.id,
@@ -269,6 +269,7 @@ class SessionLifecycleProxyContractTests(unittest.IsolatedAsyncioTestCase):
                 attachment_ids=[attachment_id],
                 run_id=run_id,
                 prompt_fingerprint=attachment_prompt_fingerprint("Repeat"),
+                prior_message_id=prior_message_id,
             )
             attachment_ids.append(attachment_id)
 
@@ -293,17 +294,18 @@ class SessionLifecycleProxyContractTests(unittest.IsolatedAsyncioTestCase):
                 for message in (await response.json())["data"]
                 if message["role"] == "user"
             ]
+            self.assertNotIn("attachments", user_messages[0])
             self.assertEqual(
                 ["first.txt", "second.txt"],
                 [
                     message["attachments"][0]["name"]
-                    for message in user_messages
+                    for message in user_messages[1:]
                 ],
             )
         stored = self.registry.list_consumed_attachments(
             session_id="session-1",
         )
-        self.assertEqual(["40", "42"], [item.message_id for item in stored])
+        self.assertEqual(["42", "44"], [item.message_id for item in stored])
 
     async def test_gateway_client_error_is_preserved_but_bad_success_is_bounded(
         self,
@@ -453,6 +455,20 @@ class SessionLifecycleProxyContractTests(unittest.IsolatedAsyncioTestCase):
                                 "role": "assistant",
                                 "content": "Done again",
                                 "timestamp": 103.0,
+                            },
+                            {
+                                "id": 44,
+                                "session_id": request.match_info["session_id"],
+                                "role": "user",
+                                "content": "Repeat",
+                                "timestamp": 104.0,
+                            },
+                            {
+                                "id": 45,
+                                "session_id": request.match_info["session_id"],
+                                "role": "assistant",
+                                "content": "Done once more",
+                                "timestamp": 105.0,
                             },
                         ]
                         if duplicate

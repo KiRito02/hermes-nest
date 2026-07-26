@@ -378,10 +378,11 @@ path.
 Consumed attachment metadata added to authoritative session history includes
 only the display metadata and an opaque authenticated `download_path`.
 For newly consumed turns, Companion records a monotonic per-session turn order,
-binds it to the real Gateway user-message `id` on the first authoritative
+captures the maximum real Gateway message `id` immediately before submitting
+the Run, binds only a later matching user message on the first authoritative
 history read, and uses that ID thereafter. This keeps repeated identical
-prompts associated with the correct attachments without inventing a Gateway
-`run_id` message field.
+prompts—including intervening turns without attachments—associated with the
+correct attachments without inventing a Gateway `run_id` message field.
 `GET /companion/v1/uploads/{attachment_id}/content` serves that consumed file
 only while its published device/inode identity still matches; randomized
 storage paths remain private. This supplies historical image/audio previews
