@@ -10,19 +10,17 @@
 [![Swift](https://img.shields.io/badge/Swift-5.9%2B-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](LICENSE)
 
-[Roadmap](PROJECT_SPEC.md) · [Issue tracker](https://github.com/KiRito02/hermes-nest/issues) · [Development](DEVELOPMENT.md)
+[Roadmap](PROJECT_SPEC.md) · [Issue tracker](https://github.com/KiRito02/hermes-nest/issues) · [Personal sideload](docs/personal-sideload.md) · [Development](DEVELOPMENT.md)
 
 </div>
 
 ## Status
 
-This fork is **in migration**. The inherited Hermex SwiftUI interface is
-present, but the approved Companion/Gateway architecture is not implemented
-yet. Do not treat the current branch as a finished client or Companion.
+Hermes Nest now uses the approved App → self-hosted Companion → loopback
+Hermes Gateway architecture. The personal product builds only the native
+iPhone/iPad App; inherited WebUI login/control routes and extension targets are
+not part of its runtime.
 
-- Product direction: App → self-hosted Companion → loopback Hermes Gateway.
-- First implementation slice:
-  [Issue #1 — Companion pairing, capabilities, and Gateway connection](https://github.com/KiRito02/hermes-nest/issues/1).
 - Distribution target: personal sideload, not App Store/TestFlight.
 - Current development branch changes remain local until explicitly approved
   for push.
@@ -95,10 +93,11 @@ an HTTPS reverse proxy, with Tailscale HTTPS also supported.
 
 Companion uses Python 3.11, pinned `aiohttp`, standard-library SQLite, a
 `uv`-locked isolated environment, XDG-owned configuration/state/releases, and a
-systemd service installed directly on the Hermes Agent host. Exact commands land with
-Issue #1 and must preserve loopback binding and degraded operation when Gateway
-is unavailable. Do not expose Gateway directly or place `API_SERVER_KEY` on the
-iPhone.
+systemd service installed directly on the Hermes Agent host. Install it from a
+clean checkout with `Companion/companionctl install`; later use `upgrade`,
+`rollback`, `backup`, `restore`, `status`, and `pair`. The command preserves
+loopback binding and degraded operation when Gateway is unavailable. Do not
+expose Gateway directly or place `API_SERVER_KEY` on the iPhone.
 
 Official API Server documentation:
 https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server
@@ -111,8 +110,11 @@ The owner's primary development machines are Linux and Windows:
 2. Ask before pushing a branch.
 3. Manually run `PR CI` on a macOS GitHub Actions runner for Xcode
    build/XCTest.
-4. After Phase I adds packaging, download the prepared artifact on Windows.
+4. Run `Personal Sideload Artifact` and download the prepared artifact on
+   Windows.
 5. Re-sign/install it with AltStore or SideStore.
+
+See the bilingual [personal sideload guide](docs/personal-sideload.md).
 
 Local Xcode development requires macOS. Open `HermesMobile.xcodeproj` and use
 the `HermesMobile` scheme. The reference simulator is iPhone 17 Pro Max;

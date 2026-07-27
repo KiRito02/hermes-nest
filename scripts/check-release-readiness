@@ -1,0 +1,287 @@
+#!/usr/bin/env python3
+"""Fail closed when the personal-sideload product regains legacy requirements."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import plistlib
+import re
+from pathlib import Path
+
+
+EXPECTED_BUNDLE_ID = "com.kirito02.hermesnest"
+FORBIDDEN_PROJECT_MARKERS = (
+    "com.apple.product-type.app-extension",
+    "HermesShareExtension",
+    "HermesLiveActivityWidget",
+    ".appex in Embed App Extensions",
+    "APP_GROUP_IDENTIFIER",
+    "com.uzairansar.hermesmobile",
+    "ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES",
+)
+FORBIDDEN_WEBUI_RUNTIME_SOURCES = (
+    "APIClient.swift",
+    "AuthManager.swift",
+    "SettingsView.swift",
+    "SessionListView.swift",
+    "ChatView.swift",
+    "AgentLiveActivityManager.swift",
+    "HermexAppIntents.swift",
+    "ProfileEntity.swift",
+)
+
+
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Validate the Hermes Nest personal-sideload product boundary."
+    )
+    parser.add_argument(
+        "--project-root",
+        type=Path,
+        default=Path(__file__).resolve().parent.parent,
+        help="repository root to validate",
+    )
+    return parser.parse_args()
+
+
+def read_plist(path: Path) -> dict[str, object]:
+    with path.open("rb") as plist_file:
+        payload = plistlib.load(plist_file)
+    if not isinstance(payload, dict):
+        raise ValueError(f"{path} must contain a plist dictionary")
+    return payload
+
+
+def main_app_source_names(project: str) -> set[str]:
+    target_match = re.search(
+        r"(?ms)^[ \t]*[0-9A-F]+ /\* HermesMobile \*/ = \{"
+        r"[ \t]*\n[ \t]*isa = PBXNativeTarget;"
+        r"(?P<body>.*?)^[ \t]*\};",
+        project,
+    )
+    if target_match is None:
+        raise ValueError("HermesMobile PBXNativeTarget was not found")
+
+    phases_match = re.search(
+        r"(?ms)buildPhases = \((?P<phases>.*?)\);",
+        target_match.group("body"),
+    )
+    if phases_match is None:
+        raise ValueError("HermesMobile build phases were not found")
+
+    source_phase_match = re.search(
+        r"(?m)^[ \t]*([0-9A-F]+) /\* Sources \*/,?[ \t]*$",
+        phases_match.group("phases"),
+    )
+    if source_phase_match is None:
+        raise ValueError("HermesMobile Sources build phase was not found")
+
+    source_phase_id = re.escape(source_phase_match.group(1))
+    source_block_match = re.search(
+        rf"(?ms)^[ \t]*{source_phase_id} /\* Sources \*/ = \{{"
+        r"(?P<body>.*?)^[ \t]*\};",
+        project,
+    )
+    if source_block_match is None:
+        raise ValueError("HermesMobile Sources build phase body was not found")
+
+    return set(
+        re.findall(
+            r"/\* ([^*/\r\n]+?) in Sources \*/",
+            source_block_match.group("body"),
+        )
+    )
+
+
+def validate_icon_assets(project_root: Path) -> list[str]:
+    failures: list[str] = []
+    assets = (
+        project_root
+        / "HermesMobile"
+        / "Resources"
+        / "Assets.xcassets"
+    )
+    app_icon_sets = sorted(
+        path.name for path in assets.glob("*.appiconset")
+    )
+    if app_icon_sets != ["AppIcon.appiconset"]:
+        failures.append(
+            "asset catalog must contain only the primary AppIcon.appiconset"
+        )
+
+    contents_path = assets / "AppIcon.appiconset" / "Contents.json"
+    contents = json.loads(contents_path.read_text(encoding="utf-8"))
+    images = contents.get("images")
+    if not isinstance(images, list):
+        failures.append("primary App icon catalog has no images array")
+        return failures
+
+    appearances: set[str] = set()
+    for image in images:
+        if not isinstance(image, dict):
+            continue
+        appearance = "light"
+        raw_appearances = image.get("appearances")
+        if isinstance(raw_appearances, list) and raw_appearances:
+            first = raw_appearances[0]
+            if isinstance(first, dict) and isinstance(first.get("value"), str):
+                appearance = first["value"]
+        filename = image.get("filename")
+        if (
+            image.get("idiom") == "universal"
+            and image.get("platform") == "ios"
+            and image.get("size") == "1024x1024"
+            and isinstance(filename, str)
+        ):
+            appearances.add(appearance)
+            if not filename.startswith("hermes_nest_"):
+                failures.append(
+                    f"App icon retains inherited filename: {filename}"
+                )
+            icon_path = contents_path.parent / filename
+            if not icon_path.is_file() or icon_path.is_symlink():
+                failures.append(
+                    f"App icon file is missing or unsafe: {filename}"
+                )
+    if appearances != {"light", "dark", "tinted"}:
+        failures.append(
+            "App icon must define light, dark, and tinted appearances"
+        )
+
+    in_app_icon = assets / "HermesAppIcon.imageset"
+    in_app_contents = json.loads(
+        (in_app_icon / "Contents.json").read_text(encoding="utf-8")
+    )
+    in_app_filenames = {
+        image.get("filename")
+        for image in in_app_contents.get("images", [])
+        if isinstance(image, dict) and isinstance(image.get("filename"), str)
+    }
+    if in_app_filenames != {"hermes_nest_icon.png"}:
+        failures.append("in-App icon must use the Hermes Nest-owned artwork")
+    if not (in_app_icon / "hermes_nest_icon.png").is_file():
+        failures.append("in-App Hermes Nest icon file is missing")
+    return failures
+
+
+def validate(project_root: Path) -> list[str]:
+    failures: list[str] = []
+
+    shared_config = (
+        project_root / "Config" / "Shared.xcconfig"
+    ).read_text(encoding="utf-8")
+    if (
+        f"APP_BUNDLE_IDENTIFIER = {EXPECTED_BUNDLE_ID}"
+        not in shared_config
+    ):
+        failures.append(
+            f"tracked bundle ID must be {EXPECTED_BUNDLE_ID}"
+        )
+    if re.search(
+        r"(?m)^[ \t]*DEVELOPMENT_TEAM[ \t]*=[ \t]*[^ \t\r\n]",
+        shared_config,
+    ):
+        failures.append("tracked DEVELOPMENT_TEAM must remain unset")
+    if "APP_GROUP_IDENTIFIER" in shared_config:
+        failures.append("tracked config must not define an App Group")
+    for config_path in (project_root / "Config").glob("*.xcconfig"):
+        config_text = config_path.read_text(encoding="utf-8")
+        if "com.uzairansar.hermesmobile" in config_text:
+            failures.append(
+                f"tracked config retains upstream bundle identity: "
+                f"{config_path.name}"
+            )
+    for export_options_path in (project_root / "Config").glob("*.plist"):
+        export_options = read_plist(export_options_path)
+        if export_options.get("teamID"):
+            failures.append(
+                "tracked export options retain an Apple Team ID: "
+                f"{export_options_path.name}"
+            )
+        if export_options.get("method") == "app-store-connect":
+            failures.append(
+                "tracked export options retain App Store distribution: "
+                f"{export_options_path.name}"
+            )
+
+    keychain_source = (
+        project_root / "HermesMobile" / "Auth" / "KeychainStore.swift"
+    )
+    if keychain_source.exists() and (
+        "com.uzairansar.hermesmobile"
+        in keychain_source.read_text(encoding="utf-8")
+    ):
+        failures.append("Keychain fallback retains upstream bundle identity")
+
+    entitlements = read_plist(
+        project_root
+        / "HermesMobile"
+        / "Resources"
+        / "HermesMobile.entitlements"
+    )
+    if "com.apple.security.application-groups" in entitlements:
+        failures.append("main App must not require an App Group entitlement")
+
+    info = read_plist(
+        project_root / "HermesMobile" / "Resources" / "Info.plist"
+    )
+    if info.get("NSSupportsLiveActivities") is True:
+        failures.append("main App must not advertise Live Activities")
+    for removed_key in (
+        "CFBundleURLTypes",
+        "HermesURLScheme",
+        "NSMicrophoneUsageDescription",
+        "NSCameraUsageDescription",
+        "NSSpeechRecognitionUsageDescription",
+        "UIBackgroundModes",
+    ):
+        if removed_key in info:
+            failures.append(
+                f"main App retains removed capability key: {removed_key}"
+            )
+
+    project = (
+        project_root / "HermesMobile.xcodeproj" / "project.pbxproj"
+    ).read_text(encoding="utf-8")
+    for marker in FORBIDDEN_PROJECT_MARKERS:
+        if marker in project:
+            failures.append(f"Xcode project contains removed marker: {marker}")
+    app_sources = main_app_source_names(project)
+    forbidden_app_sources = sorted(
+        source
+        for source in app_sources
+        if source in FORBIDDEN_WEBUI_RUNTIME_SOURCES
+        or source.startswith("APIClient+")
+    )
+    for source in forbidden_app_sources:
+        failures.append(
+            f"Xcode project contains WebUI runtime source: {source}"
+        )
+    failures.extend(validate_icon_assets(project_root))
+
+    return failures
+
+
+def main() -> None:
+    arguments = parse_arguments()
+    try:
+        failures = validate(arguments.project_root.resolve())
+    except (
+        OSError,
+        ValueError,
+        json.JSONDecodeError,
+        plistlib.InvalidFileException,
+    ) as error:
+        raise SystemExit(f"Release readiness could not be checked: {error}") from error
+
+    if failures:
+        raise SystemExit(
+            "Release readiness failed:\n"
+            + "\n".join(f"- {failure}" for failure in failures)
+        )
+    print("Release readiness: OK")
+
+
+if __name__ == "__main__":
+    main()

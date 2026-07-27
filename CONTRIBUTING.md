@@ -19,8 +19,7 @@ read the [Code of Conduct](CODE_OF_CONDUCT.md).
   Companion on the same server as a
   [Hermes Agent API Server](https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server).
   The App connects to Companion; Companion connects to `hermes gateway` over
-  loopback. Until the Companion implementation lands, the current branch is
-  documentation/migration work, not a usable deployment.
+  loopback. Use `Companion/companionctl install` for a host installation.
 
 ## Running tests
 
@@ -45,19 +44,16 @@ locally instead:
 
    ```xcconfig
    DEVELOPMENT_TEAM = YOUR_TEAM_ID
-   APP_BUNDLE_IDENTIFIER = com.yourname.hermex
-   // Temporary while using the inherited multi-target scheme:
-   APP_GROUP_IDENTIFIER = group.com.yourname.hermex
+   // Optional:
+   // APP_BUNDLE_IDENTIFIER = com.yourname.hermesnest
    ```
 
 2. Build normally. `Config/Shared.xcconfig` is wired into the project and ends
    with `#include? "Local.xcconfig"`, so your local values override the
    committed defaults without putting personal identity in git.
 
-The planned personal-sideload configuration is app-only. After it lands, Share
-extensions, widgets/Live Activities, and App Groups are not part of the initial
-signing requirement; until then, the inherited multi-target scheme may still
-require the temporary App Group override shown above.
+The personal-sideload product is app-only. Share extensions, widgets/Live
+Activities, and App Groups are not part of its signing requirement.
 
 For simulator-only development you usually don't need any of this: simulator
 builds don't require a paid team. Note that unit tests and CI run with

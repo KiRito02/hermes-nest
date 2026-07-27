@@ -13,6 +13,7 @@ unless the owner explicitly changes the distribution decision in a new Issue.
 Current development and sideload guidance:
 
 - [`PROJECT_SPEC.md`](PROJECT_SPEC.md) §6
+- [`docs/personal-sideload.md`](docs/personal-sideload.md)
 - [`DEVELOPMENT.md`](DEVELOPMENT.md)
 - [`AGENTS.md`](AGENTS.md)
 

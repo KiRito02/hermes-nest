@@ -89,11 +89,23 @@ private struct CompanionFoundationStatusView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        Image("HermesMobileBanner")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: 240)
-                            .accessibilityHidden(true)
+                        HStack(spacing: 12) {
+                            Image("HermesAppIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 56, height: 56)
+                                .clipShape(
+                                    RoundedRectangle(
+                                        cornerRadius: 13,
+                                        style: .continuous
+                                    )
+                                )
+                                .accessibilityHidden(true)
+
+                            Text("Hermes Nest")
+                                .font(.largeTitle.bold())
+                        }
+                        .accessibilityElement(children: .combine)
 
                         Label(
                             title,

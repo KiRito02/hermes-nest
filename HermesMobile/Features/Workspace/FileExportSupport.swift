@@ -3,6 +3,14 @@ import Photos
 import SwiftUI
 import UniformTypeIdentifiers
 
+struct FileExportPayload {
+    let data: Data
+    let filename: String
+    let contentType: UTType
+    let isImage: Bool
+    let isVideo: Bool
+}
+
 struct ExportedFileDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.data] }
 

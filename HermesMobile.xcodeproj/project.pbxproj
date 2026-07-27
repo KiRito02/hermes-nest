@@ -47,6 +47,7 @@
 		E00600000000000000000001 /* SessionRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00600000000000000000011 /* SessionRepository.swift */; };
 		E00600000000000000000002 /* CompanionSessionListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00600000000000000000012 /* CompanionSessionListViewModel.swift */; };
 		E00600000000000000000003 /* CompanionSessionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00600000000000000000013 /* CompanionSessionListView.swift */; };
+		E02700000000000000000001 /* CompanionPresentationSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E02700000000000000000011 /* CompanionPresentationSupport.swift */; };
 		E00600000000000000000004 /* SessionRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00600000000000000000014 /* SessionRepositoryTests.swift */; };
 		E00700000000000000000001 /* SessionRepository+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00700000000000000000011 /* SessionRepository+Lifecycle.swift */; };
 		E00800000000000000000001 /* ConversationRunService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00800000000000000000011 /* ConversationRunService.swift */; };
@@ -55,6 +56,7 @@
 		F02300000000000000000001 /* CompanionMemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02300000000000000000011 /* CompanionMemoryView.swift */; };
 		F02400000000000000000001 /* CompanionWorkspaceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02400000000000000000011 /* CompanionWorkspaceModels.swift */; };
 		E00800000000000000000002 /* ConversationRunServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00800000000000000000012 /* ConversationRunServiceTests.swift */; };
+		E02700000000000000000002 /* CompanionTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E02700000000000000000012 /* CompanionTestSupport.swift */; };
 		C04000000000000000000001 /* APIClient+Sessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04000000000000000000011 /* APIClient+Sessions.swift */; };
 		C04000000000000000000002 /* APIClient+Projects.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04000000000000000000012 /* APIClient+Projects.swift */; };
 		C04000000000000000000003 /* APIClient+Chat.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04000000000000000000013 /* APIClient+Chat.swift */; };
@@ -264,9 +266,6 @@
 		1A2B3C4D5E6F70000000300 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F70000000301 /* PrivacyInfo.xcprivacy */; };
 		9E2A653D968A4ACDA19A8142 /* ThirdPartyNotices in Resources */ = {isa = PBXBuildFile; fileRef = 488791F556304AD2AC59BC5D /* ThirdPartyNotices */; };
 		B5A100000000000000000001 /* SharedDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A100000000000000000010 /* SharedDraftStore.swift */; };
-		B5A100000000000000000002 /* SharedDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A100000000000000000010 /* SharedDraftStore.swift */; };
-		B5A100000000000000000003 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A100000000000000000011 /* ShareViewController.swift */; };
-		B5A100000000000000000007 /* ShareInputReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A100000000000000000018 /* ShareInputReader.swift */; };
 		B5A100000000000000000008 /* ShareInputReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A100000000000000000018 /* ShareInputReader.swift */; };
 		B5A100000000000000000009 /* ShareInputReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A100000000000000000019 /* ShareInputReaderTests.swift */; };
 		B5A100000000000000000060 /* AuthManagerStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A100000000000000000061 /* AuthManagerStateTests.swift */; };
@@ -301,16 +300,10 @@
 		C15400000000000000000005 /* KanbanCardDetailStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C15400000000000000000006 /* KanbanCardDetailStateTests.swift */; };
 		C21300000000000000000007 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = C21300000000000000000008 /* MarkdownUI */; };
 		B5A220000000000000000005 /* ChatMarkerMessageClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A220000000000000000006 /* ChatMarkerMessageClassifierTests.swift */; };
-		B5A100000000000000000004 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B5A100000000000000000014 /* PrivacyInfo.xcprivacy */; };
 		B5A100000000000000000005 /* SharedDraftStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A100000000000000000016 /* SharedDraftStoreTests.swift */; };
-		B5A100000000000000000006 /* HermesShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B5A100000000000000000017 /* HermesShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A04500000000000000000001 /* AgentRunActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000010 /* AgentRunActivityAttributes.swift */; };
 		A04500000000000000000002 /* HermesDeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000011 /* HermesDeepLink.swift */; };
 		A04500000000000000000003 /* AgentLiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000012 /* AgentLiveActivityManager.swift */; };
-		A04500000000000000000004 /* AgentRunActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000010 /* AgentRunActivityAttributes.swift */; };
-		A04500000000000000000005 /* HermesDeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000011 /* HermesDeepLink.swift */; };
-		A04500000000000000000006 /* AgentRunLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000013 /* AgentRunLiveActivityWidget.swift */; };
-		A04500000000000000000007 /* HermesLiveActivityWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A04500000000000000000017 /* HermesLiveActivityWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A04500000000000000000008 /* LiveActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000018 /* LiveActivityTests.swift */; };
 		2BE8F2B38F094C4C9EB18301 /* SkillsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BE8F2B38F094C4C9EB18300 /* SkillsViewModelTests.swift */; };
 		22AB000000000000000000B3 /* WorkspaceRegistryViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22AB000000000000000000F3 /* WorkspaceRegistryViewModelTests.swift */; };
@@ -342,35 +335,9 @@
 			remoteGlobalIDString = 1A2B3C4D5E6F700000000040;
 			remoteInfo = HermesMobile;
 		};
-		B5A100000000000000000030 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 1A2B3C4D5E6F700000000070 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = B5A100000000000000000040;
-			remoteInfo = HermesShareExtension;
-		};
-		A04500000000000000000030 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 1A2B3C4D5E6F700000000070 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = A04500000000000000000040;
-			remoteInfo = HermesLiveActivityWidget;
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		B5A100000000000000000023 /* Embed App Extensions */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 13;
-			files = (
-				B5A100000000000000000006 /* HermesShareExtension.appex in Embed App Extensions */,
-				A04500000000000000000007 /* HermesLiveActivityWidget.appex in Embed App Extensions */,
-			);
-			name = "Embed App Extensions";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -405,6 +372,7 @@
 		E00600000000000000000011 /* SessionRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRepository.swift; sourceTree = "<group>"; };
 		E00600000000000000000012 /* CompanionSessionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionSessionListViewModel.swift; sourceTree = "<group>"; };
 		E00600000000000000000013 /* CompanionSessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionSessionListView.swift; sourceTree = "<group>"; };
+		E02700000000000000000011 /* CompanionPresentationSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionPresentationSupport.swift; sourceTree = "<group>"; };
 		E00600000000000000000014 /* SessionRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRepositoryTests.swift; sourceTree = "<group>"; };
 		E00700000000000000000011 /* SessionRepository+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionRepository+Lifecycle.swift"; sourceTree = "<group>"; };
 		E00800000000000000000011 /* ConversationRunService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationRunService.swift; sourceTree = "<group>"; };
@@ -413,6 +381,7 @@
 		F02300000000000000000011 /* CompanionMemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionMemoryView.swift; sourceTree = "<group>"; };
 		F02400000000000000000011 /* CompanionWorkspaceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionWorkspaceModels.swift; sourceTree = "<group>"; };
 		E00800000000000000000012 /* ConversationRunServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationRunServiceTests.swift; sourceTree = "<group>"; };
+		E02700000000000000000012 /* CompanionTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionTestSupport.swift; sourceTree = "<group>"; };
 		C04000000000000000000011 /* APIClient+Sessions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+Sessions.swift"; sourceTree = "<group>"; };
 		C04000000000000000000012 /* APIClient+Projects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+Projects.swift"; sourceTree = "<group>"; };
 		C04000000000000000000013 /* APIClient+Chat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+Chat.swift"; sourceTree = "<group>"; };
@@ -641,11 +610,6 @@
 		A710739233F64F4FA4C2B710 /* ComposerVoiceInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerVoiceInputController.swift; sourceTree = "<group>"; };
 		A710739233F64F4FA4C2B711 /* ComposerVoiceDraftComposerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerVoiceDraftComposerTests.swift; sourceTree = "<group>"; };
 		B5A100000000000000000010 /* SharedDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedDraftStore.swift; sourceTree = "<group>"; };
-		B5A100000000000000000011 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
-		B5A100000000000000000018 /* ShareInputReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareInputReader.swift; sourceTree = "<group>"; };
-		B5A100000000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		B5A100000000000000000013 /* HermesShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HermesShareExtension.entitlements; sourceTree = "<group>"; };
-		B5A100000000000000000014 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B5A100000000000000000015 /* HermesMobile.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HermesMobile.entitlements; sourceTree = "<group>"; };
 		488791F556304AD2AC59BC5D /* ThirdPartyNotices */ = {isa = PBXFileReference; lastKnownFileType = folder; path = ThirdPartyNotices; sourceTree = "<group>"; };
 		B5A100000000000000000016 /* SharedDraftStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedDraftStoreTests.swift; sourceTree = "<group>"; };
@@ -681,13 +645,9 @@
 		C15300000000000000000006 /* KanbanCardEditorStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanCardEditorStateTests.swift; sourceTree = "<group>"; };
 		C15400000000000000000006 /* KanbanCardDetailStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanCardDetailStateTests.swift; sourceTree = "<group>"; };
 		B5A220000000000000000006 /* ChatMarkerMessageClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMarkerMessageClassifierTests.swift; sourceTree = "<group>"; };
-		B5A100000000000000000017 /* HermesShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HermesShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A04500000000000000000010 /* AgentRunActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRunActivityAttributes.swift; sourceTree = "<group>"; };
 		A04500000000000000000011 /* HermesDeepLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesDeepLink.swift; sourceTree = "<group>"; };
 		A04500000000000000000012 /* AgentLiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLiveActivityManager.swift; sourceTree = "<group>"; };
-		A04500000000000000000013 /* AgentRunLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRunLiveActivityWidget.swift; sourceTree = "<group>"; };
-		A04500000000000000000014 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A04500000000000000000017 /* HermesLiveActivityWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HermesLiveActivityWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A04500000000000000000018 /* LiveActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityTests.swift; sourceTree = "<group>"; };
 		C0CAM000000000000000B002 /* CameraPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPickerView.swift; sourceTree = "<group>"; };
 		C0DEC0DE0000000000000002 /* ChatComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatComposerView.swift; sourceTree = "<group>"; };
@@ -719,20 +679,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		B5A100000000000000000020 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		A04500000000000000000061 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -742,8 +688,6 @@
 				351C0F1600000000000000A1 /* Shared.xcconfig */,
 				1A2B3C4D5E6F700000000031 /* HermesMobile */,
 				1A2B3C4D5E6F700000000034 /* HermesMobileTests */,
-				B5A100000000000000000051 /* HermesShareExtension */,
-				A04500000000000000000021 /* HermesLiveActivityWidget */,
 				1A2B3C4D5E6F700000000032 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -771,8 +715,6 @@
 			children = (
 				1A2B3C4D5E6F700000000010 /* HermesMobile.app */,
 				1A2B3C4D5E6F700000000015 /* HermesMobileTests.xctest */,
-				B5A100000000000000000017 /* HermesShareExtension.appex */,
-				A04500000000000000000017 /* HermesLiveActivityWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -801,6 +743,7 @@
 				D01600000000000000000013 /* CompanionDiscoveryTests.swift */,
 				E00600000000000000000014 /* SessionRepositoryTests.swift */,
 				E00800000000000000000012 /* ConversationRunServiceTests.swift */,
+				E02700000000000000000012 /* CompanionTestSupport.swift */,
 				B5A1000000000000000000A1 /* ServerRegistryTests.swift */,
 				C0FF000000000000000000C2 /* CustomHeaderInjectionTests.swift */,
 				C03900000000000000000001 /* APIClientSessionListTests.swift */,
@@ -1035,6 +978,7 @@
 			children = (
 				E00600000000000000000013 /* CompanionSessionListView.swift */,
 				E00600000000000000000012 /* CompanionSessionListViewModel.swift */,
+				E02700000000000000000011 /* CompanionPresentationSupport.swift */,
 				D01600000000000000000012 /* CompanionDiscoveryView.swift */,
 				F02200000000000000000011 /* CompanionWorkspaceView.swift */,
 				F02300000000000000000011 /* CompanionMemoryView.swift */,
@@ -1191,26 +1135,6 @@
 			path = Share;
 			sourceTree = "<group>";
 		};
-		B5A100000000000000000051 /* HermesShareExtension */ = {
-			isa = PBXGroup;
-			children = (
-				B5A100000000000000000011 /* ShareViewController.swift */,
-				B5A100000000000000000018 /* ShareInputReader.swift */,
-				B5A100000000000000000052 /* Resources */,
-			);
-			path = HermesShareExtension;
-			sourceTree = "<group>";
-		};
-		B5A100000000000000000052 /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				B5A100000000000000000012 /* Info.plist */,
-				B5A100000000000000000013 /* HermesShareExtension.entitlements */,
-				B5A100000000000000000014 /* PrivacyInfo.xcprivacy */,
-			);
-			path = Resources;
-			sourceTree = "<group>";
-		};
 		A04500000000000000000020 /* LiveActivities */ = {
 			isa = PBXGroup;
 			children = (
@@ -1228,23 +1152,6 @@
 				1A2B3C4D5E6F700000000342 /* ProfileEntity.swift */,
 			);
 			path = AppIntents;
-			sourceTree = "<group>";
-		};
-		A04500000000000000000021 /* HermesLiveActivityWidget */ = {
-			isa = PBXGroup;
-			children = (
-				A04500000000000000000013 /* AgentRunLiveActivityWidget.swift */,
-				A04500000000000000000022 /* Resources */,
-			);
-			path = HermesLiveActivityWidget;
-			sourceTree = "<group>";
-		};
-		A04500000000000000000022 /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				A04500000000000000000014 /* Info.plist */,
-			);
-			path = Resources;
 			sourceTree = "<group>";
 		};
 		1A2B3C4D5E6F70000000206 /* Memory */ = {
@@ -1297,13 +1204,10 @@
 				1A2B3C4D5E6F700000000050 /* Sources */,
 				1A2B3C4D5E6F700000000060 /* Resources */,
 				1A2B3C4D5E6F700000000020 /* Frameworks */,
-				B5A100000000000000000023 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				B5A100000000000000000031 /* PBXTargetDependency */,
-				A04500000000000000000031 /* PBXTargetDependency */,
 			);
 			name = HermesMobile;
 			packageProductDependencies = (
@@ -1338,40 +1242,6 @@
 			productReference = 1A2B3C4D5E6F700000000015 /* HermesMobileTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		B5A100000000000000000040 /* HermesShareExtension */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = B5A100000000000000000041 /* Build configuration list for PBXNativeTarget "HermesShareExtension" */;
-			buildPhases = (
-				B5A100000000000000000021 /* Sources */,
-				B5A100000000000000000022 /* Resources */,
-				B5A100000000000000000020 /* Frameworks */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = HermesShareExtension;
-			productName = HermesShareExtension;
-			productReference = B5A100000000000000000017 /* HermesShareExtension.appex */;
-			productType = "com.apple.product-type.app-extension";
-		};
-		A04500000000000000000040 /* HermesLiveActivityWidget */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = A04500000000000000000041 /* Build configuration list for PBXNativeTarget "HermesLiveActivityWidget" */;
-			buildPhases = (
-				A04500000000000000000050 /* Sources */,
-				A04500000000000000000060 /* Resources */,
-				A04500000000000000000061 /* Frameworks */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = HermesLiveActivityWidget;
-			productName = HermesLiveActivityWidget;
-			productReference = A04500000000000000000017 /* HermesLiveActivityWidget.appex */;
-			productType = "com.apple.product-type.app-extension";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1388,12 +1258,6 @@
 					1A2B3C4D5E6F700000000044 = {
 						CreatedOnToolsVersion = 26.4.1;
 						TestTargetID = 1A2B3C4D5E6F700000000040;
-					};
-					B5A100000000000000000040 = {
-						CreatedOnToolsVersion = 26.4.1;
-					};
-					A04500000000000000000040 = {
-						CreatedOnToolsVersion = 26.4.1;
 					};
 				};
 			};
@@ -1421,8 +1285,6 @@
 			targets = (
 				1A2B3C4D5E6F700000000040 /* HermesMobile */,
 				1A2B3C4D5E6F700000000044 /* HermesMobileTests */,
-				B5A100000000000000000040 /* HermesShareExtension */,
-				A04500000000000000000040 /* HermesLiveActivityWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -1434,25 +1296,8 @@
 			files = (
 				1A2B3C4D5E6F700000000003 /* Assets.xcassets in Resources */,
 				10CA110C0DE000000000B001 /* Localizable.xcstrings in Resources */,
-				10CA110C0DE000000000B004 /* AppShortcuts.xcstrings in Resources */,
 				1A2B3C4D5E6F70000000300 /* PrivacyInfo.xcprivacy in Resources */,
 				9E2A653D968A4ACDA19A8142 /* ThirdPartyNotices in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		B5A100000000000000000022 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				B5A100000000000000000004 /* PrivacyInfo.xcprivacy in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		A04500000000000000000060 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				10CA110C0DE000000000B003 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1465,15 +1310,7 @@
 			files = (
 				1A2B3C4D5E6F700000000001 /* HermesMobileApp.swift in Sources */,
 				1A2B3C4D5E6F700000000002 /* ContentView.swift in Sources */,
-				1A2B3C4D5E6F700000000338 /* HermexAppIntents.swift in Sources */,
-				1A2B3C4D5E6F700000000343 /* ProfileEntity.swift in Sources */,
-				1A2B3C4D5E6F7000000000A1 /* AuthManager.swift in Sources */,
 				C00100000000000000000002 /* CompanionConnectionManager.swift in Sources */,
-				1A2B3C4D5E6F700000000300 /* ServerAccount.swift in Sources */,
-				A04500000000000000000001 /* AgentRunActivityAttributes.swift in Sources */,
-				A04500000000000000000002 /* HermesDeepLink.swift in Sources */,
-				A04500000000000000000003 /* AgentLiveActivityManager.swift in Sources */,
-				1A2B3C4D5E6F7000000000A2 /* APIClient.swift in Sources */,
 				C00100000000000000000001 /* CompanionConnectionService.swift in Sources */,
 				D01600000000000000000001 /* CompanionDiscoveryService.swift in Sources */,
 				E00600000000000000000001 /* SessionRepository.swift in Sources */,
@@ -1483,47 +1320,6 @@
 				F02100000000000000000001 /* CompanionWorkspaceService.swift in Sources */,
 				F02200000000000000000001 /* CompanionWorkspaceView.swift in Sources */,
 				F02300000000000000000001 /* CompanionMemoryView.swift in Sources */,
-				C04000000000000000000001 /* APIClient+Sessions.swift in Sources */,
-				C04000000000000000000002 /* APIClient+Projects.swift in Sources */,
-				C04000000000000000000003 /* APIClient+Chat.swift in Sources */,
-				C04000000000000000000004 /* APIClient+Workspace.swift in Sources */,
-				C03120000000000000B001 /* GitWorkspace.swift in Sources */,
-				C03120000000000000B002 /* APIClient+Git.swift in Sources */,
-				C03120000000000000B003 /* GitWorkspaceViewModel.swift in Sources */,
-				22AB000000000000000000B1 /* WorkspaceRegistryViewModel.swift in Sources */,
-				22AB000000000000000000B2 /* WorkspaceManagerView.swift in Sources */,
-				C03120000000000000B004 /* GitWorkspaceView.swift in Sources */,
-				C03120000000000000B005 /* GitDiffView.swift in Sources */,
-				C03180000000000000B001 /* GitActionsMenuButton.swift in Sources */,
-				C03180000000000000B002 /* GitActionToastOverlay.swift in Sources */,
-				C03180000000000000B003 /* GitInlineCommitButton.swift in Sources */,
-				C03180000000000000B004 /* GitCommitView.swift in Sources */,
-				C03180000000000000B005 /* TurnFileChangeSummary.swift in Sources */,
-				C03180000000000000B007 /* GitTurnChangesCard.swift in Sources */,
-				C03140000000000000B001 /* GitBranchPickerView.swift in Sources */,
-				C04000000000000000000005 /* APIClient+ServerPanels.swift in Sources */,
-				C04000000000000000000006 /* APIClient+Cron.swift in Sources */,
-				C04000000000000000000007 /* APIClient+Memory.swift in Sources */,
-				C04000000000000000000008 /* APIClient+Skills.swift in Sources */,
-				C04000000000000000000009 /* APIClient+Upload.swift in Sources */,
-				C14900000000000000000001 /* Kanban.swift in Sources */,
-				C14900000000000000000003 /* APIClient+Kanban.swift in Sources */,
-				C15100000000000000000001 /* KanbanEventStreamClient.swift in Sources */,
-				C14900000000000000000005 /* KanbanFeatureState.swift in Sources */,
-				C14900000000000000000007 /* KanbanLabView.swift in Sources */,
-				C15400000000000000000001 /* KanbanCardDetailState.swift in Sources */,
-				C15400000000000000000003 /* KanbanCardDetailView.swift in Sources */,
-				C15300000000000000000001 /* KanbanCardEditorState.swift in Sources */,
-				C15300000000000000000003 /* KanbanCardEditorView.swift in Sources */,
-				1A2B3C4D5E6F7000000000A8 /* Endpoints.swift in Sources */,
-				C03250000000000000B101 /* TranscribeResponse.swift in Sources */,
-				C03250000000000000B102 /* APIClient+Transcribe.swift in Sources */,
-				C03260000000000000B101 /* APIClient+TTS.swift in Sources */,
-				C03270000000000000B101 /* APIClient+SessionExport.swift in Sources */,
-				C03250000000000000B103 /* MultipartFormData.swift in Sources */,
-				C03250000000000000B104 /* ComposerVoiceNoteRecorder.swift in Sources */,
-				1A2B3C4D5E6F7000000000A3 /* APIError.swift in Sources */,
-				C04400000000000000000001 /* CacheFallbackPolicy.swift in Sources */,
 				1A2B3C4D5E6F7000000000A0 /* KeychainStore.swift in Sources */,
 				1A2B3C4D5E6F7000000000A5 /* OnboardingView.swift in Sources */,
 				C15210000000000000000006 /* OnboardingConnectPage.swift in Sources */,
@@ -1534,76 +1330,35 @@
 				C15210000000000000000002 /* OnboardingWelcomePage.swift in Sources */,
 				1A2B3C4D5E6F70000000410 /* OnboardingComponents.swift in Sources */,
 				1A2B3C4D5E6F7000000000A6 /* OnboardingViewModel.swift in Sources */,
-				1A2B3C4D5E6F7000000000A4 /* ServerInfo.swift in Sources */,
 				1A2B3C4D5E6F7000000000AB /* Session.swift in Sources */,
 				1A2B3C4D5E6F7000000000AA /* ChatMessage.swift in Sources */,
-				1A2B3C4D5E6F7000000000AD /* Workspace.swift in Sources */,
-				1A2B3C4D5E6F7000000000AE /* ServerCatalog.swift in Sources */,
-				1A2B3C4D5E6F70000000140 /* ModelFavoritesStore.swift in Sources */,
 				1A2B3C4D5E6F7000000000DE /* ToolCall.swift in Sources */,
 				1A2B3C4D5E6F7000000000A9 /* JSONValue.swift in Sources */,
 				1A2B3C4D5E6F7000000000EC /* CachedSession.swift in Sources */,
 				1A2B3C4D5E6F7000000000ED /* CachedMessage.swift in Sources */,
 				1A2B3C4D5E6F7000000000F1 /* CacheStore.swift in Sources */,
-				1A2B3C4D5E6F7000000000F5 /* SettingsView.swift in Sources */,
-				C012400000000000000004 /* AppIconSettingsSection.swift in Sources */,
-				1A2B3C4D5E6F70000000114 /* DefaultModelPickerView.swift in Sources */,
-				103200000000000000000002 /* DefaultProfilePickerView.swift in Sources */,
-				1A2B3C4D5E6F70000000110 /* ArchivedSessionsView.swift in Sources */,
 				C23400000000000000000001 /* StreamingLabReplay.swift in Sources */,
 				C23400000000000000000003 /* StreamingLabView.swift in Sources */,
 				C72600000000000000000001 /* CoreChatLabView.swift in Sources */,
-				1A2B3C4D5E6F70000000112 /* ArchivedSessionsViewModel.swift in Sources */,
-				19C1150000000000000000A1 /* CliSessionsSyncModel.swift in Sources */,
-				1A2B3C4D5E6F7000000000F8 /* AppConfig.swift in Sources */,
 				C09200000000000000000001 /* AppFont.swift in Sources */,
 				1A2B3C4D5E6F700000000100 /* AppTheme.swift in Sources */,
-				C012400000000000000002 /* AppIconChoice.swift in Sources */,
 				C09300000000000000000001 /* HapticButton.swift in Sources */,
-				C0FF000000000000000000B1 /* CustomHeadersEditor.swift in Sources */,
-				C09500000000000000000001 /* AdaptiveGlassModifier.swift in Sources */,
-				C09500000000000000000005 /* AdaptiveGlassDebugFixture.swift in Sources */,
-					1A2B3C4D5E6F7000000000A7 /* SessionListView.swift in Sources */,
-					1A2B3C4D5E6F7000000000AF /* ChatView.swift in Sources */,
-					C05100000000000000000001 /* ChatTranscriptView.swift in Sources */,
-					C05100000000000000000002 /* ChatMessageActions.swift in Sources */,
-					C05100000000000000000003 /* ChatGoalControls.swift in Sources */,
 					C05100000000000000000004 /* ChatTranscriptSupportingViews.swift in Sources */,
-					C0CAM000000000000000B001 /* CameraPickerView.swift in Sources */,
-				C0DEC0DE0000000000000001 /* ChatComposerView.swift in Sources */,
-					C05000000000000000000001 /* ChatComposerAttachmentStripView.swift in Sources */,
-					C04900000000000000000001 /* ChatComposerTextInputView.swift in Sources */,
-					C04900000000000000000003 /* ChatComposerVoiceControls.swift in Sources */,
-					C042A000000000000000001 /* ChatComposerSelectorControls.swift in Sources */,
-					C042A000000000000000003 /* ChatComposerSelectorSheets.swift in Sources */,
-					105050000000000000000001 /* ComposerModelPickerSectionExpansionState.swift in Sources */,
 				1A2B3C4D5E6F7000000000D8 /* MessageBubbleView.swift in Sources */,
 				C03190000000000000B001 /* AttachmentAudioDetection.swift in Sources */,
 				C03190000000000000B002 /* InlineAudioPlayerView.swift in Sources */,
-				BEEF02400000000000000001 /* ChatAttachmentPreviewView.swift in Sources */,
 				C12800000000000000000001 /* ToolActivityGroupView.swift in Sources */,
 				1A2B3C4D5E6F7000000000E0 /* ToolCallCardView.swift in Sources */,
-				C12800000000000000000003 /* ChatTimelineAccessorySurface.swift in Sources */,
-				C12900000000000000000001 /* ChatActiveRunStatusView.swift in Sources */,
 				C06000000000000000000001 /* ToolCallDisplayFormatter.swift in Sources */,
 				1A2B3C4D5E6F7000000000E2 /* ReasoningBlockView.swift in Sources */,
-				B5A220000000000000000001 /* ChatMarkerMessageClassifier.swift in Sources */,
-				B5A220000000000000000003 /* MarkerMessageCardView.swift in Sources */,
-				C22300000000000000000001 /* CompressionAnchorResolver.swift in Sources */,
 				C21200000000000000000001 /* StreamingWordDrain.swift in Sources */,
 				C21300000000000000000001 /* StreamingTextFade.swift in Sources */,
 				C21300000000000000000003 /* StreamingTextFadeRenderer.swift in Sources */,
-				1A2B3C4D5E6F7000000000E4 /* FileBrowserView.swift in Sources */,
-				1A2B3C4D5E6F7000000000E6 /* FileBrowserViewModel.swift in Sources */,
-				1A2B3C4D5E6F7000000000E8 /* FilePreviewView.swift in Sources */,
-				1A2B3C4D5E6F7000000000EA /* FilePreviewViewModel.swift in Sources */,
 				BEEF02600000000000000001 /* FileExportSupport.swift in Sources */,
 				1A2B3C4D5E6F7000000000DA /* MarkdownRenderer.swift in Sources */,
 				C14300000000000000000001 /* StreamingMarkdownSupport.swift in Sources */,
 				C0DE34000000000000000001 /* TranscriptMedia.swift in Sources */,
 				C0DE34000000000000000006 /* TranscriptMediaView.swift in Sources */,
-				C0DE34000000000000000008 /* TranscriptMediaPreviewViewModel.swift in Sources */,
-				C0DE34000000000000000009 /* TranscriptMediaDataLoader.swift in Sources */,
 				C0DE3400000000000000000D /* TranscriptMediaExportSupport.swift in Sources */,
 				C0DE12000000000000000001 /* TranscriptLinkPreview.swift in Sources */,
 				C0DE12000000000000000007 /* TranscriptLinkPreviewCache.swift in Sources */,
@@ -1611,64 +1366,18 @@
 				C0DE20000000000000000001 /* ChatTactileButtonStyle.swift in Sources */,
 				C0DE21000000000000000001 /* ChatMotion.swift in Sources */,
 				C0DE25000000000000000001 /* ChatScrollPolicy.swift in Sources */,
-				C0DE22000000000000000001 /* ChatHaptics.swift in Sources */,
-				C08800000000000000000001 /* SessionHaptics.swift in Sources */,
 				031031031031031031031009 /* DisplayMathView.swift in Sources */,
 				031031031031031031031001 /* MarkdownMathSegmenter.swift in Sources */,
 				031031031031031031031005 /* MarkdownMathFormatter.swift in Sources */,
 				03103103103103103103100B /* MarkdownMathFormatter+Environments.swift in Sources */,
 				031031031031031031031007 /* MarkdownMathFormatter+Support.swift in Sources */,
-					C04100000000000000000001 /* ChatComposerConfigLoader.swift in Sources */,
-					C04600000000000000000001 /* ChatStreamCoordinator.swift in Sources */,
-					C04700000000000000000001 /* ChatPendingActionCoordinator.swift in Sources */,
-					C04800000000000000000001 /* ChatAttachmentCoordinator.swift in Sources */,
-					1A2B3C4D5E6F7000000000D4 /* ChatViewModel.swift in Sources */,
-				1A2B3C4D5E6F7000000000D6 /* SSEClient.swift in Sources */,
-				C0FF000000000000000000A1 /* CustomHeader.swift in Sources */,
 				1A2B3C4D5E6F7000000000D0 /* SessionRowView.swift in Sources */,
-				1A2B3C4D5E6F7000000000D1 /* SessionListViewModel.swift in Sources */,
 				E00600000000000000000002 /* CompanionSessionListViewModel.swift in Sources */,
 				E00600000000000000000003 /* CompanionSessionListView.swift in Sources */,
+				E02700000000000000000001 /* CompanionPresentationSupport.swift in Sources */,
 				D01600000000000000000002 /* CompanionDiscoveryView.swift in Sources */,
-				A04300000000000000000001 /* SessionListComponents.swift in Sources */,
-				A10900000000000000000001 /* SessionNavigationState.swift in Sources */,
-				A04300000000000000000002 /* SessionListActionConfirmations.swift in Sources */,
-				A04300000000000000000003 /* SessionMutator.swift in Sources */,
-				A040C0DE0000000000000001 /* ProjectCreationSheet.swift in Sources */,
-				A048C0DE0000000000000001 /* SessionRenameSheet.swift in Sources */,
-				1A2B3C4D5E6F70000000130 /* ContextWindowSnapshot.swift in Sources */,
-				1A2B3C4D5E6F70000000131 /* ContextWindowIndicatorView.swift in Sources */,
 				1A2B3C4D5E6F70000000150 /* UploadResponse.swift in Sources */,
 				1A2B3C4D5E6F70000000152 /* MessageAttachment.swift in Sources */,
-				A04200000000000000000001 /* Approval.swift in Sources */,
-				A04200000000000000000003 /* ApprovalRequestOverlay.swift in Sources */,
-				C1A042000000000000000001 /* Clarification.swift in Sources */,
-				C1A042000000000000000003 /* ClarificationRequestOverlay.swift in Sources */,
-				A02400000000000000000001 /* Goal.swift in Sources */,
-				3F91D2A54B9A4F66A2C01001 /* Cron.swift in Sources */,
-				3F91D2A54B9A4F66A2C01002 /* TasksView.swift in Sources */,
-				3F91D2A54B9A4F66A2C01003 /* TasksViewModel.swift in Sources */,
-				3F91D2A54B9A4F66A2C01004 /* TaskDetailView.swift in Sources */,
-				3F91D2A54B9A4F66A2C01005 /* TaskDetailViewModel.swift in Sources */,
-				1A2B3C4D5E6F70000000200 /* Memory.swift in Sources */,
-				1A2B3C4D5E6F70000000202 /* MemoryView.swift in Sources */,
-				1A2B3C4D5E6F70000000204 /* MemoryViewModel.swift in Sources */,
-				1A2B3C4D5E6F70000000210 /* Skills.swift in Sources */,
-				1A2B3C4D5E6F70000000212 /* SkillsView.swift in Sources */,
-				1A2B3C4D5E6F70000000214 /* SkillsViewModel.swift in Sources */,
-				36CD9EF0B0734E5F8C28BB92 /* SlashCommand.swift in Sources */,
-				941A67322EB54169A55D7A64 /* SlashCommandCatalog.swift in Sources */,
-				B53F3F24A5C24D9E8E54A810 /* SlashCommandExecutor.swift in Sources */,
-				8618A9261B8047CEA6084798 /* SlashCommandAutocompleteView.swift in Sources */,
-				A710739233F64F4FA4C2B700 /* ComposerVoiceInputController.swift in Sources */,
-				8B71DA2AAC521382F54A841C /* InsightsView.swift in Sources */,
-				C0DE512E0000000000000202 /* InsightsModels.swift in Sources */,
-				C0DE512E0000000000000204 /* InsightsRows.swift in Sources */,
-				05814DEA5DE4690F730B1E15 /* InsightsViewModel.swift in Sources */,
-				26AB000000000000000000B1 /* ProvidersViewModel.swift in Sources */,
-				26AB000000000000000000B2 /* ProvidersView.swift in Sources */,
-				B5A100000000000000000001 /* SharedDraftStore.swift in Sources */,
-				B5A100000000000000000008 /* ShareInputReader.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1677,122 +1386,26 @@
 			buildActionMask = 2147483647;
 			files = (
 				10CA110C0DE000000000C001 /* LocalizationCatalogTests.swift in Sources */,
-				1A2B3C4D5E6F7000000000AC /* APIClientTests.swift in Sources */,
 				C00100000000000000000003 /* CompanionConnectionServiceTests.swift in Sources */,
 				C72400000000000000000001 /* CompanionAttachmentStagerTests.swift in Sources */,
 				D01600000000000000000003 /* CompanionDiscoveryTests.swift in Sources */,
 				E00600000000000000000004 /* SessionRepositoryTests.swift in Sources */,
 				E00800000000000000000002 /* ConversationRunServiceTests.swift in Sources */,
-				B5A1000000000000000000A0 /* ServerRegistryTests.swift in Sources */,
-				C0FF000000000000000000C1 /* CustomHeaderInjectionTests.swift in Sources */,
-				C03910000000000000000001 /* APIClientSessionListTests.swift in Sources */,
-				C03910000000000000000002 /* APIClientInsightsTests.swift in Sources */,
-				C03910000000000000000017 /* APIClientUpdatesCheckTests.swift in Sources */,
-				C03910000000000000000018 /* APIClientUpdatesApplyTests.swift in Sources */,
-				C03910000000000000000003 /* APIClientSessionDetailTests.swift in Sources */,
-				C03910000000000000000004 /* APIClientSessionMutationTests.swift in Sources */,
-				C03910000000000000000005 /* APIClientWorkspaceFileTests.swift in Sources */,
-				C03910000000000000000006 /* APIClientChatEndpointTests.swift in Sources */,
-				C03910000000000000000007 /* APIClientAuthAndErrorTests.swift in Sources */,
-				C03910000000000000000008 /* APIClientAgentControlTests.swift in Sources */,
-				C03910000000000000000009 /* APIClientConfigurationTests.swift in Sources */,
-				C0391000000000000000000A /* APIClientCronEndpointTests.swift in Sources */,
-				C0391000000000000000000B /* APIClientMemoryEndpointTests.swift in Sources */,
-				C0391000000000000000000C /* APIClientSkillEndpointTests.swift in Sources */,
-				C0391000000000000000000D /* APIClientUploadTests.swift in Sources */,
-				C03250000000000000B105 /* APIClientTranscribeTests.swift in Sources */,
-				C03260000000000000B102 /* APIClientTTSTests.swift in Sources */,
-				C03270000000000000B102 /* APIClientSessionExportTests.swift in Sources */,
-				C03250000000000000B106 /* ComposerVoiceNoteRecorderTests.swift in Sources */,
-					C04100000000000000000003 /* ChatComposerConfigLoaderTests.swift in Sources */,
-					C04600000000000000000003 /* ChatStreamCoordinatorTests.swift in Sources */,
-					C04800000000000000000003 /* ChatAttachmentCoordinatorTests.swift in Sources */,
-					C0391000000000000000000E /* ChatViewModelSendTests.swift in Sources */,
-					C0DED00000000000000DE001 /* ChatViewModelMergeDedupTests.swift in Sources */,
-					C14600000000000000000002 /* ChatToolbarHeaderTests.swift in Sources */,
+				E02700000000000000000002 /* CompanionTestSupport.swift in Sources */,
 					C15210000000000000000007 /* OnboardingFlowTests.swift in Sources */,
-				C0391000000000000000000F /* SessionListMutationTests.swift in Sources */,
-				A10900000000000000000002 /* SessionNavigationStateTests.swift in Sources */,
-				19C1150000000000000000A3 /* CliSessionsSyncModelTests.swift in Sources */,
-				C03910000000000000000010 /* APIEndpointContractTests.swift in Sources */,
-				C03910000000000000000011 /* CronManagementTests.swift in Sources */,
-				C03910000000000000000012 /* MemoryViewModelTests.swift in Sources */,
-				C03910000000000000000013 /* ModelCatalogTests.swift in Sources */,
-				C03910000000000000000014 /* MessageActionContextTests.swift in Sources */,
-				C03910000000000000000015 /* SessionIdentityTests.swift in Sources */,
-				C03910000000000000000016 /* TranscriptDisplayModelTests.swift in Sources */,
 				C14300000000000000000003 /* StreamingMarkdownSupportTests.swift in Sources */,
 				C13000000000000000000001 /* ChatVerticalScrollAxisGuardTests.swift in Sources */,
 				C0DE25000000000000000003 /* ChatScrollPolicyTests.swift in Sources */,
-				1A2B3C4D5E6F7000000000DC /* SSEClientTests.swift in Sources */,
-				C22600000000000000000001 /* ScriptedSSEStreamFixture.swift in Sources */,
-				C22600000000000000000003 /* StreamReconnectContractTests.swift in Sources */,
-				C22300000000000000000003 /* CompressionAnchorResolverTests.swift in Sources */,
 				C21200000000000000000003 /* StreamingWordDrainTests.swift in Sources */,
-				C21200000000000000000005 /* ChatViewModelStreamingPaceTests.swift in Sources */,
 				C21300000000000000000005 /* StreamingTextFadeTests.swift in Sources */,
 				C23400000000000000000005 /* StreamingLabReplayTests.swift in Sources */,
-				C14900000000000000000009 /* APIClientKanbanTests.swift in Sources */,
-				C1490000000000000000000B /* KanbanFeatureStateTests.swift in Sources */,
-				C15100000000000000000003 /* KanbanEventStreamClientTests.swift in Sources */,
-				C15100000000000000000005 /* KanbanLiveUpdateTests.swift in Sources */,
-				C15400000000000000000005 /* KanbanCardDetailStateTests.swift in Sources */,
-				C15300000000000000000005 /* KanbanCardEditorStateTests.swift in Sources */,
-				C1A042000000000000000005 /* ClarificationTests.swift in Sources */,
 				1A2B3C4D5E6F7000000000F2 /* CacheStoreTests.swift in Sources */,
-				C04400000000000000000003 /* CacheFallbackPolicyTests.swift in Sources */,
 				1A2B3C4D5E6F700000000102 /* AppThemeTests.swift in Sources */,
-				C012400000000000000006 /* AppIconChoiceTests.swift in Sources */,
-				C03120000000000000B006 /* APIClientGitTests.swift in Sources */,
-				C03120000000000000B007 /* GitWorkspaceViewModelTests.swift in Sources */,
-				C03120000000000000B008 /* TurnFileChangeAggregatorTests.swift in Sources */,
 				C03190000000000000B003 /* AttachmentAudioDetectionTests.swift in Sources */,
-				C0DE22000000000000000003 /* ChatHapticsTests.swift in Sources */,
-				C08800000000000000000003 /* SessionHapticsTests.swift in Sources */,
 				C09300000000000000000003 /* HapticButtonTests.swift in Sources */,
-				C09500000000000000000003 /* AdaptiveGlassTests.swift in Sources */,
-					1A2B3C4D5E6F70000000132 /* ContextWindowIndicatorTests.swift in Sources */,
-					1A2B3C4D5E6F70000000141 /* ModelFavoritesStoreTests.swift in Sources */,
-					105050000000000000000003 /* ComposerModelPickerSectionExpansionStateTests.swift in Sources */,
-					8F63EE9A9B344C4FA579D5A8 /* SlashCommandTests.swift in Sources */,
-				0D82B28493C6401D98DA9C0E /* SlashCommandExecutorTests.swift in Sources */,
-				A710739233F64F4FA4C2B701 /* ComposerVoiceDraftComposerTests.swift in Sources */,
-				C5A0D8F5502048B6B9258B01 /* InsightsViewModelTests.swift in Sources */,
-				2BE8F2B38F094C4C9EB18301 /* SkillsViewModelTests.swift in Sources */,
-				26AB000000000000000000B3 /* APIClientProvidersTests.swift in Sources */,
-				26AB000000000000000000B4 /* ProvidersViewModelTests.swift in Sources */,
-				22AB000000000000000000B3 /* WorkspaceRegistryViewModelTests.swift in Sources */,
-				B5A100000000000000000005 /* SharedDraftStoreTests.swift in Sources */,
-				B5A100000000000000000009 /* ShareInputReaderTests.swift in Sources */,
-				B5A100000000000000000060 /* AuthManagerStateTests.swift in Sources */,
-				B5A220000000000000000005 /* ChatMarkerMessageClassifierTests.swift in Sources */,
 				031031031031031031031003 /* MarkdownMathRendererTests.swift in Sources */,
 				C0DE34000000000000000003 /* TranscriptMediaParserTests.swift in Sources */,
-				C0DE3400000000000000000B /* TranscriptMediaPreviewViewModelTests.swift in Sources */,
 				C0DE12000000000000000003 /* TranscriptLinkPreviewTests.swift in Sources */,
-				A04500000000000000000008 /* LiveActivityTests.swift in Sources */,
-				1A2B3C4D5E6F700000000341 /* AppIntentNewChatTests.swift in Sources */,
-				1A2B3C4D5E6F700000000345 /* AppIntentNewChatInProfileTests.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		B5A100000000000000000021 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				B5A100000000000000000002 /* SharedDraftStore.swift in Sources */,
-				B5A100000000000000000003 /* ShareViewController.swift in Sources */,
-				B5A100000000000000000007 /* ShareInputReader.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		A04500000000000000000050 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				A04500000000000000000004 /* AgentRunActivityAttributes.swift in Sources */,
-				A04500000000000000000005 /* HermesDeepLink.swift in Sources */,
-				A04500000000000000000006 /* AgentRunLiveActivityWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1804,16 +1417,6 @@
 			target = 1A2B3C4D5E6F700000000040 /* HermesMobile */;
 			targetProxy = 1A2B3C4D5E6F700000000036 /* PBXContainerItemProxy */;
 		};
-		B5A100000000000000000031 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = B5A100000000000000000040 /* HermesShareExtension */;
-			targetProxy = B5A100000000000000000030 /* PBXContainerItemProxy */;
-		};
-		A04500000000000000000031 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = A04500000000000000000040 /* HermesLiveActivityWidget */;
-			targetProxy = A04500000000000000000030 /* PBXContainerItemProxy */;
-		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -1823,7 +1426,6 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				APP_DISPLAY_NAME = "Hermes Nest";
-				APP_URL_SCHEME_SUFFIX = "";
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -1871,7 +1473,6 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				HERMES_URL_SCHEME = "hermes-agent$(APP_URL_SCHEME_SUFFIX)";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				KEYCHAIN_SERVICE = "$(APP_BUNDLE_IDENTIFIER)";
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
@@ -1890,7 +1491,6 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				APP_DISPLAY_NAME = "Hermes Nest";
-				APP_URL_SCHEME_SUFFIX = "";
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -1932,7 +1532,6 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				HERMES_URL_SCHEME = "hermes-agent$(APP_URL_SCHEME_SUFFIX)";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				KEYCHAIN_SERVICE = "$(APP_BUNDLE_IDENTIFIER)";
 				MTL_ENABLE_DEBUG_INFO = NO;
@@ -1947,7 +1546,6 @@
 		1A2B3C4D5E6F700000000082 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconLight AppIconDark AppIconDisco AppIconMonochromeLight AppIconMonochromeDark AppIconGradientLight AppIconGradientDark";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HermesMobile/Resources/HermesMobile.entitlements;
@@ -1968,7 +1566,7 @@
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -1976,7 +1574,6 @@
 		1A2B3C4D5E6F700000000083 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconLight AppIconDark AppIconDisco AppIconMonochromeLight AppIconMonochromeDark AppIconGradientLight AppIconGradientDark";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HermesMobile/Resources/HermesMobile.entitlements;
@@ -1997,7 +1594,7 @@
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -2020,7 +1617,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HermesMobile.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/HermesMobile";
 			};
@@ -2044,119 +1641,9 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HermesMobile.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/HermesMobile";
-			};
-			name = Release;
-		};
-		B5A100000000000000000042 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGN_ENTITLEMENTS = HermesShareExtension/Resources/HermesShareExtension.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = HermesShareExtension/Resources/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.4;
-				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_IDENTIFIER).shareextension";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		B5A100000000000000000043 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGN_ENTITLEMENTS = HermesShareExtension/Resources/HermesShareExtension.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = HermesShareExtension/Resources/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.4;
-				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_IDENTIFIER).shareextension";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
-		A04500000000000000000042 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = HermesLiveActivityWidget/Resources/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.4;
-				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_IDENTIFIER).liveactivitywidget";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		A04500000000000000000043 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = HermesLiveActivityWidget/Resources/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.4;
-				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_IDENTIFIER).liveactivitywidget";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -2186,24 +1673,6 @@
 			buildConfigurations = (
 				1A2B3C4D5E6F700000000080 /* Debug */,
 				1A2B3C4D5E6F700000000081 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		B5A100000000000000000041 /* Build configuration list for PBXNativeTarget "HermesShareExtension" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				B5A100000000000000000042 /* Debug */,
-				B5A100000000000000000043 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		A04500000000000000000041 /* Build configuration list for PBXNativeTarget "HermesLiveActivityWidget" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				A04500000000000000000042 /* Debug */,
-				A04500000000000000000043 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -1,7 +1,7 @@
 import XCTest
 @testable import HermesMobile
 
-final class CompanionConnectionServiceTests: APIClientTestCase {
+final class CompanionConnectionServiceTests: CompanionHTTPTestCase {
     func testMessageAttachmentDecodesOpaqueCompanionDownloadPath() throws {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase

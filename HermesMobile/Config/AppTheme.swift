@@ -302,10 +302,6 @@ enum ResponseCompletionNotifications {
     static let hasRequestedPermissionKey = "responseCompletionNotifications.hasRequestedPermission"
 }
 
-enum AgentRunLiveActivityPrivacy {
-    static let showsResponseExcerptsKey = "agentRunLiveActivity.showsResponseExcerpts"
-}
-
 /// User-facing switch for the streamed-text fade-in (issues #213/#234).
 /// Defaults to on; Reduce Motion disables the animation regardless.
 enum StreamedTextAnimationSettings {

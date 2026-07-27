@@ -6,10 +6,6 @@ import Observation
 final class OnboardingViewModel {
     nonisolated static let emptyPairingSecretMessage =
         String(localized: "Enter the one-time pairing secret created on your Hermes Agent host.")
-    // Kept only for inherited AuthManager tests while the old WebUI stack
-    // remains compiled but unreachable from the Companion-only App root.
-    nonisolated static let emptyPasswordMessage =
-        String(localized: "Enter the server password.")
 
     var companionURLString = ""
     var pairingSecret = ""

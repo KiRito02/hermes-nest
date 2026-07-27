@@ -27,7 +27,8 @@ SESSION_VIEW = (
     / "HermesMobile/Features/SessionList/CompanionSessionListView.swift"
 ).read_text(encoding="utf-8")
 MESSAGE_ACTIONS = (
-    ROOT / "HermesMobile/Features/Chat/ChatMessageActions.swift"
+    ROOT
+    / "HermesMobile/Features/SessionList/CompanionPresentationSupport.swift"
 ).read_text(encoding="utf-8")
 MARKDOWN_RENDERER = (
     ROOT / "HermesMobile/Features/Chat/MarkdownRenderer.swift"
@@ -164,13 +165,13 @@ require(
 )
 
 message_row = SESSION_VIEW.split(
-    "private struct CompanionMessageRow", maxsplit=1
+    "struct CompanionMessageRow", maxsplit=1
 )[1].split(
     "private struct CompanionUsageView", maxsplit=1
 )[0]
 require(
     message_row,
-    "ChatMessageQuickActions",
+    "CompanionMessageQuickActions",
     "direct finalized-message action row",
 )
 if "ChatMessageActionsButton" in message_row:
@@ -179,8 +180,11 @@ if "ChatMessageActionsButton" in message_row:
         "behind an ellipsis-only menu."
     )
 for snippet, description in [
-    ("struct ChatMessageQuickActions", "shared direct message actions"),
-    ('systemImage: "doc.on.doc"', "direct Copy icon"),
+    (
+        "struct CompanionMessageQuickActions",
+        "Companion direct message actions",
+    ),
+    ('didCopy ? "checkmark" : "doc.on.doc"', "direct Copy icon"),
     ('systemImage: "square.and.arrow.up"', "direct Share icon"),
     (".hoverEffect(", "pointer hover feedback"),
     (".chatMinimumHitTarget(", "minimum action hit target"),

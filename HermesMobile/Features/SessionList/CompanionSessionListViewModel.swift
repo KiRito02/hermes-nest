@@ -1812,9 +1812,8 @@ final class CompanionSessionHistoryViewModel {
     private func apply(_ messages: [ChatMessage]) {
         allMessages = messages
         visibleStartIndex = max(0, messages.count - pageSize)
-        durableReasoningGroups = ChatViewModel.reasoningDisplayGroups(
-            messages: messages,
-            archivedGroups: []
+        durableReasoningGroups = CompanionReasoningPresentation.groups(
+            messages: messages
         )
         durableToolCallGroups = ToolCallGroup.groups(
             persistedToolCalls: [],

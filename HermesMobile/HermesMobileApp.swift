@@ -80,10 +80,6 @@ struct HermesMobileApp: App {
                 NavigationStack {
                     LongChatLabView()
                 }
-            } else if ProcessInfo.processInfo.arguments.contains("--kanban-lab") {
-                NavigationStack {
-                    KanbanLabView()
-                }
             } else {
                 CompanionRootView(connectionManager: connectionManager)
                     .preferredColorScheme(AppTheme.storedValue(appThemeRawValue).colorScheme)

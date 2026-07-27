@@ -154,14 +154,6 @@ struct ImageFilePreview {
     let originalByteCount: Int
 }
 
-struct FileExportPayload {
-    let data: Data
-    let filename: String
-    let contentType: UTType
-    let isImage: Bool
-    let isVideo: Bool
-}
-
 enum FileExportError: LocalizedError {
     case missingSessionID
     case missingPath

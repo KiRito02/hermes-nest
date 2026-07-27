@@ -366,15 +366,12 @@ overrides in gitignored `Config/Local.xcconfig`:
 
 ```xcconfig
 DEVELOPMENT_TEAM = YOUR_TEAM_ID
-APP_BUNDLE_IDENTIFIER = com.yourname.hermex
-// Temporary while using the inherited multi-target scheme:
-APP_GROUP_IDENTIFIER = group.com.yourname.hermex
+// Optional if the signing portal requires a unique identifier:
+// APP_BUNDLE_IDENTIFIER = com.yourname.hermesnest
 ```
 
-The planned personal-sideload configuration will build the main app only and
-will disable Share Extension, Live Activity widget, and App Group requirements.
-Until that issue lands, the inherited multi-target scheme may still require
-the temporary App Group override above.
+The personal-sideload configuration builds the main app only. Share Extension,
+Live Activity widget, and App Group requirements have been removed.
 
 The intended owner workflow is:
 
@@ -382,11 +379,14 @@ The intended owner workflow is:
 2. Manually run the `PR CI` workflow on that branch for macOS build/test.
 3. For UI/runtime changes, manually run `iOS Simulator Acceptance`; enable
    screenshots or iPad only when useful.
-4. After Phase I lands, download the sideload artifact on Windows.
+4. Manually run `Personal Sideload Artifact` on the approved branch and
+   download `HermesNest-unsigned-<commit>`.
 5. Sign/install it with AltStore or SideStore using the owner's Apple account.
 6. Re-sign when the provisioning period expires.
 
-Packaging is added later in the personal-sideload Phase I issue.
+The artifact contains `HermesNest-unsigned.ipa`, an unsigned device build that
+the sideload tool re-signs. Full English and Simplified Chinese instructions
+are in [`docs/personal-sideload.md`](docs/personal-sideload.md).
 
 Do not add App Store Connect secrets or revive inherited TestFlight workflows
 without a new explicit distribution decision.

@@ -1,0 +1,7 @@
+// Copy this file to Local.xcconfig when a local Apple signing identity exists.
+// Local.xcconfig is gitignored and must never be committed.
+
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
+
+// Optional when another personal App ID is needed:
+// APP_BUNDLE_IDENTIFIER = com.yourname.hermesnest

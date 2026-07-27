@@ -1,0 +1,67 @@
+name: Personal Sideload Artifact
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: personal-sideload-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Build App-only unsigned IPA
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    env:
+      PROJECT_PATH: HermesMobile.xcodeproj
+      SCHEME: HermesMobile
+      DERIVED_DATA_PATH: DerivedData-Sideload
+      OUTPUT_PATH: artifacts/HermesNest-unsigned.ipa
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Validate release boundary
+        run: |
+          python3 scripts/check-release-readiness
+          python3 -m unittest discover -s scripts/tests -v
+
+      - name: Build unsigned device App
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project "${PROJECT_PATH}" \
+            -scheme "${SCHEME}" \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "${DERIVED_DATA_PATH}" \
+            -showBuildTimingSummary \
+            DEVELOPMENT_TEAM= \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Package and inspect App-only IPA
+        run: |
+          set -euo pipefail
+          app_path="${DERIVED_DATA_PATH}/Build/Products/Release-iphoneos/HermesMobile.app"
+          python3 scripts/package-sideload-app \
+            --app "${app_path}" \
+            --output "${OUTPUT_PATH}"
+          unzip -l "${OUTPUT_PATH}"
+          if unzip -Z1 "${OUTPUT_PATH}" | grep -E '(^|/)(PlugIns|Watch|Extensions)/|\.appex/'; then
+            echo "Unexpected nested extension product in IPA" >&2
+            exit 1
+          fi
+
+      - name: Upload unsigned sideload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: HermesNest-unsigned-${{ github.sha }}
+          path: ${{ env.OUTPUT_PATH }}
+          if-no-files-found: error
+          retention-days: 14

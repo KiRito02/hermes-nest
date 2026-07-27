@@ -359,15 +359,8 @@ struct LongChatLabView: View {
         index: Int,
         rendersAsStreaming: Bool
     ) -> some View {
-        ChatTranscriptMessageBlock(
-            transcriptMessage: TranscriptMessage(
-                loadedIndex: index,
-                renderID: message.id,
-                anchorID: message.id,
-                message: message
-            ),
-            transcriptBlockSpacing: 10,
-            showsThinkingAndToolCards: true,
+        CompanionMessageRow(
+            message: message,
             reasoningGroups: benchmarkReasoningGroups(
                 after: index,
                 rendersAsStreaming: rendersAsStreaming
@@ -376,40 +369,8 @@ struct LongChatLabView: View {
                 after: index,
                 rendersAsStreaming: rendersAsStreaming
             ),
-            liveReasoningText: "",
-            reasoningAnchorMessageID: nil,
-            liveToolCalls: [],
-            toolCallAnchorMessageID: nil,
-            streamingAssistantMessageID: rendersAsStreaming ? message.messageId : nil,
-            localAttachmentPreviews: nil,
-            listeningMessageID: nil,
-            isViewingCachedData: false,
-            hasActiveStream: isStreaming,
-            isRegeneratingMessage: false,
-            isEditingMessage: false,
-            isForkingMessage: false,
-            loadAttachmentImage: { _ in nil },
-            loadAttachmentData: { _ in nil },
-            loadTranscriptMediaImage: { _ in nil },
-            loadTranscriptMediaData: { _ in nil },
             transcriptMediaCacheNamespace: "long-chat-lab",
-            actionContext: { message, visibleIndex in
-                MessageActionContext(
-                    message: message,
-                    visibleIndex: visibleIndex,
-                    messagesOffset: 0
-                )
-            },
-            shouldRenderMessageRow: { _ in true },
-            onPreviewAttachment: { _, _ in },
-            onPreviewTranscriptMedia: { _ in },
-            onToggleListening: { _ in },
-            onRegenerate: { _ in },
-            onEdit: { _ in },
-            onFork: { _ in },
-            onCopy: { context in
-                UIPasteboard.general.string = context.copyText
-            }
+            loadAttachment: { _ in nil }
         )
         .equatable()
     }
