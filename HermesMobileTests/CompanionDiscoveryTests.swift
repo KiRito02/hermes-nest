@@ -1,7 +1,7 @@
 import XCTest
 @testable import HermesMobile
 
-final class CompanionDiscoveryTests: APIClientTestCase {
+final class CompanionDiscoveryTests: CompanionHTTPTestCase {
     func testCapabilitiesRequireBothExactCompanionAndGatewaySurfaces() throws {
         let capabilities = try JSONDecoder().decode(
             CompanionCapabilities.self,

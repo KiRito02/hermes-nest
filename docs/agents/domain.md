@@ -4,7 +4,9 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Layout
 
-This is a single-context repo: Hermes Nest is one native iOS app with related app extension targets, tests, release docs, and one shared product vocabulary.
+This is a single-context repo: Hermes Nest is one native iOS app with tests,
+release docs, a self-hosted Companion, and one shared product vocabulary. The
+personal-sideload product has no app-extension targets.
 
 When present, use:
 

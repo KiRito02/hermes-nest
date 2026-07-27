@@ -89,13 +89,13 @@ Read by every agent (Codex, Claude Code, …); keep it tool-agnostic.
 
 ## Personal signing identity
 
-Owner-specific Team ID and bundle IDs belong in gitignored
-`Config/Local.xcconfig`; do not commit them or reuse the upstream maintainer's
-identity. Phase I will add a one-app personal-sideload configuration that
-disables Share Extension, widgets/Live Activities, and App Groups. Until it
-lands, the inherited multi-target scheme and committed upstream defaults still
-exist and may require local overrides; do not describe them as the desired
-personal distribution state.
+The owner-specific Team ID belongs only in gitignored
+`Config/Local.xcconfig`; do not commit it or reuse the upstream maintainer's
+identity. The tracked personal-v1 product default is
+`com.kirito02.hermesnest`; a different bundle ID may be supplied only through
+the same local override. The `HermesNestPersonalSideload` scheme and
+`PersonalSideload` configuration build one App with no Share Extension,
+widgets/Live Activities, or App Group requirement.
 
 App Store and TestFlight work is out of scope until the owner explicitly
 changes the distribution decision. Building a sideload artifact or Companion

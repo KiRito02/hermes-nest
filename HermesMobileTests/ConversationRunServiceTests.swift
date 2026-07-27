@@ -2,7 +2,7 @@ import XCTest
 import SwiftData
 @testable import HermesMobile
 
-final class ConversationRunServiceTests: APIClientTestCase {
+final class ConversationRunServiceTests: CompanionHTTPTestCase {
     override func tearDown() {
         RunJSONURLProtocol.reset()
         RunSSEURLProtocol.reset()

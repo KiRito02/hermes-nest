@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "hermes_mobile_light_icon.png",
+      "filename" : "hermes_nest_light_icon.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -13,7 +13,19 @@
           "value" : "dark"
         }
       ],
-      "filename" : "hermes_mobile_dark_icon.png",
+      "filename" : "hermes_nest_dark_icon.png",
+      "idiom" : "universal",
+      "platform" : "ios",
+      "size" : "1024x1024"
+    },
+    {
+      "appearances" : [
+        {
+          "appearance" : "luminosity",
+          "value" : "tinted"
+        }
+      ],
+      "filename" : "hermes_nest_tinted_icon.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"

@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 import SwiftUI
 import UIKit
@@ -46,7 +47,7 @@ struct CompanionSessionListView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             List(selection: $selectedSessionID) {
                 if viewModel.isViewingCachedData {
-                    OfflineCacheBanner()
+                    CompanionOfflineCacheBanner()
                         .listRowSeparator(.hidden)
                 }
 
@@ -488,7 +489,7 @@ struct CompanionSessionHistoryView: View {
                 spacing: HermesNestDesign.Spacing.medium
             ) {
                 if viewModel.isViewingCachedData {
-                    OfflineCacheBanner()
+                    CompanionOfflineCacheBanner()
                 }
 
                 if viewModel.needsTerminalHistoryRetry {
@@ -555,7 +556,11 @@ struct CompanionSessionHistoryView: View {
                         ),
                         transcriptMediaCacheNamespace:
                             companionURL.absoluteString,
-                        workspaceService: workspaceService
+                        loadAttachment: {
+                            try? await workspaceService.downloadAttachment(
+                                path: $0
+                            )
+                        }
                     )
                     .equatable()
                 }
@@ -1520,13 +1525,13 @@ private struct CompanionSendButtonStyle: ButtonStyle {
 }
 
 @MainActor
-private struct CompanionMessageRow: View, Equatable {
+struct CompanionMessageRow: View, Equatable {
     let message: ChatMessage
     let reasoningGroups: [ReasoningGroup]
     let toolCallGroups: [ToolCallGroup]
     let transcriptMediaCacheNamespace: String
-    let workspaceService: any CompanionWorkspaceServing
-    @State private var attachmentShareItem: SessionExportShareItem?
+    let loadAttachment: (String) async -> Data?
+    @State private var attachmentShareItem: CompanionShareItem?
     @State private var attachmentPreviewError: String?
 
     static func == (
@@ -1569,7 +1574,7 @@ private struct CompanionMessageRow: View, Equatable {
             )
 
             if let copyText {
-                ChatMessageQuickActions(text: copyText) {
+                CompanionMessageQuickActions(text: copyText) {
                     UIPasteboard.general.string = copyText
                 }
             }
@@ -1582,7 +1587,7 @@ private struct CompanionMessageRow: View, Equatable {
             item: $attachmentShareItem,
             onDismiss: clearAttachmentShareItem
         ) { item in
-            SessionExportShareSheet(fileURL: item.fileURL)
+            CompanionShareSheet(fileURL: item.fileURL)
         }
         .alert(
             "Attachment failed",
@@ -1601,10 +1606,6 @@ private struct CompanionMessageRow: View, Equatable {
         message.role == "user" ? .trailing : .leading
     }
 
-    private func loadAttachment(_ path: String) async -> Data? {
-        try? await workspaceService.downloadAttachment(path: path)
-    }
-
     private func prepareAttachmentShare(
         _ attachment: MessageAttachment,
         localData: Data?
@@ -1613,7 +1614,7 @@ private struct CompanionMessageRow: View, Equatable {
         if let localData {
             data = localData
         } else if let path = attachment.downloadPath?.nilIfEmpty {
-            data = try? await workspaceService.downloadAttachment(path: path)
+            data = await loadAttachment(path)
         } else {
             data = nil
         }
@@ -1644,7 +1645,7 @@ private struct CompanionMessageRow: View, Equatable {
                 )
                 try data.write(to: fileURL, options: [.atomic])
             }.value
-            attachmentShareItem = SessionExportShareItem(fileURL: fileURL)
+            attachmentShareItem = CompanionShareItem(fileURL: fileURL)
         } catch {
             try? FileManager.default.removeItem(at: directory)
             attachmentPreviewError = error.localizedDescription
@@ -1822,8 +1823,7 @@ private struct CompanionUsageView: View {
                 )
                 usageMetric(
                     title: "Cost",
-                    value: viewModel.session.estimatedCost?
-                        .formattedCost() ?? String(localized: "Unavailable")
+                    value: costLabel(viewModel.session.estimatedCost)
                 )
             }
         }
@@ -1856,6 +1856,11 @@ private struct CompanionUsageView: View {
     private func tokenLabel(_ tokens: Int?) -> String {
         guard let tokens else { return String(localized: "Unavailable") }
         return CompanionTokenPresentation.exactCount(tokens)
+    }
+
+    private func costLabel(_ cost: Double?) -> String {
+        guard let cost else { return String(localized: "Unavailable") }
+        return String(format: "$%.4f", cost)
     }
 
     private func usageMetric(

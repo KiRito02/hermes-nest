@@ -1,0 +1,5 @@
+// App-only personal distribution. Owner signing identity remains in the
+// gitignored Local.xcconfig included by Shared.xcconfig.
+#include "Shared.xcconfig"
+
+HERMES_DISTRIBUTION_KIND = personal-sideload

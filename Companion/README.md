@@ -29,6 +29,83 @@ user/group names, or secrets in git.
 
 ## Install a release on the Hermes Agent host with systemd
 
+The supported path is one command from a clean checkout:
+
+```bash
+Companion/companionctl install
+```
+
+The command creates an immutable release, an isolated locked `uv` environment,
+owner-only configuration/state, and the system-level systemd unit. It prompts
+for the existing Gateway key without placing it in the command line or logs.
+Its defaults use the current user and the normal Hermes Agent directory; use
+`Companion/companionctl install --help` to override the service identity,
+agent working directory, or initial writable workspace.
+The selected service user/group are stored in owner-only host deployment
+configuration and reused automatically by bare `upgrade` commands.
+
+Day-two operations use the same entry point:
+
+```bash
+Companion/companionctl status
+Companion/companionctl pair
+Companion/companionctl upgrade
+Companion/companionctl rollback
+Companion/companionctl backup --output companion-backup.tar.gz
+Companion/companionctl restore --input companion-backup.tar.gz
+```
+
+Run `companionctl` as the service account. It invokes `sudo` only when
+installing/reloading the systemd unit or controlling the service. Backups keep
+the device registry and authorized workspace configuration, but exclude the
+Gateway environment/key. The SQLite registry is captured through an online
+consistent snapshot, including committed WAL state, so `backup` does not need
+to stop Companion. Restore validates every archive member and every authorized
+absolute path; it never broadens roots silently.
+Host-specific systemd identity is not migrated in the backup; choose it again
+when installing on a new host.
+
+Hermes sessions, Hermes Agent Memory/workspace data, models/provider
+credentials, and Lucky configuration are not Companion state and must be
+migrated separately with Hermes Agent.
+
+## Move Companion to another Hermes Agent host
+
+On the old host:
+
+```bash
+Companion/companionctl backup --output /absolute/path/companion-backup.tar.gz
+```
+
+Copy that owner-only archive and a clean checkout of the selected Hermes Nest
+commit to the new host. Migrate Hermes Agent sessions, workspace, Memory,
+models/providers, and any Lucky/Tailscale configuration separately. Create the
+authorized directories at the same absolute paths recorded in the backup, then
+run:
+
+```bash
+Companion/companionctl restore --input /absolute/path/companion-backup.tar.gz
+Companion/companionctl install
+Companion/companionctl status
+Companion/companionctl pair
+```
+
+`restore` brings back device registrations and authorized-root configuration,
+but not the Gateway key. `install` asks for the new host's Gateway key without
+putting it on the command line. Existing device credentials are preserved, but
+creating a fresh one-time secret is recommended for the first connection test.
+
+迁移到新的 Hermes Agent 运行服务器时，先在旧服务器执行 `backup`。Hermes Agent
+的会话、workspace、Memory、模型/Provider 及 Lucky/Tailscale 配置需要单独迁移。
+在新服务器创建备份中记录的相同绝对路径后，依次执行 `restore`、`install`、
+`status` 和 `pair`。备份不包含 Gateway key；安装时会在终端中隐藏输入新服务器
+的 key。
+
+### Manual deployment internals
+
+The remaining commands document what `companionctl` performs and are intended
+for troubleshooting or development, not routine installation.
+
 The following placeholders mean absolute paths owned by the dedicated service
 account:
 
@@ -145,14 +222,10 @@ credential in a URL/query string.
 
 ## Pair an iPhone or iPad
 
-Run the CLI as the same service account with the same `XDG_STATE_HOME` used by
-systemd:
+Run as the same service account used for installation:
 
 ```bash
-XDG_STATE_HOME="<state-home>" \
-PYTHONPATH="<data-home>/hermex-companion/current/Companion/src" \
-"<data-home>/hermex-companion/current/Companion/.venv/bin/python" \
-  -m hermex_companion pairing create --expires-in 300
+Companion/companionctl pair
 ```
 
 The command prints one short-lived secret. In the App, enter the public HTTPS
@@ -162,13 +235,17 @@ the Gateway key.
 
 ## Upgrade and rollback
 
-Install each commit into a new immutable release directory, update the
-`current` symlink, and restart:
+From the clean checkout for a newer approved commit:
 
 ```bash
-sudo systemctl restart hermex-companion.service
+Companion/companionctl upgrade
 ```
 
-Rollback points `current` to a previously tested release and restarts the
-service. Do not delete the state directory: the SQLite device registry is
-shared across releases and preserves pairing/revocation history.
+Return to the immediately previous immutable release with:
+
+```bash
+Companion/companionctl rollback
+```
+
+Both commands preserve the shared SQLite device registry, authorized workspace
+configuration, and pairing/revocation history.

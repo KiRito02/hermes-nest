@@ -1,7 +1,7 @@
 import XCTest
 @testable import HermesMobile
 
-final class SessionRepositoryTests: APIClientTestCase {
+final class SessionRepositoryTests: CompanionHTTPTestCase {
     func testListUsesCompanionCredentialAndTolerantlyMapsGatewaySessions() async throws {
         let keychain = InMemoryKeychainStore()
         try keychain.save("device-credential", forKey: .companionDeviceCredential)
