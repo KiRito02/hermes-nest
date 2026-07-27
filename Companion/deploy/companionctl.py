@@ -27,6 +27,7 @@ from urllib import request as url_request
 
 COMPANION_DIRECTORY = "hermex-companion"
 WORKSPACE_CONFIG = "workspaces.json"
+DEPLOYMENT_CONFIG = "deployment.json"
 STATE_DATABASE = "companion.sqlite3"
 BACKUP_VERSION = 1
 MAXIMUM_WORKSPACE_CONFIG_BYTES = 1 * 1_024 * 1_024
@@ -48,6 +49,17 @@ def absolute_path(value: str) -> Path:
 def release_identifier(value: str) -> str:
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", value):
         raise argparse.ArgumentTypeError("release ID contains unsafe characters")
+    return value
+
+
+def service_identity(value: object) -> str:
+    if (
+        not isinstance(value, str)
+        or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]*", value)
+    ):
+        raise argparse.ArgumentTypeError(
+            "service identity contains unsupported characters"
+        )
     return value
 
 
@@ -135,9 +147,14 @@ def parse_arguments() -> argparse.Namespace:
         "--release-id",
         type=release_identifier,
     )
-    install.add_argument("--service-user", default=getpass.getuser())
+    install.add_argument(
+        "--service-user",
+        type=service_identity,
+        default=getpass.getuser(),
+    )
     install.add_argument(
         "--service-group",
+        type=service_identity,
         default=grp.getgrgid(os.getgid()).gr_name,
     )
     install.add_argument(
@@ -162,11 +179,6 @@ def parse_arguments() -> argparse.Namespace:
     upgrade.add_argument(
         "--release-id",
         type=release_identifier,
-    )
-    upgrade.add_argument("--service-user", default=getpass.getuser())
-    upgrade.add_argument(
-        "--service-group",
-        default=grp.getgrgid(os.getgid()).gr_name,
     )
     commands.add_parser(
         "rollback",
@@ -506,6 +518,7 @@ def prepare_initial_configuration(arguments: argparse.Namespace) -> None:
     config_directory = arguments.config_home / COMPANION_DIRECTORY
     workspace_config = config_directory / WORKSPACE_CONFIG
     environment_file = config_directory / "hermex-companion.env"
+    deployment_config = config_directory / DEPLOYMENT_CONFIG
     config_directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     config_directory.chmod(0o700)
 
@@ -554,6 +567,47 @@ def prepare_initial_configuration(arguments: argparse.Namespace) -> None:
         ).encode("utf-8")
         write_private_file(environment_file, environment_payload)
 
+    deployment_payload = json.dumps(
+        {
+            "service_user": arguments.service_user,
+            "service_group": arguments.service_group,
+        },
+        sort_keys=True,
+        indent=2,
+    ).encode("utf-8") + b"\n"
+    if deployment_config.exists():
+        stored_user, stored_group = read_deployment_identity(
+            deployment_config
+        )
+        if (
+            stored_user != arguments.service_user
+            or stored_group != arguments.service_group
+        ):
+            raise SystemExit(
+                "configured service identity differs from this install request"
+            )
+    else:
+        write_private_file(deployment_config, deployment_payload)
+
+
+def read_deployment_identity(path: Path) -> tuple[str, str]:
+    if not path.is_file() or path.is_symlink():
+        raise SystemExit(f"deployment configuration is missing or unsafe: {path}")
+    try:
+        payload = json.loads(
+            read_regular_nofollow(path, 64 * 1_024)
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise SystemExit("deployment configuration is invalid JSON") from error
+    if not isinstance(payload, dict):
+        raise SystemExit("deployment configuration must be an object")
+    try:
+        user = service_identity(payload.get("service_user", ""))
+        group = service_identity(payload.get("service_group", ""))
+    except argparse.ArgumentTypeError as error:
+        raise SystemExit("deployment configuration has an invalid identity") from error
+    return user, group
+
 
 def set_current_release(current: Path, release: Path) -> None:
     temporary = current.with_name(f".{current.name}.{os.getpid()}.tmp")
@@ -573,6 +627,16 @@ def install_release(
     )
     if enable_service:
         prepare_initial_configuration(arguments)
+    else:
+        deployment_config = (
+            arguments.config_home
+            / COMPANION_DIRECTORY
+            / DEPLOYMENT_CONFIG
+        )
+        (
+            arguments.service_user,
+            arguments.service_group,
+        ) = read_deployment_identity(deployment_config)
 
     source_companion = arguments.source_root / "Companion"
     if not (source_companion / "pyproject.toml").is_file():

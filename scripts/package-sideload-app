@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import os
 import plistlib
+import re
 import shutil
 import stat
 import tempfile
@@ -13,8 +14,25 @@ import zipfile
 from pathlib import Path
 
 
-EXPECTED_BUNDLE_ID = "com.kirito02.hermesnest"
 FORBIDDEN_BUNDLE_DIRECTORIES = {"PlugIns", "Watch", "Extensions"}
+
+
+def default_bundle_id() -> str:
+    shared_config = (
+        Path(__file__).resolve().parent.parent
+        / "Config"
+        / "Shared.xcconfig"
+    ).read_text(encoding="utf-8")
+    match = re.search(
+        r"(?m)^APP_BUNDLE_IDENTIFIER[ \t]*=[ \t]*"
+        r"([^$\r\n]+)",
+        shared_config,
+    )
+    if match is None:
+        raise ValueError(
+            "Config/Shared.xcconfig has no concrete APP_BUNDLE_IDENTIFIER"
+        )
+    return match.group(1).strip()
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -23,20 +41,25 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument("--app", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--expected-bundle-id",
+        default=default_bundle_id(),
+        help="bundle identity expected in the input App",
+    )
     return parser.parse_args()
 
 
-def validate_app(app: Path) -> None:
+def validate_app(app: Path, expected_bundle_id: str) -> None:
     if not app.is_dir() or app.suffix != ".app":
         raise ValueError("--app must name an existing .app directory")
 
     info_path = app / "Info.plist"
     with info_path.open("rb") as info_file:
         info = plistlib.load(info_file)
-    if info.get("CFBundleIdentifier") != EXPECTED_BUNDLE_ID:
+    if info.get("CFBundleIdentifier") != expected_bundle_id:
         raise ValueError(
             "app bundle ID must be "
-            f"{EXPECTED_BUNDLE_ID}, got {info.get('CFBundleIdentifier')!r}"
+            f"{expected_bundle_id}, got {info.get('CFBundleIdentifier')!r}"
         )
 
     for path in app.rglob("*"):
@@ -79,10 +102,10 @@ def zip_payload(payload_root: Path, output: Path) -> None:
         temporary_output.unlink(missing_ok=True)
 
 
-def package(app: Path, output: Path) -> None:
+def package(app: Path, output: Path, expected_bundle_id: str) -> None:
     app = app.resolve()
     output = output.resolve()
-    validate_app(app)
+    validate_app(app, expected_bundle_id)
 
     with tempfile.TemporaryDirectory(
         prefix="hermes-nest-sideload-"
@@ -91,14 +114,18 @@ def package(app: Path, output: Path) -> None:
         payload.mkdir()
         packaged_app = payload / "HermesNest.app"
         shutil.copytree(app, packaged_app, symlinks=True)
-        validate_app(packaged_app)
+        validate_app(packaged_app, expected_bundle_id)
         zip_payload(payload, output)
 
 
 def main() -> None:
     arguments = parse_arguments()
     try:
-        package(arguments.app, arguments.output)
+        package(
+            arguments.app,
+            arguments.output,
+            arguments.expected_bundle_id,
+        )
     except (OSError, ValueError, plistlib.InvalidFileException) as error:
         raise SystemExit(f"Sideload packaging failed: {error}") from error
     print(f"Created App-only sideload package: {arguments.output}")

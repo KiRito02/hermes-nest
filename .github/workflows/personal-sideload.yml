@@ -18,7 +18,8 @@ jobs:
 
     env:
       PROJECT_PATH: HermesMobile.xcodeproj
-      SCHEME: HermesMobile
+      SCHEME: HermesNestPersonalSideload
+      CONFIGURATION: PersonalSideload
       DERIVED_DATA_PATH: DerivedData-Sideload
       OUTPUT_PATH: artifacts/HermesNest-unsigned.ipa
 
@@ -37,7 +38,7 @@ jobs:
           xcodebuild build \
             -project "${PROJECT_PATH}" \
             -scheme "${SCHEME}" \
-            -configuration Release \
+            -configuration "${CONFIGURATION}" \
             -destination "generic/platform=iOS" \
             -derivedDataPath "${DERIVED_DATA_PATH}" \
             -showBuildTimingSummary \
@@ -48,7 +49,7 @@ jobs:
       - name: Package and inspect App-only IPA
         run: |
           set -euo pipefail
-          app_path="${DERIVED_DATA_PATH}/Build/Products/Release-iphoneos/HermesMobile.app"
+          app_path="${DERIVED_DATA_PATH}/Build/Products/${CONFIGURATION}-iphoneos/HermesMobile.app"
           python3 scripts/package-sideload-app \
             --app "${app_path}" \
             --output "${OUTPUT_PATH}"

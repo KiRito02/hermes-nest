@@ -370,8 +370,9 @@ DEVELOPMENT_TEAM = YOUR_TEAM_ID
 // APP_BUNDLE_IDENTIFIER = com.yourname.hermesnest
 ```
 
-The personal-sideload configuration builds the main app only. Share Extension,
-Live Activity widget, and App Group requirements have been removed.
+The `HermesNestPersonalSideload` scheme uses the `PersonalSideload`
+configuration and builds the main app only. Share Extension, Live Activity
+widget, and App Group requirements have been removed.
 
 The intended owner workflow is:
 

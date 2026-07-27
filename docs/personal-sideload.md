@@ -20,9 +20,10 @@ Windows 上再由 AltStore 或 SideStore 使用用户自己的免费 Apple 账�
 5. Extract the artifact zip once. The file to install is
    `HermesNest-unsigned.ipa`; do not extract the IPA itself.
 
-The workflow runs the release-readiness tests, builds a Release device App
-without an owner identity, rejects nested extensions, and packages exactly
-`Payload/HermesNest.app`.
+The workflow runs the release-readiness tests, builds the dedicated
+`HermesNestPersonalSideload` scheme and `PersonalSideload` device
+configuration without an owner identity, rejects nested extensions, and
+packages exactly `Payload/HermesNest.app`.
 
 ### Install from Windows
 
@@ -46,8 +47,11 @@ Never enter the Hermes Gateway `API_SERVER_KEY` in the App.
 
 On a Mac, copy `Config/Local.xcconfig.example` to the gitignored
 `Config/Local.xcconfig`, set `DEVELOPMENT_TEAM`, and build the `HermesMobile`
-scheme. The default bundle ID is `com.kirito02.hermesnest`. A personal override
-may be used locally when the signing portal requires a unique ID.
+project with the `HermesNestPersonalSideload` scheme. The default bundle ID is
+`com.kirito02.hermesnest`. A personal override may be used locally when the
+signing portal requires a unique ID. When packaging that locally overridden
+build, pass the same value to
+`scripts/package-sideload-app --expected-bundle-id`.
 
 ## 简体中文
 
@@ -60,8 +64,10 @@ may be used locally when the signing portal requires a unique ID.
 5. 将下载的 artifact zip 解压一次。要安装的文件是
    `HermesNest-unsigned.ipa`，不需要再解压 IPA。
 
-工作流会先运行发布边界检查，再构建不包含个人开发者身份的 Release 真机 App，
-拒绝任何内嵌扩展，最后只打包 `Payload/HermesNest.app`。
+工作流会先运行发布边界检查，再使用专用的
+`HermesNestPersonalSideload` scheme 和 `PersonalSideload` configuration
+构建不包含个人开发者身份的真机 App，拒绝任何内嵌扩展，最后只打包
+`Payload/HermesNest.app`。
 
 ### 在 Windows 上安装
 
@@ -83,8 +89,10 @@ may be used locally when the signing portal requires a unique ID.
 
 把 `Config/Local.xcconfig.example` 复制为已被 git 忽略的
 `Config/Local.xcconfig`，填写 `DEVELOPMENT_TEAM`，然后构建
-`HermesMobile` scheme。默认 Bundle ID 为 `com.kirito02.hermesnest`；
-如果 Apple 签名后台要求唯一标识，可以只在本地覆盖它。
+`HermesNestPersonalSideload` scheme。默认 Bundle ID 为
+`com.kirito02.hermesnest`；
+如果 Apple 签名后台要求唯一标识，可以只在本地覆盖它。打包这个本地覆盖的构建时，
+把同一个值传给 `scripts/package-sideload-app --expected-bundle-id`。
 
 ## Physical-device acceptance / 真机验收
 

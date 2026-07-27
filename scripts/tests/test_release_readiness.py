@@ -129,6 +129,42 @@ class ReleaseReadinessCLITests(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_unreviewed_runtime_source_is_rejected_by_allowlist(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_app_only_fixture(root)
+            project_path = root / "HermesMobile.xcodeproj" / "project.pbxproj"
+            project_path.write_text(
+                project_path.read_text(encoding="utf-8").replace(
+                    "CCC000000000000000000001 "
+                    "/* HermesMobileApp.swift in Sources */,",
+                    "CCC000000000000000000001 "
+                    "/* HermesMobileApp.swift in Sources */,\n"
+                    "\t\tDDD000000000000000000001 "
+                    "/* FutureSurface.swift in Sources */,",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(CHECKER),
+                    "--project-root",
+                    str(root),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn(
+            "personal App target contains sources outside its allowlist: "
+            "FutureSurface.swift",
+            result.stderr,
+        )
+
     def test_upstream_identity_in_any_tracked_config_is_rejected(
         self,
     ) -> None:
@@ -257,6 +293,79 @@ class ReleaseReadinessCLITests(unittest.TestCase):
             result.stderr,
         )
 
+    def test_personal_scheme_cannot_archive_the_release_configuration(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_app_only_fixture(root)
+            scheme = (
+                root
+                / "HermesMobile.xcodeproj"
+                / "xcshareddata"
+                / "xcschemes"
+                / "HermesNestPersonalSideload.xcscheme"
+            )
+            scheme.write_text(
+                scheme.read_text(encoding="utf-8").replace(
+                    '<ArchiveAction buildConfiguration="PersonalSideload" />',
+                    '<ArchiveAction buildConfiguration="Release" />',
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(CHECKER),
+                    "--project-root",
+                    str(root),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn(
+            "ArchiveAction must use PersonalSideload",
+            result.stderr,
+        )
+
+    def test_duplicate_icon_appearance_artwork_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_app_only_fixture(root)
+            icons = (
+                root
+                / "HermesMobile"
+                / "Resources"
+                / "Assets.xcassets"
+                / "AppIcon.appiconset"
+            )
+            light = icons / "hermes_nest_light_icon.png"
+            (icons / "hermes_nest_dark_icon.png").write_bytes(
+                light.read_bytes()
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(CHECKER),
+                    "--project-root",
+                    str(root),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn(
+            "App icon appearance variants must contain distinct artwork",
+            result.stderr,
+        )
+
     @staticmethod
     def _write_app_only_fixture(root: Path) -> None:
         config = root / "Config"
@@ -270,6 +379,14 @@ class ReleaseReadinessCLITests(unittest.TestCase):
                     "",
                 ]
             ),
+            encoding="utf-8",
+        )
+        (config / "PersonalSideloadSources.txt").write_text(
+            "HermesMobileApp.swift\n",
+            encoding="utf-8",
+        )
+        (config / "PersonalSideload.xcconfig").write_text(
+            '#include "Shared.xcconfig"\n',
             encoding="utf-8",
         )
 
@@ -306,7 +423,9 @@ class ReleaseReadinessCLITests(unittest.TestCase):
                     }
                 ]
             icon_entries.append(entry)
-            (app_icon / filename).write_bytes(b"fixture")
+            (app_icon / filename).write_bytes(
+                f"fixture-{appearance}".encode("utf-8")
+            )
         (app_icon / "Contents.json").write_text(
             json.dumps(
                 {
@@ -365,9 +484,38 @@ class ReleaseReadinessCLITests(unittest.TestCase):
                     '"com.apple.product-type.bundle.unit-test";',
                     "};",
                     "PRODUCT_BUNDLE_IDENTIFIER = $(APP_BUNDLE_IDENTIFIER);",
+                    "baseConfigurationReference = "
+                    "PersonalSideload.xcconfig */;",
+                    "name = PersonalSideload;",
+                    "name = PersonalSideload;",
+                    "name = PersonalSideload;",
                     "",
                 ]
             ),
+            encoding="utf-8",
+        )
+        schemes = project / "xcshareddata" / "xcschemes"
+        schemes.mkdir(parents=True)
+        (
+            schemes / "HermesNestPersonalSideload.xcscheme"
+        ).write_text(
+            """<?xml version="1.0" encoding="UTF-8"?>
+<Scheme>
+  <BuildAction>
+    <BuildActionEntries>
+      <BuildActionEntry>
+        <BuildableReference
+          BuildableName="HermesMobile.app"
+          BlueprintName="HermesMobile" />
+      </BuildActionEntry>
+    </BuildActionEntries>
+  </BuildAction>
+  <LaunchAction buildConfiguration="PersonalSideload" />
+  <ProfileAction buildConfiguration="PersonalSideload" />
+  <AnalyzeAction buildConfiguration="PersonalSideload" />
+  <ArchiveAction buildConfiguration="PersonalSideload" />
+</Scheme>
+""",
             encoding="utf-8",
         )
 

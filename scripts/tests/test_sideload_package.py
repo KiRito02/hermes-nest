@@ -67,6 +67,20 @@ class SideloadPackageCLITests(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("app bundle ID must be", result.stderr)
 
+    def test_explicit_local_bundle_override_can_be_packaged(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            bundle_id = "com.example.personal.hermesnest"
+            app = self._write_app(root, bundle_id=bundle_id)
+
+            result = self._run(
+                app,
+                root / "HermesNest-unsigned.ipa",
+                expected_bundle_id=bundle_id,
+            )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+
     @staticmethod
     def _write_app(
         root: Path,
@@ -88,16 +102,26 @@ class SideloadPackageCLITests(unittest.TestCase):
         return app
 
     @staticmethod
-    def _run(app: Path, output: Path) -> subprocess.CompletedProcess[str]:
+    def _run(
+        app: Path,
+        output: Path,
+        *,
+        expected_bundle_id: str | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        arguments = [
+            sys.executable,
+            str(PACKAGER),
+            "--app",
+            str(app),
+            "--output",
+            str(output),
+        ]
+        if expected_bundle_id is not None:
+            arguments.extend(
+                ["--expected-bundle-id", expected_bundle_id]
+            )
         return subprocess.run(
-            [
-                sys.executable,
-                str(PACKAGER),
-                "--app",
-                str(app),
-                "--output",
-                str(output),
-            ],
+            arguments,
             check=False,
             capture_output=True,
             text=True,

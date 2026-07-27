@@ -44,7 +44,7 @@ Issue/PR, not this index.
 | Allowed-root file browse/preview/download | implemented | P1 | privacy | [#22](https://github.com/KiRito02/hermes-nest/pull/22); Companion-native aliases, no arbitrary filesystem |
 | Streaming upload + turn availability | implemented | P1 | write | [#22](https://github.com/KiRito02/hermes-nest/pull/22); bounded, cancelable, atomic |
 | Built-in Memory management | implemented | P1 | privacy | [#22](https://github.com/KiRito02/hermes-nest/pull/22); `MEMORY.md`/`USER.md`, locking and stale-write defense |
-| Personal app-only signing/sideload workflow | roadmap | P0 | secret | Disable inherited extensions/App Groups in the personal scheme |
+| Personal app-only signing/sideload workflow | in-progress | P0 | secret | [#27](https://github.com/KiRito02/hermes-nest/issues/27): App-only unsigned artifact, owner-local Team ID, no extension/App Group requirement |
 | Arbitrary file delete/terminal/Git mutation | n-a | — | exec | Outside Companion v1 |
 | Hermes Bridge Kanban/Boards | n-a | — | write | WebUI/Bridge-specific |
 | WebUI projects/profile cookies/personalities | n-a | — | write | No cookie backend |

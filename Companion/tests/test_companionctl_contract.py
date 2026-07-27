@@ -412,6 +412,18 @@ class CompanionControlContractTests(unittest.TestCase):
                 state_bytes,
                 (state_directory / "companion.sqlite3").read_bytes(),
             )
+            deployment_config = config_directory / "deployment.json"
+            self.assertEqual(
+                {
+                    "service_user": "test-user",
+                    "service_group": "test-group",
+                },
+                json.loads(deployment_config.read_text(encoding="utf-8")),
+            )
+            self.assertEqual(
+                0o600,
+                deployment_config.stat().st_mode & 0o777,
+            )
             rendered_unit = (
                 data_home / "hermex-companion" / "hermex-companion.service"
             )
@@ -443,10 +455,6 @@ class CompanionControlContractTests(unittest.TestCase):
                 str(COMPANION_ROOT.parent),
                 "--release-id",
                 "release-b",
-                "--service-user",
-                "test-user",
-                "--service-group",
-                "test-group",
                 environment={
                     "PATH": f"{fake_bin}:{os.environ['PATH']}",
                     "COMPANIONCTL_COMMAND_LOG": str(command_log),
@@ -472,6 +480,9 @@ class CompanionControlContractTests(unittest.TestCase):
                 upgrade_commands,
             )
             self.assertNotIn("enable --now", upgrade_commands)
+            upgraded_unit = rendered_unit.read_text(encoding="utf-8")
+            self.assertIn("User=test-user", upgraded_unit)
+            self.assertIn("Group=test-group", upgraded_unit)
 
             command_log.write_text("", encoding="utf-8")
             rollback = self._run(

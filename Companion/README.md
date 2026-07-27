@@ -41,6 +41,8 @@ for the existing Gateway key without placing it in the command line or logs.
 Its defaults use the current user and the normal Hermes Agent directory; use
 `Companion/companionctl install --help` to override the service identity,
 agent working directory, or initial writable workspace.
+The selected service user/group are stored in owner-only host deployment
+configuration and reused automatically by bare `upgrade` commands.
 
 Day-two operations use the same entry point:
 
@@ -60,6 +62,8 @@ Gateway environment/key. The SQLite registry is captured through an online
 consistent snapshot, including committed WAL state, so `backup` does not need
 to stop Companion. Restore validates every archive member and every authorized
 absolute path; it never broadens roots silently.
+Host-specific systemd identity is not migrated in the backup; choose it again
+when installing on a new host.
 
 Hermes sessions, Hermes Agent Memory/workspace data, models/provider
 credentials, and Lucky configuration are not Companion state and must be

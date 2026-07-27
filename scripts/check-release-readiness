@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import plistlib
 import re
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 
 EXPECTED_BUNDLE_ID = "com.kirito02.hermesnest"
@@ -19,6 +21,8 @@ FORBIDDEN_PROJECT_MARKERS = (
     "APP_GROUP_IDENTIFIER",
     "com.uzairansar.hermesmobile",
     "ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES",
+    "LDSwiftEventSource",
+    "swift-eventsource",
 )
 FORBIDDEN_WEBUI_RUNTIME_SOURCES = (
     "APIClient.swift",
@@ -118,6 +122,7 @@ def validate_icon_assets(project_root: Path) -> list[str]:
         return failures
 
     appearances: set[str] = set()
+    appearance_digests: dict[str, str] = {}
     for image in images:
         if not isinstance(image, dict):
             continue
@@ -144,9 +149,17 @@ def validate_icon_assets(project_root: Path) -> list[str]:
                 failures.append(
                     f"App icon file is missing or unsafe: {filename}"
                 )
+            else:
+                appearance_digests[appearance] = hashlib.sha256(
+                    icon_path.read_bytes()
+                ).hexdigest()
     if appearances != {"light", "dark", "tinted"}:
         failures.append(
             "App icon must define light, dark, and tinted appearances"
+        )
+    elif len(set(appearance_digests.values())) != 3:
+        failures.append(
+            "App icon appearance variants must contain distinct artwork"
         )
 
     in_app_icon = assets / "HermesAppIcon.imageset"
@@ -162,6 +175,66 @@ def validate_icon_assets(project_root: Path) -> list[str]:
         failures.append("in-App icon must use the Hermes Nest-owned artwork")
     if not (in_app_icon / "hermes_nest_icon.png").is_file():
         failures.append("in-App Hermes Nest icon file is missing")
+    return failures
+
+
+def validate_personal_scheme(
+    project_root: Path,
+    project: str,
+) -> list[str]:
+    failures: list[str] = []
+    configuration = (
+        project_root / "Config" / "PersonalSideload.xcconfig"
+    ).read_text(encoding="utf-8")
+    if '#include "Shared.xcconfig"' not in configuration:
+        failures.append(
+            "PersonalSideload configuration must inherit Shared.xcconfig"
+        )
+    if project.count("name = PersonalSideload;") != 3:
+        failures.append(
+            "project must define PersonalSideload for project, App, and tests"
+        )
+    if (
+        "PersonalSideload.xcconfig */;"
+        not in project
+    ):
+        failures.append(
+            "PersonalSideload project configuration is not attached"
+        )
+
+    scheme_path = (
+        project_root
+        / "HermesMobile.xcodeproj"
+        / "xcshareddata"
+        / "xcschemes"
+        / "HermesNestPersonalSideload.xcscheme"
+    )
+    scheme = ET.parse(scheme_path).getroot()
+    build_references = scheme.findall(
+        "./BuildAction/BuildActionEntries/"
+        "BuildActionEntry/BuildableReference"
+    )
+    if len(build_references) != 1 or (
+        build_references[0].get("BlueprintName") != "HermesMobile"
+        or build_references[0].get("BuildableName") != "HermesMobile.app"
+    ):
+        failures.append(
+            "personal sideload scheme must build only HermesMobile.app"
+        )
+    for action_name in (
+        "LaunchAction",
+        "ProfileAction",
+        "AnalyzeAction",
+        "ArchiveAction",
+    ):
+        action = scheme.find(f"./{action_name}")
+        if (
+            action is None
+            or action.get("buildConfiguration") != "PersonalSideload"
+        ):
+            failures.append(
+                f"{action_name} must use PersonalSideload"
+            )
     return failures
 
 
@@ -247,7 +320,29 @@ def validate(project_root: Path) -> list[str]:
     for marker in FORBIDDEN_PROJECT_MARKERS:
         if marker in project:
             failures.append(f"Xcode project contains removed marker: {marker}")
+    failures.extend(validate_personal_scheme(project_root, project))
     app_sources = main_app_source_names(project)
+    expected_sources = {
+        line.strip()
+        for line in (
+            project_root
+            / "Config"
+            / "PersonalSideloadSources.txt"
+        ).read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    unexpected_sources = sorted(app_sources - expected_sources)
+    missing_sources = sorted(expected_sources - app_sources)
+    if unexpected_sources:
+        failures.append(
+            "personal App target contains sources outside its allowlist: "
+            + ", ".join(unexpected_sources)
+        )
+    if missing_sources:
+        failures.append(
+            "personal App target is missing allowlisted sources: "
+            + ", ".join(missing_sources)
+        )
     forbidden_app_sources = sorted(
         source
         for source in app_sources
@@ -272,6 +367,7 @@ def main() -> None:
         ValueError,
         json.JSONDecodeError,
         plistlib.InvalidFileException,
+        ET.ParseError,
     ) as error:
         raise SystemExit(f"Release readiness could not be checked: {error}") from error
 
