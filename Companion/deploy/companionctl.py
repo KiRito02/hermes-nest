@@ -826,9 +826,18 @@ def create_pairing_secret(arguments: argparse.Namespace) -> None:
     python = release / "Companion" / ".venv" / "bin" / "python"
     if not python.is_file():
         raise SystemExit(f"installed Companion Python is missing: {python}")
+    source_directory = release / "Companion" / "src"
+    inherited_python_path = os.environ.get("PYTHONPATH")
     environment = {
         **os.environ,
         "XDG_STATE_HOME": str(arguments.state_home),
+        "PYTHONPATH": (
+            str(source_directory)
+            if not inherited_python_path
+            else os.pathsep.join(
+                (str(source_directory), inherited_python_path)
+            )
+        ),
     }
     run_command(
         [
