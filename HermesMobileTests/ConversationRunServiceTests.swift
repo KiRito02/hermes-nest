@@ -2045,7 +2045,8 @@ final class ConversationRunServiceTests: APIClientTestCase {
             )
         )
 
-        XCTAssertTrue(await viewModel.load())
+        let didLoad = await viewModel.load()
+        XCTAssertTrue(didLoad)
 
         XCTAssertEqual(
             ["I should inspect the requested file first."],
