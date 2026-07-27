@@ -159,6 +159,49 @@ final class ConversationRunServiceTests: APIClientTestCase {
         )
     }
 
+    func testStartIncludesOnlyCompanionAttachmentIDs() async throws {
+        let keychain = InMemoryKeychainStore()
+        try keychain.save(
+            "device-credential",
+            forKey: .companionDeviceCredential
+        )
+        let session = makeSession { request in
+            let body = try apiTestJSONBody(from: request)
+            XCTAssertEqual(
+                ["attachment-1", "attachment-2"],
+                body["attachment_ids"] as? [String]
+            )
+            XCTAssertNil(body["attachments"])
+            XCTAssertNil(body["file_ids"])
+            return self.response(
+                status: 202,
+                json: """
+                {
+                  "run_id": "run-attachment",
+                  "status": "started"
+                }
+                """,
+                request: request
+            )
+        }
+        let service = ConversationRunService(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            keychain: keychain,
+            session: session
+        )
+
+        _ = try await service.start(
+            ConversationRunStartRequest(
+                input: "Review these files",
+                sessionID: "session-1",
+                conversationHistory: [],
+                attachmentIDs: ["attachment-1", "attachment-2"]
+            )
+        )
+    }
+
     func testStatusAndStopKeepLifecycleStatesDistinct() async throws {
         let keychain = InMemoryKeychainStore()
         try keychain.save(
@@ -1942,6 +1985,81 @@ final class ConversationRunServiceTests: APIClientTestCase {
             ],
             model: "anthropic/claude-sonnet-4.6",
             provider: "openrouter"
+        )
+    }
+
+    @MainActor
+    func testAuthoritativeHistoryRebuildsReasoningAndToolActivity() async throws {
+        let session = try makeSessionSummary()
+        let messages = [
+            ChatMessage(
+                role: "user",
+                content: "Inspect the file",
+                timestamp: 1,
+                messageId: "user-1"
+            ),
+            ChatMessage(
+                role: "assistant",
+                content: nil,
+                timestamp: 2,
+                messageId: "assistant-tool",
+                toolCalls: [
+                    .object([
+                        "id": .string("tool-1"),
+                        "function": .object([
+                            "name": .string("read_file"),
+                            "arguments": .string(
+                                #"{"path":"README.md"}"#
+                            ),
+                        ]),
+                    ])
+                ],
+                reasoning: "I should inspect the requested file first."
+            ),
+            ChatMessage(
+                role: "tool",
+                content: "Project documentation",
+                timestamp: 3,
+                messageId: "tool-result",
+                toolCallId: "tool-1"
+            ),
+            ChatMessage(
+                role: "assistant",
+                content: "The file contains project documentation.",
+                timestamp: 4,
+                messageId: "assistant-answer"
+            ),
+        ]
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: RunHistoryRepositoryStub(
+                session: session,
+                historyMessagesByCall: [1: messages]
+            ),
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: RunServiceStub(
+                eventResult: .holdOpen,
+                statuses: []
+            )
+        )
+
+        let didLoad = await viewModel.load()
+        XCTAssertTrue(didLoad)
+
+        XCTAssertEqual(
+            ["I should inspect the requested file first."],
+            viewModel.durableReasoningGroups.map(\.text)
+        )
+        XCTAssertEqual(1, viewModel.durableToolCallGroups.count)
+        XCTAssertEqual(
+            "read_file",
+            viewModel.durableToolCallGroups.first?.toolCalls.first?.name
+        )
+        XCTAssertEqual(
+            "Project documentation",
+            viewModel.durableToolCallGroups.first?.toolCalls.first?.preview
         )
     }
 

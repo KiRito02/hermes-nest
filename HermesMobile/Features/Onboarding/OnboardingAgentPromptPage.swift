@@ -10,7 +10,7 @@ struct OnboardingAgentPromptPage: View {
                     stepNumber: 1,
                     icon: "terminal",
                     title: String(localized: "Set up Hermes Nest Companion"),
-                    description: String(localized: "Send this prompt to an agent on your NAS. It installs Companion, keeps the Gateway key local, and prepares HTTPS access.")
+                    description: String(localized: "Send this prompt to an agent on your Hermes Agent host. It installs Companion, keeps the Gateway key local, and prepares HTTPS access.")
                 )
 
                 OnboardingAgentPromptCard(

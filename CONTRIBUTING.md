@@ -16,7 +16,7 @@ read the [Code of Conduct](CODE_OF_CONDUCT.md).
   simulator works). UI changes that affect adaptive layout should also be
   built and launched on an available 13-inch iPad Pro simulator.
 - To actually use the target architecture you need the self-hosted Hermes Nest
-  Companion on the same NAS as a
+  Companion on the same server as a
   [Hermes Agent API Server](https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server).
   The App connects to Companion; Companion connects to `hermes gateway` over
   loopback. Until the Companion implementation lands, the current branch is

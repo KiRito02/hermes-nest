@@ -50,7 +50,7 @@ loopback so Lucky or Tailscale HTTPS can proxy to it.
 
 ## Pairing
 
-Create a short-lived, single-use pairing secret locally on the NAS:
+Create a short-lived, single-use pairing secret locally on the Hermes Agent host:
 
 ```bash
 PYTHONPATH=src python -m hermex_companion pairing create --expires-in 300
@@ -163,7 +163,11 @@ capability snapshot when Gateway is reachable, authorized, and compatible.
       "model_options_proxy": true,
       "session_model_lock_proxy": true,
       "skills_proxy": true,
-      "toolsets_proxy": true
+      "toolsets_proxy": true,
+      "files": true,
+      "uploads": true,
+      "upload_from_file": true,
+      "memory": true
     },
     "endpoints": {
       "health": {
@@ -205,6 +209,34 @@ capability snapshot when Gateway is reachable, authorized, and compatible.
       "toolsets": {
         "method": "GET",
         "path": "/v1/toolsets"
+      },
+      "file_roots": {
+        "method": "GET",
+        "path": "/companion/v1/files/roots"
+      },
+      "uploads": {
+        "method": "POST",
+        "path": "/companion/v1/uploads"
+      },
+      "upload_from_file": {
+        "method": "POST",
+        "path": "/companion/v1/uploads/from-file"
+      },
+      "upload_content": {
+        "method": "GET",
+        "path": "/companion/v1/uploads/{attachment_id}/content"
+      },
+      "memory": {
+        "method": "GET",
+        "path": "/companion/v1/memory/{target}"
+      },
+      "memory_operations": {
+        "method": "POST",
+        "path": "/companion/v1/memory/{target}/operations"
+      },
+      "memory_reset": {
+        "method": "POST",
+        "path": "/companion/v1/memory/{target}/reset"
       }
     }
   },
@@ -265,10 +297,127 @@ Top-level status is `ok` only when Gateway status is `ok`; otherwise it is
 compatible Gateway response supplies them. Gateway PID, configured platforms,
 agent counts, paths, and detailed readiness checks are never returned.
 
+## Server-authorized files and attachments
+
+The Hermes Agent host configures zero or more absolute roots locally. The App
+can choose only root aliases and descendants returned by Companion; it cannot
+submit, discover, or broaden host paths. Zero roots are exposed by default.
+Symlinks, special files, traversal, absolute App paths, sensitive credential
+names, and paths outside a configured root are rejected or omitted.
+
+`GET /companion/v1/files/roots` returns aliases only:
+
+```json
+{
+  "roots": [
+    {
+      "id": "projects",
+      "name": "Projects",
+      "writable": true,
+      "attachable": true
+    }
+  ]
+}
+```
+
+`attachable` is true only when the canonical root is inside the configured
+Agent working directory. Roots outside it remain browse/download-only.
+
+`GET /companion/v1/files/roots/{root_id}/entries` accepts `path`, a page
+`limit` from 1 through 200, and an opaque numeric `cursor`. Directories sort
+before files. A response contains `root_id`, the alias-relative `path`,
+bounded `entries`, and `next_cursor`. Companion refuses a directory containing
+more than 10,000 raw entries instead of performing unbounded enumeration and
+sorting.
+
+`GET /companion/v1/files/roots/{root_id}/preview?path=...` returns at most
+256 KiB of UTF-8 text or binary metadata. `GET .../download?path=...` streams
+one regular file with a safe attachment filename. Neither response reveals the
+host path.
+
+`POST /companion/v1/uploads` is multipart/form-data. The first part is
+`metadata` JSON with exactly `root_id`, `directory`, and `session_id`; the
+second and final part is `file`. Companion streams into a mode-0600 sibling
+temporary file and publishes only after fsync through an atomic no-overwrite
+filesystem operation. Display MIME metadata is derived from the sanitized
+filename; the untrusted multipart `Content-Type` header is not authoritative.
+Published attachment storage uses a Companion-generated random name inside a
+hidden mode-0700 directory; the original display name remains metadata and the
+internal path is never returned to the App or file browser.
+
+`POST /companion/v1/uploads/from-file` stages an existing regular file from an
+authorized source alias directly on the host. Its exact JSON fields are
+`source_root_id`, `source_path`, `destination_root_id`,
+`destination_directory`, and `session_id`. The source still passes the same
+root, traversal, symlink, sensitive-path, regular-file, and 50 MiB checks, and
+the destination must be writable. The App offers only attachable destinations
+for chat. This avoids a host file
+making a round trip through the iPhone.
+
+Limits are 50 MiB per file, 10 pending files per device/session, and 200 MiB
+pending bytes per device/session. A successful `201` returns an opaque upload
+`id`; Runs accept those IDs only through the Companion-only `attachment_ids`
+field. Companion resolves Agent-working-directory-relative paths server-side
+and removes `attachment_ids` before forwarding to Gateway. Absolute paths
+and randomized internal storage paths never reach the App or user-visible
+history. A pending attachment is claimed before Gateway start, so concurrent
+Runs cannot submit the same attachment twice. A claim left behind by a process
+stop stays unavailable after restart: the Gateway does not provide an
+idempotency key that would let Companion distinguish “never submitted” from
+“accepted but response not persisted,” so restart recovery fails closed rather
+than risking duplicate submission.
+
+`GET /companion/v1/uploads?session_id=...` restores the device's pending
+queue. `DELETE /companion/v1/uploads/{attachment_id}` removes only an
+unconsumed file whose device/inode identity still matches the file Companion
+published. Removal first atomically moves the directory entry to a private
+random quarantine name, verifies that entry against the already-open file
+descriptor, and only then unlinks it. If the file was already removed directly
+on the host, deletion clears the stale pending record without touching another
+path.
+Consumed attachment metadata added to authoritative session history includes
+only the display metadata and an opaque authenticated `download_path`.
+For newly consumed turns, Companion records a monotonic per-session turn order,
+captures the maximum real Gateway message `id` immediately before submitting
+the Run, binds only a later matching user message on the first authoritative
+history read, and uses that ID thereafter. This keeps repeated identical
+prompts—including intervening turns without attachments—associated with the
+correct attachments without inventing a Gateway `run_id` message field.
+`GET /companion/v1/uploads/{attachment_id}/content` serves that consumed file
+only while its published device/inode identity still matches; randomized
+storage paths remain private. This supplies historical image/audio previews
+without exposing host paths.
+
+## Built-in Memory
+
+Memory is disabled until the host explicitly configures the active Hermes
+profile's memories directory. Only built-in `MEMORY.md` (`target=memory`) and
+`USER.md` (`target=user`) are supported; external Memory providers are out of
+scope.
+
+`GET /companion/v1/memory/{target}` returns `entries`, a SHA-256 `revision`,
+`char_count`, and the configured `char_limit`. Mutations use
+`POST .../{target}/operations` with the current revision and 1–50 `add`,
+`replace`, or `remove` operations. They are applied all-or-nothing under the
+same sibling `.lock` convention and `§` delimiter as Hermes Agent, pass the
+strict bounded threat scanner, enforce the configured character limit, and
+publish through fsync plus atomic replacement. A stale revision returns
+`409 memory_revision_conflict`; external format drift is never overwritten.
+
+`POST /companion/v1/memory/{target}/reset` requires the current revision and
+the exact confirmation `RESET MEMORY` or `RESET USER`.
+Memory files and their sibling lock files are opened without following
+symbolic links and must remain regular files. Every lock/read/atomic-write
+sequence stays anchored to a directory descriptor whose device/inode identity
+must match the directory configured at Companion startup. Reads are rejected
+before loading content when a built-in Memory file exceeds the 4,000,000-byte
+safety bound; the profile's configured character limit remains the user-visible
+content limit.
+
 ## Gateway-compatible sessions
 
 Every route below requires device authentication. Companion removes the device
-`Authorization` header, sends only its NAS-local Gateway bearer credential over
+`Authorization` header, sends only its host-local Gateway bearer credential over
 loopback, and never forwards other App request headers. Redirects are not
 followed. `HEAD` is not an alias for either supported GET resource and returns
 `405` without contacting Gateway.
@@ -276,6 +425,13 @@ followed. `HEAD` is not an alias for either supported GET resource and returns
 This contract was verified against Hermes Agent `0.19.0`, upstream commit
 `07e97d2f5dc3d2092cfe693ef07b2527a36cd2d8`, its session API tests, the
 official API Server documentation, and the owner's running loopback Gateway.
+
+The verified Runs attachment handoff remains path-based because Gateway accepts
+no file descriptor or file ID. Companion revalidates the randomized private
+file immediately before Run submission, and its mode-0700 storage prevents
+remote devices or other host users from replacing it. A hostile process running
+as the same Companion service identity is outside this remote-client boundary
+and must not be granted access to that identity.
 
 The supported query fields are:
 
@@ -350,7 +506,7 @@ reordering rows, or creating a Companion-owned transcript.
 ## Gateway-compatible model selection
 
 Every route below requires device authentication. Companion replaces the App
-device bearer with its NAS-local Gateway bearer, strips other App headers, and
+device bearer with its host-local Gateway bearer, strips other App headers, and
 does not follow redirects:
 
 | Method | Path | Purpose |
@@ -436,7 +592,7 @@ authoritative if another client later resumes the Hermes session.
 `GET /v1/skills` and `GET /v1/toolsets` are the only discovery routes exposed
 by this slice. Both require the App's device bearer, accept no query string or
 request body, reject implicit HEAD, and replace the device bearer with the
-NAS-local Gateway bearer. Companion never exposes Skill/Toolset mutation
+host-local Gateway bearer. Companion never exposes Skill/Toolset mutation
 routes or forwards other App headers.
 
 This contract was verified against the owner's live Gateway on Hermes Agent
@@ -502,7 +658,7 @@ never return raw upstream details.
 ## Gateway-compatible Runs
 
 Every route below requires device authentication and accepts no query
-parameters. Companion replaces the App device bearer with its NAS-local
+parameters. Companion replaces the App device bearer with its host-local
 Gateway bearer, strips all other App headers, and does not follow redirects.
 Run IDs are single bounded path segments. Unsupported methods, suffixes,
 implicit HEAD, and invalid IDs never reach Gateway.
@@ -660,7 +816,7 @@ Gateway failures use the common bounded error envelope:
 
 | Status | Code | Meaning |
 | --- | --- | --- |
-| 502 | `gateway_unauthorized` | Gateway rejected the NAS-local credential |
+| 502 | `gateway_unauthorized` | Gateway rejected the host-local credential |
 | 503 | `gateway_unavailable` | Gateway returned a server failure |
 | 502 | `gateway_incompatible` | Unsupported status, media type, or success shape |
 | 502 | `gateway_malformed_response` | Success body was not valid JSON |

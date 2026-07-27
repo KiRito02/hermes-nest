@@ -326,6 +326,13 @@ struct ConversationRunDeltaBuffer: Equatable {
     }
 }
 
+private struct FailedAttachmentUpload: Sendable {
+    let fileURL: URL
+    let filename: String
+    let contentType: String
+    let destination: CompanionUploadDestination
+}
+
 @MainActor
 @Observable
 final class CompanionSessionHistoryViewModel {
@@ -352,6 +359,8 @@ final class CompanionSessionHistoryViewModel {
     private(set) var streamedAssistantText = ""
     private(set) var reasoningText = ""
     private(set) var liveToolCalls: [ToolCall] = []
+    private(set) var durableReasoningGroups: [ReasoningGroup] = []
+    private(set) var durableToolCallGroups: [ToolCallGroup] = []
     private(set) var needsTerminalHistoryRetry = false
     private(set) var pendingApproval: ConversationApprovalRequest?
     private(set) var approvalErrorMessage: String?
@@ -362,11 +371,17 @@ final class CompanionSessionHistoryViewModel {
     private(set) var isApplyingModelSelection = false
     private(set) var modelSelectionErrorMessage: String?
     private(set) var latestRunUsage: ConversationRunUsage?
+    private(set) var pendingUploads: [CompanionUpload] = []
+    private(set) var isUploadingAttachment = false
+    private(set) var attachmentUploadProgress: Double?
+    private(set) var attachmentErrorMessage: String?
+    private var failedAttachmentUpload: FailedAttachmentUpload?
 
     private let repository: any SessionRepository
     private let runService: any ConversationRunServing
     private let modelService: any CompanionModelServing
     private let modelSelectionStore: any CompanionModelSelectionStoring
+    private let workspaceService: any CompanionWorkspaceServing
     private let companionURL: URL
     private let pageSize: Int
     private let reconciliationDelayNanoseconds: UInt64
@@ -396,6 +411,7 @@ final class CompanionSessionHistoryViewModel {
         supportsRunApprovals: Bool = false,
         supportsModelSelection: Bool = false,
         modelService: (any CompanionModelServing)? = nil,
+        workspaceService: (any CompanionWorkspaceServing)? = nil,
         modelSelectionStore: (
             any CompanionModelSelectionStoring
         )? = nil,
@@ -413,6 +429,8 @@ final class CompanionSessionHistoryViewModel {
         )
         self.modelSelectionStore =
             modelSelectionStore ?? CompanionModelSelectionStore()
+        self.workspaceService = workspaceService
+            ?? CompanionWorkspaceService(companionURL: companionURL)
         self.supportsRunApprovals = supportsRunApprovals
         self.supportsModelSelection = supportsModelSelection
         self.reconciliationDelayNanoseconds =
@@ -422,6 +440,22 @@ final class CompanionSessionHistoryViewModel {
     var visibleMessages: [ChatMessage] {
         guard visibleStartIndex < allMessages.count else { return [] }
         return Array(allMessages[visibleStartIndex...])
+    }
+
+    func durableReasoning(
+        anchoredTo message: ChatMessage
+    ) -> [ReasoningGroup] {
+        durableReasoningGroups.filter {
+            $0.anchorMessageID == message.id
+        }
+    }
+
+    func durableToolActivity(
+        anchoredTo message: ChatMessage
+    ) -> [ToolCallGroup] {
+        durableToolCallGroups.filter {
+            $0.anchorMessageID == message.id
+        }
     }
 
     var hasOlderMessages: Bool {
@@ -435,10 +469,175 @@ final class CompanionSessionHistoryViewModel {
     var canSend: Bool {
         !isRunActive
             && !isLoading
+            && !isUploadingAttachment
             && !isViewingCachedData
             && !isTerminalRefreshPending
             && !isApplyingModelSelection
             && errorMessage == nil
+    }
+
+    func uploadAttachment(
+        fileURL: URL,
+        filename: String,
+        contentType: String,
+        destination: CompanionUploadDestination,
+        rememberFailure: Bool = true
+    ) async -> Bool {
+        guard
+            let sessionID = session.sessionId,
+            pendingUploads.count < 10,
+            !isUploadingAttachment
+        else {
+            attachmentErrorMessage = String(
+                localized: "A turn can include at most 10 attachments."
+            )
+            return false
+        }
+        isUploadingAttachment = true
+        attachmentUploadProgress = 0
+        attachmentErrorMessage = nil
+        defer {
+            isUploadingAttachment = false
+            attachmentUploadProgress = nil
+        }
+        do {
+            let upload = try await workspaceService.upload(
+                sessionID: sessionID,
+                destination: destination,
+                filename: filename,
+                contentType: contentType,
+                fileURL: fileURL,
+                progress: { [weak self] progress in
+                    Task { @MainActor in
+                        self?.attachmentUploadProgress = progress
+                    }
+                }
+            )
+            pendingUploads.append(upload)
+            try? FileManager.default.removeItem(at: fileURL)
+            return true
+        } catch {
+            guard !(error is CancellationError) else {
+                try? FileManager.default.removeItem(at: fileURL)
+                return false
+            }
+            if rememberFailure {
+                if let previous = failedAttachmentUpload,
+                   previous.fileURL != fileURL {
+                    try? FileManager.default.removeItem(
+                        at: previous.fileURL
+                    )
+                }
+                failedAttachmentUpload = FailedAttachmentUpload(
+                    fileURL: fileURL,
+                    filename: filename,
+                    contentType: contentType,
+                    destination: destination
+                )
+            }
+            if !rememberFailure {
+                try? FileManager.default.removeItem(at: fileURL)
+            }
+            attachmentErrorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    var canRetryAttachmentUpload: Bool {
+        failedAttachmentUpload != nil && !isUploadingAttachment
+    }
+
+    func retryAttachmentUpload() async {
+        guard let failedAttachmentUpload else { return }
+        let succeeded = await uploadAttachment(
+            fileURL: failedAttachmentUpload.fileURL,
+            filename: failedAttachmentUpload.filename,
+            contentType: failedAttachmentUpload.contentType,
+            destination: failedAttachmentUpload.destination,
+            rememberFailure: true
+        )
+        if succeeded
+            || !FileManager.default.fileExists(
+                atPath: failedAttachmentUpload.fileURL.path
+            ) {
+            self.failedAttachmentUpload = nil
+        }
+    }
+
+    func prepareAttachmentSelection() {
+        if let failedAttachmentUpload {
+            try? FileManager.default.removeItem(
+                at: failedAttachmentUpload.fileURL
+            )
+        }
+        failedAttachmentUpload = nil
+        attachmentErrorMessage = nil
+    }
+
+    func stageServerFile(
+        sourceRootID: String,
+        sourcePath: String,
+        destination: CompanionUploadDestination
+    ) async -> Bool {
+        guard
+            let sessionID = session.sessionId,
+            pendingUploads.count < 10,
+            !isUploadingAttachment
+        else {
+            attachmentErrorMessage = String(
+                localized: "A turn can include at most 10 attachments."
+            )
+            return false
+        }
+        isUploadingAttachment = true
+        attachmentUploadProgress = nil
+        attachmentErrorMessage = nil
+        defer { isUploadingAttachment = false }
+        do {
+            let upload = try await workspaceService.stageServerFile(
+                sessionID: sessionID,
+                sourceRootID: sourceRootID,
+                sourcePath: sourcePath,
+                destination: destination
+            )
+            pendingUploads.append(upload)
+            return true
+        } catch {
+            guard !(error is CancellationError) else { return false }
+            attachmentErrorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func restorePendingUploads() async {
+        guard let sessionID = session.sessionId else { return }
+        do {
+            pendingUploads = try await workspaceService.uploads(
+                sessionID: sessionID
+            )
+        } catch {
+            guard !(error is CancellationError) else { return }
+            attachmentErrorMessage = error.localizedDescription
+        }
+    }
+
+    func removePendingUpload(_ upload: CompanionUpload) async {
+        guard let id = upload.id?.trimmedNonEmptyValue else { return }
+        do {
+            try await workspaceService.deleteUpload(id: id)
+            pendingUploads.removeAll { $0.id == id }
+        } catch {
+            guard !(error is CancellationError) else { return }
+            attachmentErrorMessage = error.localizedDescription
+        }
+    }
+
+    func clearAttachmentError() {
+        attachmentErrorMessage = nil
+    }
+
+    func setAttachmentError(_ message: String) {
+        attachmentErrorMessage = message
     }
 
     var canRequestStop: Bool {
@@ -774,7 +973,8 @@ final class CompanionSessionHistoryViewModel {
             role: "user",
             content: trimmed,
             timestamp: Date().timeIntervalSince1970,
-            messageId: "local-\(UUID().uuidString)"
+            messageId: "local-\(UUID().uuidString)",
+            attachments: pendingUploads.map(\.messageAttachment)
         )
         apply(allMessages + [optimisticUser])
         streamedAssistantText = ""
@@ -799,7 +999,10 @@ final class CompanionSessionHistoryViewModel {
                     input: trimmed,
                     sessionID: sessionID,
                     conversationHistory: authoritativeHistory,
-                    selection: selectedModel
+                    selection: selectedModel,
+                    attachmentIDs: pendingUploads.compactMap {
+                        $0.id?.trimmedNonEmptyValue
+                    }
                 )
             )
         } catch {
@@ -809,6 +1012,7 @@ final class CompanionSessionHistoryViewModel {
         }
 
         activeRunID = started.runID
+        pendingUploads = []
         runState = .streaming
         runTask = Task { [weak self] in
             await self?.consumeEvents(
@@ -1420,6 +1624,15 @@ final class CompanionSessionHistoryViewModel {
     private func apply(_ messages: [ChatMessage]) {
         allMessages = messages
         visibleStartIndex = max(0, messages.count - pageSize)
+        durableReasoningGroups = ChatViewModel.reasoningDisplayGroups(
+            messages: messages,
+            archivedGroups: []
+        )
+        durableToolCallGroups = ToolCallGroup.groups(
+            persistedToolCalls: [],
+            messages: messages,
+            messageOffset: nil
+        )
     }
 
     private func cachedMessages(

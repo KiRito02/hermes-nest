@@ -89,6 +89,42 @@ struct CompanionCapabilities: Codable, Equatable, Sendable {
         }
         return true
     }
+
+    var supportsFiles: Bool {
+        companion?.features?["files"] == .bool(true)
+            && companion?.endpoints?["file_roots"]?.method == "GET"
+            && companion?.endpoints?["file_roots"]?.path
+                == "/companion/v1/files/roots"
+    }
+
+    var supportsUploads: Bool {
+        supportsFiles
+            && companion?.features?["uploads"] == .bool(true)
+            && companion?.endpoints?["uploads"]?.method == "POST"
+            && companion?.endpoints?["uploads"]?.path
+                == "/companion/v1/uploads"
+    }
+
+    var supportsServerFileAttachments: Bool {
+        supportsUploads
+            && companion?.features?["upload_from_file"] == .bool(true)
+            && companion?.endpoints?["upload_from_file"]?.method == "POST"
+            && companion?.endpoints?["upload_from_file"]?.path
+                == "/companion/v1/uploads/from-file"
+    }
+
+    var supportsBuiltInMemory: Bool {
+        companion?.features?["memory"] == .bool(true)
+            && companion?.endpoints?["memory"]?.method == "GET"
+            && companion?.endpoints?["memory"]?.path
+                == "/companion/v1/memory/{target}"
+            && companion?.endpoints?["memory_operations"]?.method == "POST"
+            && companion?.endpoints?["memory_operations"]?.path
+                == "/companion/v1/memory/{target}/operations"
+            && companion?.endpoints?["memory_reset"]?.method == "POST"
+            && companion?.endpoints?["memory_reset"]?.path
+                == "/companion/v1/memory/{target}/reset"
+    }
 }
 
 struct CompanionCapabilityBlock: Codable, Equatable, Sendable {
@@ -832,15 +868,15 @@ enum CompanionConnectionError: LocalizedError, Equatable {
         case .incompatibleCompanion:
             return String(localized: "This Hermes Nest Companion version is not compatible with the app.")
         case .invalidDeviceCredential:
-            return String(localized: "This device credential is no longer valid. Create a new pairing secret on the NAS.")
+            return String(localized: "This device credential is no longer valid. Create a new pairing secret on the Hermes Agent host.")
         case .deviceRevoked:
-            return String(localized: "This device was revoked. Create a new pairing secret on the NAS.")
+            return String(localized: "This device was revoked. Create a new pairing secret on the Hermes Agent host.")
         case .pairingSecretInvalid:
             return String(localized: "The pairing secret is invalid.")
         case .pairingSecretUsed:
-            return String(localized: "The pairing secret was already used. Create a new one on the NAS.")
+            return String(localized: "The pairing secret was already used. Create a new one on the Hermes Agent host.")
         case .pairingSecretExpired:
-            return String(localized: "The pairing secret expired. Create a new one on the NAS.")
+            return String(localized: "The pairing secret expired. Create a new one on the Hermes Agent host.")
         case .invalidRequest:
             return String(localized: "Check the Companion URL, pairing secret, and device name.")
         case .unexpectedResponse:

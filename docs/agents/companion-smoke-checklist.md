@@ -8,7 +8,7 @@ to retain.
 
 ## Safety
 
-- Run against the owner's intended NAS deployment.
+- Run against the owner's intended Hermes Agent host deployment.
 - Never put `API_SERVER_KEY` on the App-facing side.
 - Never paste or commit a device credential, pairing secret, Gateway key,
   private hostname, filesystem path, Memory content, prompt, or uploaded file.
@@ -43,7 +43,8 @@ Green:
 
 ## Step 2 — Pairing and device authentication
 
-Generate a short-lived, single-use pairing secret on the NAS using the
+Generate a short-lived, single-use pairing secret on the Hermes Agent host
+using the
 `python -m hermex_companion pairing create --expires-in 300` command documented
 in `Companion/README.md`.
 
@@ -67,7 +68,8 @@ Green:
 - local Gateway 401/403 never echoes the Gateway key;
 - App never needs direct access to port 8642.
 
-For comparison, probe Gateway only from the NAS and follow the evidence order in
+For comparison, probe Gateway only from the Hermes Agent host and follow the
+evidence order in
 `AGENTS.md`.
 
 ## Step 4 — SSE passthrough
@@ -94,6 +96,8 @@ Green:
 - upload streams with progress and cancellation;
 - failure/cancel leaves no published partial file;
 - success is atomic and collision behavior matches the contract;
+- an existing authorized host file stages server-side without a phone
+  download/upload round trip;
 - the verified upload-to-turn strategy makes the file available to Hermes.
 
 ## Step 6 — built-in Memory

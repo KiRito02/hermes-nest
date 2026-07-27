@@ -29,6 +29,7 @@ ProtectKernelTunables=true
 ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=@STATE_HOME@/hermex-companion
+@HOST_WRITE_PATHS@
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictRealtime=true
 RestrictSUIDSGID=true

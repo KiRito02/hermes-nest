@@ -2,8 +2,8 @@
 
 This file is for fast orientation only. `PROJECT_SPEC.md` remains the source of truth for product scope, API behavior, build phases, dependencies, and open decisions.
 
-Hermes Nest is a native iPhone/iPad control surface plus a self-hosted NAS Companion
-for a Hermes AI agent stack. The App is the interaction/review surface;
+Hermes Nest is a native iPhone/iPad control surface plus a self-hosted
+Companion on the server running Hermes Agent. The App is the interaction/review surface;
 Companion is its only remote endpoint; Hermes Gateway remains the execution
 plane behind Companion on loopback.
 
@@ -18,13 +18,13 @@ plane behind Companion on loopback.
 ## Boundaries
 
 - Native SwiftUI app, not a webview wrapper.
-- App plus a small NAS Companion; do not turn Companion into a general WebUI,
+- App plus a small host-local Companion; do not turn Companion into a general WebUI,
   terminal, arbitrary filesystem API, or hosted relay.
 - Versioned Companion contract plus verified Gateway behavior only; never
   invent endpoint paths or JSON shapes.
 - Tolerant decoding over brittle model purity; upstream JSON can drift.
 - Gateway owns agent execution. Companion owns device auth and approved
-  NAS-local capabilities. The App owns mobile interaction quality.
+  host-local capabilities. The App owns mobile interaction quality.
 
 ## Product Feel
 

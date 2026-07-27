@@ -61,8 +61,8 @@ for snippet, description in [
         "attachment accessibility identifier",
     ),
     (
-        "Images unavailable with Hermes Runs",
-        "attachment availability explanation",
+        "The connected Companion does not advertise the secure upload contract.",
+        "capability-gated attachment availability explanation",
     ),
 ]:
     require(attachment_entry, snippet, description)

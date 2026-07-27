@@ -30,7 +30,7 @@ yet. Do not treat the current branch as a finished client or Companion.
 ## Goal
 
 Hermes Nest connects an iPhone or iPad to a small Companion running on the
-owner's NAS. Companion keeps the Gateway key local, calls
+Hermes Agent host. Companion keeps the Gateway key local, calls
 [Hermes Agent](https://github.com/NousResearch/hermes-agent) on loopback, and
 adds restricted file/upload/built-in-Memory capabilities.
 
@@ -43,7 +43,7 @@ the inherited `hermes-webui` backend:
 - merged Companion/Gateway capability discovery;
 - sessions, streaming runs, reconnect, stop, and approvals;
 - Jobs, Skills/Toolsets, models, inline images, adaptive iPad layout;
-- restricted NAS file browsing, streaming upload, and built-in Memory
+- restricted host file browsing, streaming upload, and built-in Memory
   management;
 - offline read-only cache;
 - a separate performance track for long, streaming conversations.
@@ -55,7 +55,7 @@ the inherited `hermes-webui` backend:
 Required:
 
 - Companion URL plus one-time local pairing.
-- Revocable device authentication; `API_SERVER_KEY` stays on the NAS.
+- Revocable device authentication; `API_SERVER_KEY` stays on the Hermes Agent host.
 - Companion/Gateway readiness and tolerant merged capabilities.
 - Session list/history and persisted conversation turns.
 - Structured streaming, status recovery, stop, and approvals when advertised.
@@ -74,9 +74,9 @@ Not promised in Companion v1:
 
 See [`PROJECT_SPEC.md`](PROJECT_SPEC.md) for the authoritative scope.
 
-## NAS deployment
+## Hermes Agent host deployment
 
-Configure Hermes Agent on the NAS and keep Gateway on loopback:
+Configure Hermes Agent on its host and keep Gateway on loopback:
 
 ```dotenv
 API_SERVER_ENABLED=true
@@ -95,7 +95,7 @@ an HTTPS reverse proxy, with Tailscale HTTPS also supported.
 
 Companion uses Python 3.11, pinned `aiohttp`, standard-library SQLite, a
 `uv`-locked isolated environment, XDG-owned configuration/state/releases, and a
-systemd service installed directly on the NAS host. Exact commands land with
+systemd service installed directly on the Hermes Agent host. Exact commands land with
 Issue #1 and must preserve loopback binding and degraded operation when Gateway
 is unavailable. Do not expose Gateway directly or place `API_SERVER_KEY` on the
 iPhone.
@@ -105,7 +105,7 @@ https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server
 
 ## Development workflow
 
-The owner's primary machines are Linux/NAS and Windows:
+The owner's primary development machines are Linux and Windows:
 
 1. Edit and commit source on Linux/Windows.
 2. Ask before pushing a branch.

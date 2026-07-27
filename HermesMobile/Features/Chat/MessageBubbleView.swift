@@ -310,6 +310,10 @@ struct MessageBubbleView: View {
     /// (or filename fallback) once and defers to the injected raw-data loader.
     private func audioLoader(for attachment: MessageAttachment) -> () async -> Data? {
         let resolvedPath: String? = {
+            if let downloadPath = attachment.downloadPath,
+               !downloadPath.isEmpty {
+                return downloadPath
+            }
             if let path = attachment.path, !path.isEmpty { return path }
             if let name = attachment.name, !name.isEmpty { return name }
             return nil
@@ -328,7 +332,10 @@ struct MessageBubbleView: View {
     private var attachmentsWithPreviews: [(attachment: MessageAttachment, localData: Data?)] {
         guard let attachments = message.attachments else { return [] }
         return attachments.map { attachment in
-            let key = attachment.path ?? attachment.name ?? ""
+            let key = attachment.downloadPath
+                ?? attachment.path
+                ?? attachment.name
+                ?? ""
             let localData = localAttachmentPreviews?[key]
             return (attachment, localData)
         }
@@ -405,8 +412,12 @@ private struct GridAttachmentCell: View {
     let size: CGFloat
 
     private var resolvedPath: String? {
-        // The server saves uploads to the workspace root. Use the explicit
-        // path when available; for older sessions fall back to filename.
+        // Companion history supplies an opaque authenticated download route.
+        // Older providers may still expose an explicit path or only a name.
+        if let downloadPath = attachment.downloadPath,
+           !downloadPath.isEmpty {
+            return downloadPath
+        }
         if let path = attachment.path, !path.isEmpty { return path }
         if let name = attachment.name, !name.isEmpty { return name }
         return nil

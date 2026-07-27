@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 
@@ -87,6 +88,70 @@ class DeploymentContractTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("User=test-user", result.stdout)
+
+    def test_renderer_grants_writes_only_from_host_configuration(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            config_home = root / "config"
+            state_home = root / "state"
+            data_home = root / "data"
+            writable = root / "agent" / "uploads"
+            read_only = root / "archive"
+            memory = root / "hermes" / "memories"
+            for path in (writable, read_only, memory):
+                path.mkdir(parents=True)
+            host_config = root / "workspaces.json"
+            host_config.write_text(
+                json.dumps(
+                    {
+                        "roots": [
+                            {
+                                "id": "uploads",
+                                "name": "Uploads",
+                                "path": str(writable),
+                                "writable": True,
+                            },
+                            {
+                                "id": "archive",
+                                "name": "Archive",
+                                "path": str(read_only),
+                                "writable": False,
+                            },
+                        ],
+                        "memory": {"directory": str(memory)},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(RENDERER),
+                    "--service-user",
+                    "test-user",
+                    "--service-group",
+                    "test-group",
+                    "--config-home",
+                    str(config_home),
+                    "--state-home",
+                    str(state_home),
+                    "--data-home",
+                    str(data_home),
+                    "--companion-dir",
+                    str(data_home / "current" / "Companion"),
+                    "--host-config",
+                    str(host_config),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        unit = result.stdout
+        self.assertIn(f"ReadWritePaths={writable}", unit)
+        self.assertIn(f"ReadWritePaths={memory}", unit)
+        self.assertNotIn(f"ReadWritePaths={read_only}", unit)
 
 
 if __name__ == "__main__":

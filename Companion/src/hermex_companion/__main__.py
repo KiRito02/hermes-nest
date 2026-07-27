@@ -9,8 +9,10 @@ from aiohttp import web
 
 from hermex_companion.app import create_app
 from hermex_companion.gateway import GatewayDiscovery
-from hermex_companion.paths import database_path
+from hermex_companion.memory import MemoryAccess
+from hermex_companion.paths import database_path, workspace_config_path
 from hermex_companion.registry import DeviceRegistry
+from hermex_companion.workspace import WorkspaceAccess
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8643
@@ -51,8 +53,10 @@ def _serve(arguments: Sequence[str]) -> None:
         os.environ.get("HERMEX_COMPANION_GATEWAY_URL", DEFAULT_GATEWAY_URL),
         os.environ.get("HERMEX_COMPANION_GATEWAY_KEY", ""),
     )
+    workspace = WorkspaceAccess.from_config_file(workspace_config_path())
+    memory = MemoryAccess.from_config_file(workspace_config_path())
     web.run_app(
-        create_app(registry, gateway),
+        create_app(registry, gateway, workspace=workspace, memory=memory),
         host=options.host,
         port=options.port,
         print=None,

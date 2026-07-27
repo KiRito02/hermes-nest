@@ -63,7 +63,7 @@ struct CompanionRootView: View {
         case "unavailable":
             return String(localized: "Companion is reachable, but Hermes Gateway is unavailable.")
         case "unauthorized":
-            return String(localized: "Companion is reachable, but its NAS-local Gateway credential was rejected.")
+            return String(localized: "Companion is reachable, but its host-local Gateway credential was rejected.")
         case "incompatible":
             return String(localized: "Companion is reachable, but this Hermes Gateway version is incompatible.")
         case "degraded":

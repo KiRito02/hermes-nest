@@ -5,17 +5,20 @@ struct ConversationRunStartRequest: Equatable, Sendable {
     let sessionID: String
     let conversationHistory: [ChatMessage]
     let selection: CompanionModelSelection?
+    let attachmentIDs: [String]
 
     init(
         input: String,
         sessionID: String,
         conversationHistory: [ChatMessage],
-        selection: CompanionModelSelection? = nil
+        selection: CompanionModelSelection? = nil,
+        attachmentIDs: [String] = []
     ) {
         self.input = input
         self.sessionID = sessionID
         self.conversationHistory = conversationHistory
         self.selection = selection
+        self.attachmentIDs = attachmentIDs
     }
 }
 
@@ -518,7 +521,7 @@ enum ConversationRunServiceError: LocalizedError, Equatable {
         case .requestTooLarge:
             return String(localized: "The conversation history exceeded Companion's size limit.")
         case .gatewayUnauthorized:
-            return String(localized: "Companion's NAS-local Gateway credential was rejected.")
+            return String(localized: "Companion's host-local Gateway credential was rejected.")
         case .gatewayUnavailable:
             return String(localized: "Hermes Gateway is temporarily unavailable.")
         case .gatewayIncompatible:
@@ -586,7 +589,10 @@ actor ConversationRunService: ConversationRunServing {
             provider: request.selection?.provider,
             modelOptions: request.selection?.reasoningEffort.map {
                 HermesModelOptionsBody(reasoningEffort: $0)
-            }
+            },
+            attachmentIDs: request.attachmentIDs.isEmpty
+                ? nil
+                : request.attachmentIDs
         )
         let encoded: Data
         do {
@@ -968,6 +974,7 @@ private struct RunStartBody: Encodable {
     let model: String?
     let provider: String?
     let modelOptions: HermesModelOptionsBody?
+    let attachmentIDs: [String]?
 
     enum CodingKeys: String, CodingKey {
         case input
@@ -976,6 +983,7 @@ private struct RunStartBody: Encodable {
         case model
         case provider
         case modelOptions = "model_options"
+        case attachmentIDs = "attachment_ids"
     }
 }
 
