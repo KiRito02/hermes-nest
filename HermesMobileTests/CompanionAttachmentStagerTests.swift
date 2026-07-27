@@ -213,6 +213,39 @@ final class CompanionAttachmentStagerTests: XCTestCase {
         XCTAssertEqual(discarded, [attachment])
     }
 
+    @MainActor
+    func testUploadPreflightFailureDiscardsCurrentUnownedFile() async throws {
+        let stagingDirectory = try temporaryDirectory()
+        let stagedURL =
+            stagingDirectory.appendingPathComponent("preflight.txt")
+        try Data("staged".utf8).write(to: stagedURL)
+        let attachment = CompanionStagedAttachment(
+            fileURL: stagedURL,
+            filename: "preflight.txt",
+            contentType: "text/plain"
+        )
+        let stager = RecordingAttachmentStager(stagedAttachments: [])
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: SessionSummary(title: "Missing identity"),
+            repository: AttachmentStagerSessionRepository(),
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            attachmentStager: stager
+        )
+
+        await viewModel.uploadDroppedAttachments(
+            [attachment],
+            destination: CompanionUploadDestination(
+                rootID: "workspace",
+                directory: ""
+            )
+        )
+
+        let discarded = await stager.discardedAttachments()
+        XCTAssertEqual(discarded, [attachment])
+    }
+
     private func temporaryDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(

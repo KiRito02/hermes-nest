@@ -634,10 +634,14 @@ final class CompanionSessionHistoryViewModel {
                 destination: destination
             )
             guard uploaded else {
-                let nextIndex = index + 1
-                if nextIndex < attachments.endIndex {
+                let firstUnownedIndex =
+                    failedAttachmentUpload?.fileURL
+                        == attachment.fileURL
+                        ? index + 1
+                        : index
+                if firstUnownedIndex < attachments.endIndex {
                     await attachmentStager.discard(
-                        Array(attachments[nextIndex...])
+                        Array(attachments[firstUnownedIndex...])
                     )
                 }
                 return
@@ -686,7 +690,7 @@ final class CompanionSessionHistoryViewModel {
             try? FileManager.default.removeItem(at: fileURL)
             return true
         } catch {
-            guard !(error is CancellationError) else {
+            guard !(error is CancellationError), !Task.isCancelled else {
                 try? FileManager.default.removeItem(at: fileURL)
                 return false
             }

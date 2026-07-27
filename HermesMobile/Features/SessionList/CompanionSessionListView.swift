@@ -902,6 +902,8 @@ struct CompanionSessionHistoryView: View {
         }
         .onDisappear {
             droppedAttachmentTask?.cancel()
+            attachmentUploadTask?.cancel()
+            viewModel.cancelAttachmentRetry()
             Task {
                 await viewModel.discardStagedDroppedAttachments()
             }
