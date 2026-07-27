@@ -164,6 +164,9 @@ jobs:
 
           capture_ui en en_US --core-chat-lab core-chat-en.png
           capture_ui zh-Hans zh_CN --core-chat-lab core-chat-zh-Hans.png
+          xcrun simctl ui "${SIMULATOR_UDID}" appearance dark
+          capture_ui en en_US --core-chat-lab core-chat-dark.png
+          xcrun simctl ui "${SIMULATOR_UDID}" appearance light
           capture_ui en en_US --long-chat-lab long-chat.png
 
           {
@@ -191,6 +194,7 @@ jobs:
       PROJECT_PATH: HermesMobile.xcodeproj
       SCHEME: HermesMobile
       DERIVED_DATA_PATH: DerivedData-iPad-Acceptance
+      OUTPUT_PATH: ipad-ui-smoke
 
     steps:
       - name: Check out
@@ -266,6 +270,7 @@ jobs:
           echo "path=${app_path}" >> "$GITHUB_OUTPUT"
 
       - name: Install and launch on iPad
+        id: launch
         env:
           APP_PATH: ${{ steps.signed_app.outputs.path }}
           SIMULATOR_UDID: ${{ steps.sim.outputs.udid }}
@@ -284,3 +289,62 @@ jobs:
             -AppleLanguages "(en)" \
             -AppleLocale "en_US" \
             --core-chat-lab
+          echo "bundle_id=${bundle_id}" >> "$GITHUB_OUTPUT"
+
+      - name: Capture iPad adaptive-layout screenshots
+        env:
+          BUNDLE_ID: ${{ steps.launch.outputs.bundle_id }}
+          SIMULATOR_NAME: ${{ steps.sim.outputs.name }}
+          SIMULATOR_UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${OUTPUT_PATH}"
+          xcrun simctl ui "${SIMULATOR_UDID}" appearance light
+          xcrun simctl status_bar "${SIMULATOR_UDID}" override \
+            --time 9:41 \
+            --batteryState charged \
+            --batteryLevel 100 \
+            --wifiBars 3
+
+          capture_ipad() {
+            local filename="$1"
+            shift
+            xcrun simctl terminate "${SIMULATOR_UDID}" "${BUNDLE_ID}" \
+              2>/dev/null || true
+            xcrun simctl launch \
+              "${SIMULATOR_UDID}" \
+              "${BUNDLE_ID}" \
+              -AppleLanguages "(en)" \
+              -AppleLocale "en_US" \
+              "$@" | tee -a "${OUTPUT_PATH}/launch.log"
+            sleep 4
+            xcrun simctl io "${SIMULATOR_UDID}" screenshot \
+              "${OUTPUT_PATH}/${filename}"
+          }
+
+          capture_ipad \
+            core-chat-ipad-portrait.png \
+            --core-chat-ipad-lab
+          capture_ipad \
+            core-chat-ipad-compact.png \
+            --core-chat-compact-lab
+          capture_ipad \
+            core-chat-ipad-landscape.png \
+            --core-chat-ipad-lab \
+            --landscape
+
+          {
+            echo "Simulator: ${SIMULATOR_NAME}"
+            echo "UDID: ${SIMULATOR_UDID}"
+            echo "Bundle: ${BUNDLE_ID}"
+            echo "Build: signed Debug iphonesimulator"
+            echo "Landscape: requested through UIWindowScene geometry"
+            echo "Stage Manager: compact-width fixture; live resize remains manual"
+          } > "${OUTPUT_PATH}/metadata.txt"
+
+      - name: Upload iPad screenshots
+        uses: actions/upload-artifact@v7
+        with:
+          name: ipad-ui-smoke
+          path: ${{ env.OUTPUT_PATH }}
+          if-no-files-found: error

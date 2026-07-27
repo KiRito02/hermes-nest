@@ -18,6 +18,7 @@ struct CompanionSessionListView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var sessionPendingDelete: SessionSummary?
     @State private var isCreatingSession = false
+    @FocusState private var isSearchFocused: Bool
     private let repository: any SessionRepository
 
     init(
@@ -99,6 +100,7 @@ struct CompanionSessionListView: View {
             .background(HermesNestDesign.sidebar)
             .navigationTitle("Chats")
             .searchable(text: $searchText, prompt: "Search chats")
+            .searchFocused($isSearchFocused)
             .refreshable {
                 await viewModel.loadInitial(modelContext: modelContext)
             }
@@ -170,6 +172,7 @@ struct CompanionSessionListView: View {
                         }
                     }
                     .disabled(isCreatingSession || viewModel.isViewingCachedData)
+                    .help("New Chat")
                     .accessibilityLabel("New chat")
                 }
 
@@ -207,6 +210,19 @@ struct CompanionSessionListView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .focusedSceneValue(
+            \.hermexSceneActions,
+            HermexSceneActions(
+                canCreateNewChat:
+                    !isCreatingSession
+                        && !viewModel.isViewingCachedData,
+                createNewChat: createSession,
+                searchSessions: {
+                    columnVisibility = .all
+                    isSearchFocused = true
+                }
+            )
+        )
         .task {
             if viewModel.sessions.isEmpty {
                 await viewModel.loadInitial(modelContext: modelContext)
@@ -417,6 +433,7 @@ struct CompanionSessionHistoryView: View {
     @State private var attachmentUploadTask: Task<Void, Never>?
     @State private var draftMessage = ""
     @State private var isUserInteractingWithScroll = false
+    @State private var restoresComposerFocusAfterPresentation = false
     @FocusState private var composerIsFocused: Bool
 
     init(
@@ -698,7 +715,7 @@ struct CompanionSessionHistoryView: View {
                         Label("Delete", systemImage: "trash")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: "ellipsis")
                 }
                 .accessibilityLabel("Session actions")
                 .disabled(viewModel.isRunActive)
@@ -754,12 +771,18 @@ struct CompanionSessionHistoryView: View {
         } message: {
             Text("This removes the session from Hermes. Deletion cannot be undone.")
         }
-        .sheet(isPresented: $showsModelPicker) {
+        .sheet(
+            isPresented: $showsModelPicker,
+            onDismiss: restoreComposerFocusIfNeeded
+        ) {
             CompanionModelPickerView(viewModel: viewModel)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showsUsage) {
+        .sheet(
+            isPresented: $showsUsage,
+            onDismiss: restoreComposerFocusIfNeeded
+        ) {
             CompanionUsageView(viewModel: viewModel)
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
@@ -958,6 +981,8 @@ struct CompanionSessionHistoryView: View {
                             in: .whitespacesAndNewlines
                         ).isEmpty || !viewModel.canSend
                     )
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .help("Send message")
                     .accessibilityLabel("Send message")
                     .accessibilityIdentifier("companion.run.send")
                 }
@@ -1000,7 +1025,7 @@ struct CompanionSessionHistoryView: View {
                     id: \.offset
                 ) { _, upload in
                     HStack(spacing: 6) {
-                        Image(systemName: "doc")
+                        Image(systemName: upload.presentationSystemImage)
                         Text(upload.name?.nilIfEmpty ?? "Attachment")
                             .lineLimit(1)
                         Button {
@@ -1067,93 +1092,113 @@ struct CompanionSessionHistoryView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            controlLayout {
-                if !viewModel.modelGroups.isEmpty
-                    || viewModel.isLoadingModelOptions {
-                    Button {
-                        showsModelPicker = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            if viewModel.isLoadingModelOptions {
-                                ProgressView()
-                                    .controlSize(.small)
-                            } else {
-                                Image(systemName: "cpu")
-                            }
-                            Text(viewModel.selectedModelDisplayName)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Image(systemName: "chevron.down")
-                                .font(.caption2.weight(.semibold))
-                        }
-                        .font(HermesNestDesign.Typography.control)
-                        .frame(minHeight: 32)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(
-                        !viewModel.canChangeModel
-                            || viewModel.modelGroups.isEmpty
-                    )
-                    .accessibilityLabel("Choose model")
-                    .accessibilityIdentifier("companion.model.picker")
+            adaptiveModelControls
+        }
+    }
 
-                    if viewModel.selectedModelSupportsReasoning {
-                        Menu {
-                            ForEach(
-                                CompanionReasoningEffort.allCases,
-                                id: \.self
-                            ) { effort in
-                                Button {
-                                    Task {
-                                        await viewModel.selectReasoning(effort)
-                                    }
-                                } label: {
-                                    if viewModel.selectedModel?
-                                        .reasoningEffort == effort {
-                                        Label(
-                                            effort.displayName,
-                                            systemImage: "checkmark"
-                                        )
-                                    } else {
-                                        Text(effort.displayName)
-                                    }
-                                }
-                            }
-                        } label: {
-                            Label(
-                                viewModel.selectedReasoningDisplayName,
-                                systemImage: "brain"
-                            )
-                            .font(HermesNestDesign.Typography.control)
-                            .frame(minHeight: 32)
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(!viewModel.canChangeModel)
-                        .accessibilityLabel("Choose reasoning effort")
-                        .accessibilityIdentifier("companion.reasoning.picker")
-                    }
+    @ViewBuilder
+    private var adaptiveModelControls: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 6) {
+                modelControlItems
+            }
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    modelControlItems
+                    Spacer(minLength: 0)
                 }
 
-                Button {
-                    showsUsage = true
-                } label: {
-                    Label(
-                        usageControlLabel,
-                        systemImage: "chart.bar.xaxis"
-                    )
-                    .font(HermesNestDesign.Typography.control)
-                    .frame(minHeight: 32)
+                VStack(alignment: .leading, spacing: 6) {
+                    modelControlItems
                 }
-                .buttonStyle(.bordered)
-                .accessibilityLabel("Model and token usage")
-                .accessibilityHint(
-                    "Shows exact run and session usage. Context occupancy is shown only when Hermes reports it."
-                )
-                .accessibilityIdentifier("companion.usage")
-
-                Spacer(minLength: 0)
             }
         }
+    }
+
+    @ViewBuilder
+    private var modelControlItems: some View {
+        if !viewModel.modelGroups.isEmpty
+            || viewModel.isLoadingModelOptions {
+            Button {
+                preserveComposerFocus()
+                showsModelPicker = true
+            } label: {
+                CompanionComposerControlLabel(
+                    title: viewModel.selectedModelDisplayName,
+                    systemImage: "cpu",
+                    showsDisclosure: true,
+                    isLoading: viewModel.isLoadingModelOptions
+                )
+            }
+            .buttonStyle(.chatTactile(.compactControl))
+            .hoverEffect(.highlight)
+            .help("Choose model")
+            .disabled(
+                !viewModel.canChangeModel
+                    || viewModel.modelGroups.isEmpty
+            )
+            .accessibilityLabel("Choose model")
+            .accessibilityValue(viewModel.selectedModelDisplayName)
+            .accessibilityIdentifier("companion.model.picker")
+
+            if viewModel.selectedModelSupportsReasoning {
+                Menu {
+                    ForEach(
+                        CompanionReasoningEffort.allCases,
+                        id: \.self
+                    ) { effort in
+                        Button {
+                            preserveComposerFocus()
+                            Task {
+                                await viewModel.selectReasoning(effort)
+                                restoreComposerFocusIfNeeded()
+                            }
+                        } label: {
+                            if viewModel.selectedModel?
+                                .reasoningEffort == effort {
+                                Label(
+                                    effort.displayName,
+                                    systemImage: "checkmark"
+                                )
+                            } else {
+                                Text(effort.displayName)
+                            }
+                        }
+                    }
+                } label: {
+                    CompanionComposerControlLabel(
+                        title: viewModel.selectedReasoningDisplayName,
+                        systemImage: "brain",
+                        showsDisclosure: true
+                    )
+                }
+                .buttonStyle(.chatTactile(.compactControl))
+                .hoverEffect(.highlight)
+                .help("Choose reasoning effort")
+                .disabled(!viewModel.canChangeModel)
+                .accessibilityLabel("Choose reasoning effort")
+                .accessibilityIdentifier("companion.reasoning.picker")
+            }
+        }
+
+        Button {
+            preserveComposerFocus()
+            showsUsage = true
+        } label: {
+            CompanionComposerControlLabel(
+                title: usageControlLabel,
+                systemImage: "chart.bar.xaxis"
+            )
+        }
+        .buttonStyle(.chatTactile(.compactControl))
+        .hoverEffect(.highlight)
+        .help("Model and token usage")
+        .accessibilityLabel("Model and token usage")
+        .accessibilityHint(
+            "Shows exact run and session usage. Context occupancy is shown only when Hermes reports it."
+        )
+        .accessibilityIdentifier("companion.usage")
     }
 
     private var usageControlLabel: String {
@@ -1173,13 +1218,6 @@ struct CompanionSessionHistoryView: View {
         return AnyLayout(HStackLayout(alignment: .bottom, spacing: 10))
     }
 
-    private var controlLayout: AnyLayout {
-        if dynamicTypeSize.isAccessibilitySize {
-            return AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-        }
-        return AnyLayout(HStackLayout(spacing: 8))
-    }
-
     private func sendDraft() {
         let draft = draftMessage
         Task {
@@ -1190,6 +1228,19 @@ struct CompanionSessionHistoryView: View {
                 draftMessage = ""
                 composerIsFocused = false
             }
+        }
+    }
+
+    private func preserveComposerFocus() {
+        restoresComposerFocusAfterPresentation = composerIsFocused
+    }
+
+    private func restoreComposerFocusIfNeeded() {
+        guard restoresComposerFocusAfterPresentation else { return }
+        restoresComposerFocusAfterPresentation = false
+        Task { @MainActor in
+            await Task.yield()
+            composerIsFocused = true
         }
     }
 
@@ -1413,22 +1464,9 @@ private struct CompanionMessageRow: View, Equatable {
                 }
             )
 
-            if copyText != nil {
-                ChatMessageActionsButton {
-                    Button {
-                        UIPasteboard.general.string = copyText
-                    } label: {
-                        Label("Copy Message", systemImage: "doc.on.doc")
-                    }
-
-                    if let copyText {
-                        ShareLink(item: copyText) {
-                            Label(
-                                "Share Message",
-                                systemImage: "square.and.arrow.up"
-                            )
-                        }
-                    }
+            if let copyText {
+                ChatMessageQuickActions(text: copyText) {
+                    UIPasteboard.general.string = copyText
                 }
             }
         }
@@ -1526,6 +1564,59 @@ private struct CompanionMessageRow: View, Equatable {
     }
 }
 
+private struct CompanionComposerControlLabel: View {
+    let title: String
+    let systemImage: String
+    var showsDisclosure = false
+    var isLoading = false
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if isLoading {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Image(systemName: systemImage)
+            }
+
+            Text(title)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            if showsDisclosure {
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+            }
+        }
+        .font(HermesNestDesign.Typography.control)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 9)
+        .frame(minHeight: 32)
+        .background(
+            HermesNestDesign.raisedSurface,
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(HermesNestDesign.subtleBorder, lineWidth: 0.5)
+        }
+        .contentShape(Capsule())
+        .chatMinimumHitTarget(
+            horizontalPadding: 4,
+            verticalPadding: 6,
+            in: Capsule()
+        )
+    }
+}
+
+private extension CompanionUpload {
+    var presentationSystemImage: String {
+        contentType?.lowercased().hasPrefix("image/") == true
+            ? "photo"
+            : "doc"
+    }
+}
+
 @MainActor
 private struct CompanionUsageView: View {
     @Bindable var viewModel: CompanionSessionHistoryViewModel
@@ -1567,6 +1658,14 @@ private struct CompanionUsageView: View {
             Text(viewModel.selectedModelDisplayName)
                 .font(.headline)
                 .textSelection(.enabled)
+
+            if let identifier = viewModel.selectedModelIdentifier,
+               identifier != viewModel.selectedModelDisplayName {
+                Text(identifier)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
 
             if let provider = viewModel.selectedModelProviderDisplayName {
                 Text(provider)
@@ -1749,10 +1848,12 @@ private struct CompanionModelPickerView: View {
                                     )
 
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text(option.model)
+                                        Text(option.displayName)
                                             .foregroundStyle(.primary)
                                             .lineLimit(2)
                                         HStack(spacing: 6) {
+                                            Text(option.model)
+                                                .fontDesign(.monospaced)
                                             Text(option.provider)
                                             if option.supportsReasoning {
                                                 Label(
@@ -1802,7 +1903,8 @@ private struct CompanionModelPickerView: View {
         guard !query.isEmpty else { return viewModel.modelGroups }
         return viewModel.modelGroups.compactMap { group in
             let models = group.models.filter {
-                $0.model.localizedCaseInsensitiveContains(query)
+                $0.displayName.localizedCaseInsensitiveContains(query)
+                    || $0.model.localizedCaseInsensitiveContains(query)
                     || $0.provider.localizedCaseInsensitiveContains(query)
                     || $0.providerName.localizedCaseInsensitiveContains(query)
             }

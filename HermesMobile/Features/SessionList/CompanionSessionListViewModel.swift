@@ -663,10 +663,18 @@ final class CompanionSessionHistoryViewModel {
     }
 
     var selectedModelDisplayName: String {
+        CompanionModelPresentation.friendlyName(
+            for: selectedModelOption?.model
+                ?? selectedModel?.model
+                ?? session.model
+                ?? ""
+        )
+    }
+
+    var selectedModelIdentifier: String? {
         selectedModelOption?.model
             ?? selectedModel?.model
             ?? session.model
-            ?? String(localized: "Model")
     }
 
     var selectedModelProviderDisplayName: String? {

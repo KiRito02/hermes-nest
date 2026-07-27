@@ -1,5 +1,53 @@
 import SwiftUI
 
+struct ChatMessageQuickActions: View {
+    let text: String
+    let onCopy: () -> Void
+
+    @State private var didCopy = false
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Button {
+                onCopy()
+                didCopy = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(1.2))
+                    didCopy = false
+                }
+            } label: {
+                actionIcon(
+                    systemImage: didCopy ? "checkmark" : "doc.on.doc"
+                )
+                .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(.plain)
+            .hoverEffect(.highlight)
+            .help(didCopy ? "Copied Message" : "Copy Message")
+            .accessibilityLabel(
+                didCopy ? "Copied Message" : "Copy Message"
+            )
+
+            ShareLink(item: text) {
+                actionIcon(systemImage: "square.and.arrow.up")
+            }
+            .buttonStyle(.plain)
+            .hoverEffect(.highlight)
+            .help("Share Message")
+            .accessibilityLabel("Share Message")
+        }
+        .font(.system(size: 14, weight: .medium))
+        .foregroundStyle(.secondary)
+    }
+
+    private func actionIcon(systemImage: String) -> some View {
+        Image(systemName: systemImage)
+            .frame(width: 28, height: 28)
+            .contentShape(Circle())
+            .chatMinimumHitTarget(in: Circle())
+    }
+}
+
 struct ChatMessageActionMenu: View {
     let context: MessageActionContext
     let listeningMessageID: String?
