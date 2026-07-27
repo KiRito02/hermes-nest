@@ -1368,6 +1368,8 @@
 				C0DE21000000000000000001 /* ChatMotion.swift in Sources */,
 				C0DE25000000000000000001 /* ChatScrollPolicy.swift in Sources */,
 				C02700000000000000000001 /* ActiveStreamRecoveryState.swift in Sources */,
+				C12800000000000000000003 /* ChatTimelineAccessorySurface.swift in Sources */,
+				C09500000000000000000001 /* AdaptiveGlassModifier.swift in Sources */,
 				031031031031031031031009 /* DisplayMathView.swift in Sources */,
 				031031031031031031031001 /* MarkdownMathSegmenter.swift in Sources */,
 				031031031031031031031005 /* MarkdownMathFormatter.swift in Sources */,

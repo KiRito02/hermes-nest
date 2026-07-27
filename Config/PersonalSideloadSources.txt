@@ -1,4 +1,5 @@
 ActiveStreamRecoveryState.swift
+AdaptiveGlassModifier.swift
 AppFont.swift
 AppTheme.swift
 AttachmentAudioDetection.swift
@@ -9,6 +10,7 @@ ChatMessage.swift
 ChatMotion.swift
 ChatScrollPolicy.swift
 ChatTactileButtonStyle.swift
+ChatTimelineAccessorySurface.swift
 ChatTranscriptSupportingViews.swift
 CompanionConnectionManager.swift
 CompanionConnectionService.swift
