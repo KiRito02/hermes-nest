@@ -151,12 +151,13 @@ private enum CoreChatLabFixture {
                 ),
                 (
                     "user",
-                    "Good. If attachments are unavailable, explain that in the composer."
+                    "Good. Clarify how image attachments work in the composer."
                 ),
                 (
                     "assistant",
-                    "Confirmed. The attachment entry remains visible and "
-                        + "explains that image input is not yet advertised by Hermes Runs."
+                    "Confirmed. Images can be attached through Companion for "
+                        + "Hermes Vision analysis. Only native inline image input "
+                        + "is not yet advertised by Hermes Runs."
                 ),
             ]
         }

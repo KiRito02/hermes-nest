@@ -794,6 +794,13 @@ struct CompanionSessionHistoryView: View {
                 }
             }
             Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                String(
+                    localized:
+                        "Images are uploaded securely and analyzed by Hermes Vision; native inline image input is not required."
+                )
+            )
         }
         .sheet(isPresented: $showsServerFilePicker) {
             if let destination = uploadDestination {

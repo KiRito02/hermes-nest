@@ -360,7 +360,12 @@ pending bytes per device/session. A successful `201` returns an opaque upload
 field. Companion resolves Agent-working-directory-relative paths server-side
 and removes `attachment_ids` before forwarding to Gateway. Absolute paths
 and randomized internal storage paths never reach the App or user-visible
-history. A pending attachment is claimed before Gateway start, so concurrent
+history. When a manifest contains an `image/*` attachment, Companion also
+directs Hermes to use `vision_analyze` with the resolved relative path when the
+user requests visual analysis. This is a file-and-tool handoff; it does not
+claim that Gateway Runs support `image_url`, `input_image`, `file`,
+`input_file`, or `file_id` content parts. A pending attachment is claimed
+before Gateway start, so concurrent
 Runs cannot submit the same attachment twice. A claim left behind by a process
 stop stays unavailable after restart: the Gateway does not provide an
 idempotency key that would let Companion distinguish “never submitted” from
