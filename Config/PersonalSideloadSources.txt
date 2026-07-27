@@ -1,3 +1,4 @@
+ActiveStreamRecoveryState.swift
 AppFont.swift
 AppTheme.swift
 AttachmentAudioDetection.swift

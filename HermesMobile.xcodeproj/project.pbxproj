@@ -150,6 +150,7 @@
 		C04600000000000000000003 /* ChatStreamCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04600000000000000000004 /* ChatStreamCoordinatorTests.swift */; };
 		C22600000000000000000001 /* ScriptedSSEStreamFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22600000000000000000002 /* ScriptedSSEStreamFixture.swift */; };
 		C22600000000000000000003 /* StreamReconnectContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22600000000000000000004 /* StreamReconnectContractTests.swift */; };
+		C02700000000000000000001 /* ActiveStreamRecoveryState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C02700000000000000000002 /* ActiveStreamRecoveryState.swift */; };
 		1A2B3C4D5E6F7000000000D4 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000D5 /* ChatViewModel.swift */; };
 		1A2B3C4D5E6F7000000000D6 /* SSEClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000D7 /* SSEClient.swift */; };
 		C0FF000000000000000000A1 /* CustomHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FF000000000000000000A2 /* CustomHeader.swift */; };
@@ -476,6 +477,7 @@
 		C04600000000000000000004 /* ChatStreamCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStreamCoordinatorTests.swift; sourceTree = "<group>"; };
 		C22600000000000000000002 /* ScriptedSSEStreamFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptedSSEStreamFixture.swift; sourceTree = "<group>"; };
 		C22600000000000000000004 /* StreamReconnectContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamReconnectContractTests.swift; sourceTree = "<group>"; };
+		C02700000000000000000002 /* ActiveStreamRecoveryState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveStreamRecoveryState.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000D5 /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000D7 /* SSEClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSEClient.swift; sourceTree = "<group>"; };
 		C0FF000000000000000000A2 /* CustomHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomHeader.swift; sourceTree = "<group>"; };
@@ -1014,6 +1016,7 @@
 				C0DE20000000000000000002 /* ChatTactileButtonStyle.swift */,
 				C0DE21000000000000000002 /* ChatMotion.swift */,
 				C0DE25000000000000000002 /* ChatScrollPolicy.swift */,
+				C02700000000000000000002 /* ActiveStreamRecoveryState.swift */,
 				C0DE22000000000000000002 /* ChatHaptics.swift */,
 				105050000000000000000002 /* ComposerModelPickerSectionExpansionState.swift */,
 				A04200000000000000000004 /* ApprovalRequestOverlay.swift */,
@@ -1364,6 +1367,7 @@
 				C0DE20000000000000000001 /* ChatTactileButtonStyle.swift in Sources */,
 				C0DE21000000000000000001 /* ChatMotion.swift in Sources */,
 				C0DE25000000000000000001 /* ChatScrollPolicy.swift in Sources */,
+				C02700000000000000000001 /* ActiveStreamRecoveryState.swift in Sources */,
 				031031031031031031031009 /* DisplayMathView.swift in Sources */,
 				031031031031031031031001 /* MarkdownMathSegmenter.swift in Sources */,
 				031031031031031031031005 /* MarkdownMathFormatter.swift in Sources */,

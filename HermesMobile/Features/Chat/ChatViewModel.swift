@@ -189,12 +189,6 @@ struct ChatPollingIntervals: Equatable {
     )
 }
 
-enum ActiveStreamRecoveryState: Equatable {
-    case idle
-    case checking
-    case reconnecting
-}
-
 @MainActor
 @Observable
 final class ChatViewModel {
