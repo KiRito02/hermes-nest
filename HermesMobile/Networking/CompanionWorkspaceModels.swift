@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 struct CompanionWorkspaceRoot: Decodable, Equatable, Sendable {
     let id: String?
@@ -115,6 +116,177 @@ struct CompanionMemoryOperation: Encodable, Equatable, Sendable {
 struct CompanionUploadDestination: Equatable, Sendable {
     let rootID: String
     let directory: String
+}
+
+struct CompanionStagedAttachment: Equatable, Sendable {
+    let fileURL: URL
+    let filename: String
+    let contentType: String
+}
+
+protocol CompanionAttachmentStaging: Sendable {
+    func stage(
+        _ sourceURLs: [URL],
+        maximumBytes: Int
+    ) async throws -> [CompanionStagedAttachment]
+
+    func discard(
+        _ attachments: [CompanionStagedAttachment]
+    ) async
+}
+
+actor CompanionAttachmentStager: CompanionAttachmentStaging {
+    private let fileManager: FileManager
+    private let stagingDirectory: URL
+    private let chunkSize = 256 * 1_024
+
+    init(
+        fileManager: FileManager = .default,
+        stagingDirectory: URL = FileManager.default.temporaryDirectory
+    ) {
+        self.fileManager = fileManager
+        self.stagingDirectory = stagingDirectory
+    }
+
+    func stage(
+        _ sourceURLs: [URL],
+        maximumBytes: Int
+    ) async throws -> [CompanionStagedAttachment] {
+        guard maximumBytes > 0 else {
+            throw CompanionWorkspaceServiceError.invalidRequest
+        }
+
+        var staged: [CompanionStagedAttachment] = []
+        do {
+            for sourceURL in sourceURLs {
+                try Task.checkCancellation()
+                let accessed =
+                    sourceURL.startAccessingSecurityScopedResource()
+                defer {
+                    if accessed {
+                        sourceURL.stopAccessingSecurityScopedResource()
+                    }
+                }
+                staged.append(
+                    try stageOne(
+                        sourceURL,
+                        maximumBytes: maximumBytes
+                    )
+                )
+            }
+            try Task.checkCancellation()
+            return staged
+        } catch {
+            discardImmediately(staged)
+            throw error
+        }
+    }
+
+    func discard(
+        _ attachments: [CompanionStagedAttachment]
+    ) async {
+        discardImmediately(attachments)
+    }
+
+    private func stageOne(
+        _ sourceURL: URL,
+        maximumBytes: Int
+    ) throws -> CompanionStagedAttachment {
+        let values = try sourceURL.resourceValues(
+            forKeys: [
+                .contentTypeKey,
+                .fileSizeKey,
+                .isRegularFileKey,
+                .isSymbolicLinkKey,
+            ]
+        )
+        guard
+            values.isRegularFile == true,
+            values.isSymbolicLink != true,
+            let fileSize = values.fileSize,
+            fileSize >= 0
+        else {
+            throw CompanionWorkspaceServiceError.invalidRequest
+        }
+        guard fileSize <= maximumBytes else {
+            throw CompanionWorkspaceServiceError.requestTooLarge
+        }
+
+        let filename = sourceURL.lastPathComponent
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !filename.isEmpty else {
+            throw CompanionWorkspaceServiceError.invalidRequest
+        }
+
+        try fileManager.createDirectory(
+            at: stagingDirectory,
+            withIntermediateDirectories: true
+        )
+        let fileExtension = sourceURL.pathExtension
+        let stagedName = fileExtension.isEmpty
+            ? "hermes-nest-drop-\(UUID().uuidString)"
+            : "hermes-nest-drop-\(UUID().uuidString).\(fileExtension)"
+        let stagedURL = stagingDirectory.appendingPathComponent(
+            stagedName,
+            isDirectory: false
+        )
+        guard fileManager.createFile(
+            atPath: stagedURL.path,
+            contents: nil
+        ) else {
+            throw CompanionWorkspaceServiceError.invalidRequest
+        }
+
+        do {
+            let input = try FileHandle(forReadingFrom: sourceURL)
+            defer { try? input.close() }
+            let output = try FileHandle(forWritingTo: stagedURL)
+            defer { try? output.close() }
+
+            var copiedBytes = 0
+            while let data = try input.read(upToCount: chunkSize),
+                  !data.isEmpty {
+                try Task.checkCancellation()
+                copiedBytes += data.count
+                guard copiedBytes <= maximumBytes else {
+                    throw CompanionWorkspaceServiceError.requestTooLarge
+                }
+                try output.write(contentsOf: data)
+            }
+            try Task.checkCancellation()
+            try output.synchronize()
+
+            let stagedSize = try stagedURL.resourceValues(
+                forKeys: [.fileSizeKey, .isRegularFileKey]
+            )
+            guard
+                stagedSize.isRegularFile == true,
+                stagedSize.fileSize == copiedBytes,
+                copiedBytes == fileSize
+            else {
+                throw CompanionWorkspaceServiceError.invalidRequest
+            }
+
+            return CompanionStagedAttachment(
+                fileURL: stagedURL,
+                filename: filename,
+                contentType:
+                    values.contentType?.preferredMIMEType
+                    ?? "application/octet-stream"
+            )
+        } catch {
+            try? fileManager.removeItem(at: stagedURL)
+            throw error
+        }
+    }
+
+    private func discardImmediately(
+        _ attachments: [CompanionStagedAttachment]
+    ) {
+        for attachment in attachments {
+            try? fileManager.removeItem(at: attachment.fileURL)
+        }
+    }
 }
 
 protocol CompanionWorkspaceServing: Sendable {

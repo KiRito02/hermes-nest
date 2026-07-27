@@ -55,6 +55,23 @@ struct HermesMobileApp: App {
                 NavigationStack {
                     StreamingLabView()
                 }
+            } else if ProcessInfo.processInfo.arguments.contains(
+                "--core-chat-ipad-lab"
+            ) {
+                AdaptiveCoreChatLabView(
+                    layout: .regular,
+                    requestsLandscape:
+                        ProcessInfo.processInfo.arguments.contains(
+                            "--landscape"
+                        )
+                )
+            } else if ProcessInfo.processInfo.arguments.contains(
+                "--core-chat-compact-lab"
+            ) {
+                AdaptiveCoreChatLabView(
+                    layout: .compact,
+                    requestsLandscape: false
+                )
             } else if ProcessInfo.processInfo.arguments.contains("--core-chat-lab") {
                 NavigationStack {
                     CoreChatLabView()
