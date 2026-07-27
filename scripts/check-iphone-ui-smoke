@@ -257,6 +257,15 @@ for snippet, description in [
         "core-chat-ipad-compact.png",
         "compact Stage Manager-width fixture capture",
     ),
+    ("for attempt in {1..8}", "bounded iPad screenshot readiness retries"),
+    (
+        "if (( byte_count >= 180000 )); then",
+        "populated iPad screenshot evidence gate",
+    ),
+    (
+        "Timed out waiting for populated ${filename}",
+        "explicit blank iPad screenshot failure",
+    ),
     ("name: ipad-ui-smoke", "uploaded iPad screenshot artifact"),
 ]:
     require(ACCEPTANCE_WORKFLOW, snippet, description)

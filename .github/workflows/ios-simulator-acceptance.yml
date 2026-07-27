@@ -317,9 +317,26 @@ jobs:
               -AppleLanguages "(en)" \
               -AppleLocale "en_US" \
               "$@" | tee -a "${OUTPUT_PATH}/launch.log"
-            sleep 4
-            xcrun simctl io "${SIMULATOR_UDID}" screenshot \
-              "${OUTPUT_PATH}/${filename}"
+
+            # A cold iPad simulator can report launch success before SwiftUI
+            # has replaced the blank launch frame. Retry until this dense,
+            # deterministic fixture produces a meaningfully populated PNG.
+            local attempt
+            for attempt in {1..8}; do
+              sleep 2
+              local candidate="${RUNNER_TEMP}/${filename}.${attempt}.png"
+              xcrun simctl io "${SIMULATOR_UDID}" screenshot "${candidate}"
+              local byte_count
+              byte_count=$(stat -f%z "${candidate}")
+              if (( byte_count >= 180000 )); then
+                mv "${candidate}" "${OUTPUT_PATH}/${filename}"
+                return
+              fi
+              echo "Screenshot not ready (${byte_count} bytes), retry ${attempt}/8"
+            done
+
+            echo "Timed out waiting for populated ${filename}" >&2
+            exit 1
           }
 
           capture_ipad \
