@@ -232,6 +232,7 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
             forwarded = self.gateway_requests[-1]["body"]
             self.assertNotIn("attachment_ids", forwarded)
             self.assertIn(stored_relative_path, forwarded["instructions"])
+            self.assertNotIn("vision_analyze", forwarded["instructions"])
             self.assertNotIn('"path":"incoming/notes.txt"', forwarded["instructions"])
             self.assertNotIn(str(host_path), forwarded["instructions"])
             pending = await self.client.get(
@@ -254,6 +255,94 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
                 session_id="session-attachments",
             )
             self.assertEqual(12, consumed[0].prior_message_id)
+
+    async def test_image_attachment_directs_hermes_to_vision_analyze(
+        self,
+    ) -> None:
+        await self.client.close()
+        with TemporaryDirectory() as directory:
+            self.registry = DeviceRegistry(":memory:")
+            host_path = Path(directory) / "agent-workspace"
+            incoming = host_path / "incoming"
+            incoming.mkdir(parents=True)
+            workspace = WorkspaceAccess(
+                [
+                    WorkspaceRoot(
+                        id="projects",
+                        name="Projects",
+                        path=host_path,
+                        writable=True,
+                    )
+                ],
+                agent_working_directory=host_path,
+            )
+            companion_app = create_app(
+                self.registry,
+                GatewayDiscovery(
+                    str(self.gateway_server.make_url("")).rstrip("/"),
+                    "gateway-run-key",
+                ),
+                workspace=workspace,
+            )
+            self.client = TestClient(TestServer(companion_app))
+            await self.client.start_server()
+            self.device_credential = await self._pair_device()
+            headers = {
+                "Authorization": f"Bearer {self.device_credential}",
+            }
+            form = FormData()
+            form.add_field(
+                "metadata",
+                json.dumps(
+                    {
+                        "root_id": "projects",
+                        "directory": "incoming",
+                        "session_id": "session-image",
+                    }
+                ),
+                content_type="application/json",
+            )
+            form.add_field(
+                "file",
+                b"\x89PNG\r\n\x1a\nimage body",
+                filename="diagram.png",
+                content_type="application/octet-stream",
+            )
+            uploaded = await self.client.post(
+                "/companion/v1/uploads",
+                data=form,
+                headers=headers,
+            )
+            self.assertEqual(201, uploaded.status)
+            upload_id = (await uploaded.json())["upload"]["id"]
+            device_id = self.registry.authenticate(
+                self.device_credential
+            ).id
+            attachment = self.registry.ready_attachment_for_device(
+                device_id=device_id,
+                attachment_id=upload_id,
+            )
+
+            started = await self.client.post(
+                "/v1/runs",
+                json={
+                    "input": "What does this diagram show?",
+                    "session_id": "session-image",
+                    "attachment_ids": [upload_id],
+                },
+                headers=headers,
+            )
+
+            self.assertEqual(202, started.status)
+            forwarded = self.gateway_requests[-1]["body"]
+            self.assertNotIn("attachment_ids", forwarded)
+            self.assertIn(attachment.relative_path, forwarded["instructions"])
+            self.assertIn("vision_analyze", forwarded["instructions"])
+            self.assertIn(
+                "instead of guessing about the image contents",
+                forwarded["instructions"],
+            )
+            self.assertNotIn(str(host_path), forwarded["instructions"])
 
     async def test_attachment_is_claimed_before_concurrent_gateway_start(
         self,

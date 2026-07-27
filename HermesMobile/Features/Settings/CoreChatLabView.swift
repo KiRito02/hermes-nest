@@ -184,12 +184,12 @@ private enum CoreChatLabFixture {
                 ),
                 (
                     "user",
-                    "很好。附件暂不可用时，也要在输入区明确说明。"
+                    "很好，也要在输入区说明图片附件会如何处理。"
                 ),
                 (
                     "assistant",
-                    "已确认。界面会保留附件入口，"
-                        + "并明确显示当前 Hermes Runs API 尚未开放图片输入。"
+                    "已确认。图片会作为安全文件附件上传，并请求 Hermes "
+                        + "尝试通过 Vision 分析；Runs 尚未声明支持原生内联图片输入。"
                 ),
             ]
         } else {
@@ -227,12 +227,13 @@ private enum CoreChatLabFixture {
                 ),
                 (
                     "user",
-                    "Good. If attachments are unavailable, explain that in the composer."
+                    "Good. Clarify how image attachments work in the composer."
                 ),
                 (
                     "assistant",
-                    "Confirmed. The attachment entry remains visible and "
-                        + "explains that image input is not yet advertised by Hermes Runs."
+                    "Confirmed. Images are uploaded as secure file attachments, "
+                        + "and Hermes will try Vision analysis. Native inline "
+                        + "image input is not advertised by Runs."
                 ),
             ]
         }

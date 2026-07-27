@@ -281,16 +281,6 @@
         }
       }
     },
-    "Unavailable because the current Hermes Runs API does not advertise image input.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "当前 Hermes Runs API 未声明支持图片输入，因此不可用。"
-          }
-        }
-      }
-    },
     "The Board is refreshing.": {
       "localizations": {
         "zh-Hans": {
@@ -4336,6 +4326,16 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "图片已保存到“照片”。"
+          }
+        }
+      }
+    },
+    "Images are uploaded as secure file attachments. Hermes will try Vision analysis; native inline image input is not advertised by Runs.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图片会作为安全文件附件上传，Hermes 将尝试通过 Vision 分析；Runs 尚未声明支持原生内联图片输入。"
           }
         }
       }
