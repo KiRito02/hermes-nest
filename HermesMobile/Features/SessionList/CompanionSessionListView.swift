@@ -18,6 +18,7 @@ struct CompanionSessionListView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var sessionPendingDelete: SessionSummary?
     @State private var isCreatingSession = false
+    @FocusState private var isSearchFocused: Bool
     private let repository: any SessionRepository
 
     init(
@@ -99,6 +100,7 @@ struct CompanionSessionListView: View {
             .background(HermesNestDesign.sidebar)
             .navigationTitle("Chats")
             .searchable(text: $searchText, prompt: "Search chats")
+            .searchFocused($isSearchFocused)
             .refreshable {
                 await viewModel.loadInitial(modelContext: modelContext)
             }
@@ -170,6 +172,7 @@ struct CompanionSessionListView: View {
                         }
                     }
                     .disabled(isCreatingSession || viewModel.isViewingCachedData)
+                    .help("New Chat")
                     .accessibilityLabel("New chat")
                 }
 
@@ -207,6 +210,19 @@ struct CompanionSessionListView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .focusedSceneValue(
+            \.hermexSceneActions,
+            HermexSceneActions(
+                canCreateNewChat:
+                    !isCreatingSession
+                        && !viewModel.isViewingCachedData,
+                createNewChat: createSession,
+                searchSessions: {
+                    columnVisibility = .all
+                    isSearchFocused = true
+                }
+            )
+        )
         .task {
             if viewModel.sessions.isEmpty {
                 await viewModel.loadInitial(modelContext: modelContext)
@@ -415,8 +431,11 @@ struct CompanionSessionHistoryView: View {
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var uploadDestination: CompanionUploadDestination?
     @State private var attachmentUploadTask: Task<Void, Never>?
+    @State private var droppedAttachmentTask: Task<Void, Never>?
+    @State private var isDropTargeted = false
     @State private var draftMessage = ""
     @State private var isUserInteractingWithScroll = false
+    @State private var restoresComposerFocusAfterPresentation = false
     @FocusState private var composerIsFocused: Bool
 
     init(
@@ -698,7 +717,7 @@ struct CompanionSessionHistoryView: View {
                         Label("Delete", systemImage: "trash")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: "ellipsis")
                 }
                 .accessibilityLabel("Session actions")
                 .disabled(viewModel.isRunActive)
@@ -754,26 +773,53 @@ struct CompanionSessionHistoryView: View {
         } message: {
             Text("This removes the session from Hermes. Deletion cannot be undone.")
         }
-        .sheet(isPresented: $showsModelPicker) {
+        .sheet(
+            isPresented: $showsModelPicker,
+            onDismiss: restoreComposerFocusIfNeeded
+        ) {
             CompanionModelPickerView(viewModel: viewModel)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showsUsage) {
+        .sheet(
+            isPresented: $showsUsage,
+            onDismiss: restoreComposerFocusIfNeeded
+        ) {
             CompanionUsageView(viewModel: viewModel)
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showsUploadDestination) {
+        .sheet(
+            isPresented: $showsUploadDestination,
+            onDismiss: {
+                Task {
+                    await viewModel.discardStagedDroppedAttachments()
+                }
+            }
+        ) {
             CompanionUploadDestinationPicker(
                 companionURL: companionURL,
                 service: workspaceService
             ) { destination in
                 uploadDestination = destination
-                showsUploadDestination = false
-                Task { @MainActor in
-                    await Task.yield()
-                    showsAttachmentSourcePicker = true
+                if !viewModel.hasStagedDroppedAttachments {
+                    showsUploadDestination = false
+                    Task { @MainActor in
+                        await Task.yield()
+                        showsAttachmentSourcePicker = true
+                    }
+                } else {
+                    let droppedAttachments =
+                        viewModel.takeStagedDroppedAttachments()
+                    showsUploadDestination = false
+                    attachmentUploadTask?.cancel()
+                    attachmentUploadTask = Task { @MainActor in
+                        defer { attachmentUploadTask = nil }
+                        await viewModel.uploadDroppedAttachments(
+                            droppedAttachments,
+                            destination: destination
+                        )
+                    }
                 }
             }
         }
@@ -849,10 +895,18 @@ struct CompanionSessionHistoryView: View {
                 }
             }
             Button("Cancel", role: .cancel) {
-                viewModel.clearAttachmentError()
+                viewModel.cancelAttachmentRetry()
             }
         } message: {
             Text(viewModel.attachmentErrorMessage ?? "")
+        }
+        .onDisappear {
+            droppedAttachmentTask?.cancel()
+            attachmentUploadTask?.cancel()
+            viewModel.cancelAttachmentRetry()
+            Task {
+                await viewModel.discardStagedDroppedAttachments()
+            }
         }
     }
 
@@ -871,7 +925,8 @@ struct CompanionSessionHistoryView: View {
             }
 
             if !viewModel.pendingUploads.isEmpty
-                || viewModel.isUploadingAttachment {
+                || viewModel.isUploadingAttachment
+                || viewModel.isPreparingDroppedAttachments {
                 attachmentStrip
             }
 
@@ -894,6 +949,7 @@ struct CompanionSessionHistoryView: View {
                 .disabled(
                     viewModel.pendingUploads.count >= 10
                         || viewModel.isUploadingAttachment
+                        || viewModel.isPreparingDroppedAttachments
                 )
                 .accessibilityLabel("Add attachment")
                 .accessibilityHint(
@@ -923,7 +979,10 @@ struct CompanionSessionHistoryView: View {
                 .focused($composerIsFocused)
                 .lineLimit(1...6)
                 .textFieldStyle(.plain)
-                .disabled(!viewModel.canSend)
+                .disabled(
+                    !viewModel.canSend
+                        || viewModel.isPreparingDroppedAttachments
+                )
                 .submitLabel(.send)
                 .onSubmit {
                     sendDraft()
@@ -956,8 +1015,12 @@ struct CompanionSessionHistoryView: View {
                     .disabled(
                         draftMessage.trimmingCharacters(
                             in: .whitespacesAndNewlines
-                        ).isEmpty || !viewModel.canSend
+                        ).isEmpty
+                            || !viewModel.canSend
+                            || viewModel.isPreparingDroppedAttachments
                     )
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .help("Send message")
                     .accessibilityLabel("Send message")
                     .accessibilityIdentifier("companion.run.send")
                 }
@@ -990,6 +1053,28 @@ struct CompanionSessionHistoryView: View {
         .frame(maxWidth: HermesNestDesign.transcriptMaximumWidth)
         .frame(maxWidth: .infinity)
         .background(.regularMaterial)
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(
+                    cornerRadius: HermesNestDesign.composerCornerRadius,
+                    style: .continuous
+                )
+                .stroke(Color.accentColor, lineWidth: 2)
+                .padding(.horizontal, HermesNestDesign.Spacing.large)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            handleDroppedFiles(urls)
+        } isTargeted: { isTargeted in
+            isDropTargeted =
+                isTargeted
+                    && supportsUploads
+                    && viewModel.pendingUploads.count < 10
+                    && !viewModel.isUploadingAttachment
+                    && !viewModel.isPreparingDroppedAttachments
+        }
     }
 
     private var attachmentStrip: some View {
@@ -1000,7 +1085,7 @@ struct CompanionSessionHistoryView: View {
                     id: \.offset
                 ) { _, upload in
                     HStack(spacing: 6) {
-                        Image(systemName: "doc")
+                        Image(systemName: upload.presentationSystemImage)
                         Text(upload.name?.nilIfEmpty ?? "Attachment")
                             .lineLimit(1)
                         Button {
@@ -1041,6 +1126,15 @@ struct CompanionSessionHistoryView: View {
                     }
                     .font(.caption)
                 }
+
+                if viewModel.isPreparingDroppedAttachments {
+                    Label(
+                        "Preparing dropped attachments...",
+                        systemImage: "arrow.down.doc"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -1067,102 +1161,123 @@ struct CompanionSessionHistoryView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            controlLayout {
-                if !viewModel.modelGroups.isEmpty
-                    || viewModel.isLoadingModelOptions {
-                    Button {
-                        showsModelPicker = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            if viewModel.isLoadingModelOptions {
-                                ProgressView()
-                                    .controlSize(.small)
-                            } else {
-                                Image(systemName: "cpu")
-                            }
-                            Text(viewModel.selectedModelDisplayName)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Image(systemName: "chevron.down")
-                                .font(.caption2.weight(.semibold))
-                        }
-                        .font(HermesNestDesign.Typography.control)
-                        .frame(minHeight: 32)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(
-                        !viewModel.canChangeModel
-                            || viewModel.modelGroups.isEmpty
-                    )
-                    .accessibilityLabel("Choose model")
-                    .accessibilityIdentifier("companion.model.picker")
+            adaptiveModelControls
+        }
+    }
 
-                    if viewModel.selectedModelSupportsReasoning {
-                        Menu {
-                            ForEach(
-                                CompanionReasoningEffort.allCases,
-                                id: \.self
-                            ) { effort in
-                                Button {
-                                    Task {
-                                        await viewModel.selectReasoning(effort)
-                                    }
-                                } label: {
-                                    if viewModel.selectedModel?
-                                        .reasoningEffort == effort {
-                                        Label(
-                                            effort.displayName,
-                                            systemImage: "checkmark"
-                                        )
-                                    } else {
-                                        Text(effort.displayName)
-                                    }
-                                }
-                            }
-                        } label: {
-                            Label(
-                                viewModel.selectedReasoningDisplayName,
-                                systemImage: "brain"
-                            )
-                            .font(HermesNestDesign.Typography.control)
-                            .frame(minHeight: 32)
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(!viewModel.canChangeModel)
-                        .accessibilityLabel("Choose reasoning effort")
-                        .accessibilityIdentifier("companion.reasoning.picker")
-                    }
+    @ViewBuilder
+    private var adaptiveModelControls: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 6) {
+                modelControlItems
+            }
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    modelControlItems
+                    Spacer(minLength: 0)
                 }
 
-                Button {
-                    showsUsage = true
-                } label: {
-                    Label(
-                        usageControlLabel,
-                        systemImage: "chart.bar.xaxis"
-                    )
-                    .font(HermesNestDesign.Typography.control)
-                    .frame(minHeight: 32)
+                VStack(alignment: .leading, spacing: 6) {
+                    modelControlItems
                 }
-                .buttonStyle(.bordered)
-                .accessibilityLabel("Model and token usage")
-                .accessibilityHint(
-                    "Shows exact run and session usage. Context occupancy is shown only when Hermes reports it."
-                )
-                .accessibilityIdentifier("companion.usage")
-
-                Spacer(minLength: 0)
             }
         }
+    }
+
+    @ViewBuilder
+    private var modelControlItems: some View {
+        if !viewModel.modelGroups.isEmpty
+            || viewModel.isLoadingModelOptions {
+            Button {
+                preserveComposerFocus()
+                showsModelPicker = true
+            } label: {
+                CompanionComposerControlLabel(
+                    title: viewModel.selectedModelDisplayName,
+                    systemImage: "cpu",
+                    showsDisclosure: true,
+                    isLoading: viewModel.isLoadingModelOptions
+                )
+            }
+            .buttonStyle(.chatTactile(.compactControl))
+            .hoverEffect(.highlight)
+            .help("Choose model")
+            .disabled(
+                !viewModel.canChangeModel
+                    || viewModel.modelGroups.isEmpty
+            )
+            .accessibilityLabel("Choose model")
+            .accessibilityValue(viewModel.selectedModelDisplayName)
+            .accessibilityIdentifier("companion.model.picker")
+
+            if viewModel.selectedModelSupportsReasoning {
+                Menu {
+                    ForEach(
+                        CompanionReasoningEffort.allCases,
+                        id: \.self
+                    ) { effort in
+                        Button {
+                            preserveComposerFocus()
+                            Task {
+                                await viewModel.selectReasoning(effort)
+                                restoreComposerFocusIfNeeded()
+                            }
+                        } label: {
+                            if viewModel.selectedModel?
+                                .reasoningEffort == effort {
+                                Label(
+                                    effort.displayName,
+                                    systemImage: "checkmark"
+                                )
+                            } else {
+                                Text(effort.displayName)
+                            }
+                        }
+                    }
+                } label: {
+                    CompanionComposerControlLabel(
+                        title: viewModel.selectedReasoningDisplayName,
+                        systemImage: "brain",
+                        showsDisclosure: true
+                    )
+                }
+                .buttonStyle(.chatTactile(.compactControl))
+                .hoverEffect(.highlight)
+                .help("Choose reasoning effort")
+                .disabled(!viewModel.canChangeModel)
+                .accessibilityLabel("Choose reasoning effort")
+                .accessibilityIdentifier("companion.reasoning.picker")
+            }
+        }
+
+        Button {
+            preserveComposerFocus()
+            showsUsage = true
+        } label: {
+            CompanionComposerControlLabel(
+                title: usageControlLabel,
+                systemImage: "chart.bar.xaxis"
+            )
+        }
+        .buttonStyle(.chatTactile(.compactControl))
+        .hoverEffect(.highlight)
+        .help("Model and token usage")
+        .accessibilityLabel("Model and token usage")
+        .accessibilityHint(
+            "Shows exact run and session usage. Context occupancy is shown only when Hermes reports it."
+        )
+        .accessibilityIdentifier("companion.usage")
     }
 
     private var usageControlLabel: String {
         guard let tokens = viewModel.latestRunUsage?.totalTokens else {
             return String(localized: "Usage")
         }
+        let exactTokens = CompanionTokenPresentation.exactCount(tokens)
         return String(
             localized:
-                "\(ContextWindowFormatter.formatTokens(tokens)) tokens"
+                "\(exactTokens) tokens"
         )
     }
 
@@ -1171,13 +1286,6 @@ struct CompanionSessionHistoryView: View {
             return AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
         }
         return AnyLayout(HStackLayout(alignment: .bottom, spacing: 10))
-    }
-
-    private var controlLayout: AnyLayout {
-        if dynamicTypeSize.isAccessibilitySize {
-            return AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-        }
-        return AnyLayout(HStackLayout(spacing: 8))
     }
 
     private func sendDraft() {
@@ -1190,6 +1298,19 @@ struct CompanionSessionHistoryView: View {
                 draftMessage = ""
                 composerIsFocused = false
             }
+        }
+    }
+
+    private func preserveComposerFocus() {
+        restoresComposerFocusAfterPresentation = composerIsFocused
+    }
+
+    private func restoreComposerFocusIfNeeded() {
+        guard restoresComposerFocusAfterPresentation else { return }
+        restoresComposerFocusAfterPresentation = false
+        Task { @MainActor in
+            await Task.yield()
+            composerIsFocused = true
         }
     }
 
@@ -1319,6 +1440,33 @@ struct CompanionSessionHistoryView: View {
         }
     }
 
+    private func handleDroppedFiles(_ urls: [URL]) -> Bool {
+        guard
+            supportsUploads,
+            !viewModel.isPreparingDroppedAttachments,
+            !viewModel.isUploadingAttachment,
+            viewModel.pendingUploads.count < 10
+        else {
+            return false
+        }
+
+        let remaining = 10 - viewModel.pendingUploads.count
+        let selected = Array(urls.prefix(remaining))
+        guard !selected.isEmpty else { return false }
+
+        droppedAttachmentTask?.cancel()
+        droppedAttachmentTask = Task { @MainActor in
+            defer { droppedAttachmentTask = nil }
+            if await viewModel.prepareDroppedAttachments(
+                selected,
+                maximumCount: remaining
+            ) {
+                showsUploadDestination = true
+            }
+        }
+        return true
+    }
+
     private func stageAttachmentFile(from sourceURL: URL) async throws -> URL {
         let stagedURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(
@@ -1413,22 +1561,9 @@ private struct CompanionMessageRow: View, Equatable {
                 }
             )
 
-            if copyText != nil {
-                ChatMessageActionsButton {
-                    Button {
-                        UIPasteboard.general.string = copyText
-                    } label: {
-                        Label("Copy Message", systemImage: "doc.on.doc")
-                    }
-
-                    if let copyText {
-                        ShareLink(item: copyText) {
-                            Label(
-                                "Share Message",
-                                systemImage: "square.and.arrow.up"
-                            )
-                        }
-                    }
+            if let copyText {
+                ChatMessageQuickActions(text: copyText) {
+                    UIPasteboard.general.string = copyText
                 }
             }
         }
@@ -1526,6 +1661,59 @@ private struct CompanionMessageRow: View, Equatable {
     }
 }
 
+private struct CompanionComposerControlLabel: View {
+    let title: String
+    let systemImage: String
+    var showsDisclosure = false
+    var isLoading = false
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if isLoading {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Image(systemName: systemImage)
+            }
+
+            Text(title)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            if showsDisclosure {
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+            }
+        }
+        .font(HermesNestDesign.Typography.control)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 9)
+        .frame(minHeight: 32)
+        .background(
+            HermesNestDesign.raisedSurface,
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(HermesNestDesign.subtleBorder, lineWidth: 0.5)
+        }
+        .contentShape(Capsule())
+        .chatMinimumHitTarget(
+            horizontalPadding: 4,
+            verticalPadding: 6,
+            in: Capsule()
+        )
+    }
+}
+
+private extension CompanionUpload {
+    var presentationSystemImage: String {
+        contentType?.lowercased().hasPrefix("image/") == true
+            ? "photo"
+            : "doc"
+    }
+}
+
 @MainActor
 private struct CompanionUsageView: View {
     @Bindable var viewModel: CompanionSessionHistoryViewModel
@@ -1567,6 +1755,14 @@ private struct CompanionUsageView: View {
             Text(viewModel.selectedModelDisplayName)
                 .font(.headline)
                 .textSelection(.enabled)
+
+            if let identifier = viewModel.selectedModelIdentifier,
+               identifier != viewModel.selectedModelDisplayName {
+                Text(identifier)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
 
             if let provider = viewModel.selectedModelProviderDisplayName {
                 Text(provider)
@@ -1652,7 +1848,7 @@ private struct CompanionUsageView: View {
 
     private func tokenLabel(_ tokens: Int?) -> String {
         guard let tokens else { return String(localized: "Unavailable") }
-        return ContextWindowFormatter.formatTokens(tokens)
+        return CompanionTokenPresentation.exactCount(tokens)
     }
 
     private func usageMetric(
@@ -1749,10 +1945,12 @@ private struct CompanionModelPickerView: View {
                                     )
 
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text(option.model)
+                                        Text(option.presentationName)
                                             .foregroundStyle(.primary)
                                             .lineLimit(2)
                                         HStack(spacing: 6) {
+                                            Text(option.model)
+                                                .fontDesign(.monospaced)
                                             Text(option.provider)
                                             if option.supportsReasoning {
                                                 Label(
@@ -1802,7 +2000,8 @@ private struct CompanionModelPickerView: View {
         guard !query.isEmpty else { return viewModel.modelGroups }
         return viewModel.modelGroups.compactMap { group in
             let models = group.models.filter {
-                $0.model.localizedCaseInsensitiveContains(query)
+                $0.presentationName.localizedCaseInsensitiveContains(query)
+                    || $0.model.localizedCaseInsensitiveContains(query)
                     || $0.provider.localizedCaseInsensitiveContains(query)
                     || $0.providerName.localizedCaseInsensitiveContains(query)
             }

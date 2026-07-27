@@ -1,6 +1,7 @@
 #if DEBUG
 import Foundation
 import SwiftUI
+import UIKit
 
 /// Deterministic, server-free fixture that exercises the production core chat
 /// surface. CI launches it with `--core-chat-lab` for localized screenshots.
@@ -45,6 +46,81 @@ struct CoreChatLabView: View {
         )
     }
 
+}
+
+/// Signed simulator acceptance host for the regular iPad split view and a
+/// deterministic narrow Stage Manager-width content proposal. The compact
+/// fixture does not pretend to resize Simulator itself; manual acceptance
+/// still covers live Stage Manager window resizing.
+struct AdaptiveCoreChatLabView: View {
+    enum Layout {
+        case regular
+        case compact
+    }
+
+    let layout: Layout
+    let requestsLandscape: Bool
+
+    @State private var columnVisibility:
+        NavigationSplitViewVisibility = .all
+
+    var body: some View {
+        Group {
+            switch layout {
+            case .regular:
+                NavigationSplitView(
+                    columnVisibility: $columnVisibility
+                ) {
+                    List {
+                        Label(
+                            "Hermes Nest UI Review",
+                            systemImage: "bubble.left.and.bubble.right"
+                        )
+                    }
+                    .navigationTitle("Chats")
+                    .navigationSplitViewColumnWidth(
+                        min: 280,
+                        ideal: HermesNestDesign.sidebarIdealWidth,
+                        max: 390
+                    )
+                } detail: {
+                    CoreChatLabView()
+                }
+                .navigationSplitViewStyle(.balanced)
+
+            case .compact:
+                NavigationStack {
+                    CoreChatLabView()
+                }
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
+                .background(HermesNestDesign.raisedSurface)
+            }
+        }
+        .task {
+            guard requestsLandscape else { return }
+            requestLandscapeGeometry()
+        }
+    }
+
+    private func requestLandscapeGeometry() {
+        guard
+            let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: {
+                    $0.activationState == .foregroundActive
+                })
+        else {
+            return
+        }
+
+        scene.requestGeometryUpdate(
+            .iOS(interfaceOrientations: .landscape)
+        ) { _ in
+            // The signed screenshot job exposes a failed rotation visually;
+            // runtime geometry errors do not alter production behavior.
+        }
+    }
 }
 
 private enum CoreChatLabFixture {

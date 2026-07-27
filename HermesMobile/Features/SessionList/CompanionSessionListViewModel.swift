@@ -2,6 +2,91 @@ import Foundation
 import Observation
 import SwiftData
 
+enum CompanionModelPresentation {
+    static func friendlyName(for identifier: String) -> String {
+        let leaf = identifier
+            .split(separator: "/", omittingEmptySubsequences: true)
+            .last
+            .map(String.init)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            ?? ""
+        guard !leaf.isEmpty else {
+            return String(localized: "Model")
+        }
+
+        let words = leaf.split { character in
+            character == "-"
+                || character == "_"
+                || character == ":"
+                || character.isWhitespace
+        }
+        return words.map(styledWord).joined(separator: " ")
+    }
+
+    private static func styledWord(_ word: Substring) -> String {
+        let value = String(word)
+        let lowercased = value.lowercased()
+        switch lowercased {
+        case "gpt":
+            return "GPT"
+        case "claude":
+            return "Claude"
+        case "sonnet":
+            return "Sonnet"
+        case "opus":
+            return "Opus"
+        case "haiku":
+            return "Haiku"
+        case "codex":
+            return "Codex"
+        case "gemini":
+            return "Gemini"
+        case "qwen":
+            return "Qwen"
+        case "llama":
+            return "Llama"
+        case "hermes":
+            return "Hermes"
+        case "mistral":
+            return "Mistral"
+        case "deepseek":
+            return "DeepSeek"
+        default:
+            if lowercased.hasPrefix("gpt") {
+                return "GPT" + String(value.dropFirst(3))
+            }
+            if lowercased.hasPrefix("qwen") {
+                return "Qwen" + String(value.dropFirst(4))
+            }
+            if !lowercased.dropLast().isEmpty,
+               lowercased.dropLast().allSatisfy(\.isNumber),
+               lowercased.last == "b" {
+                return String(lowercased.dropLast()) + "B"
+            }
+            return value.prefix(1).uppercased()
+                + String(value.dropFirst())
+        }
+    }
+}
+
+enum CompanionTokenPresentation {
+    static func exactCount(
+        _ tokens: Int,
+        locale: Locale = .current
+    ) -> String {
+        tokens.formatted(
+            .number
+                .locale(locale)
+        )
+    }
+}
+
+extension CompanionModelOption {
+    var presentationName: String {
+        CompanionModelPresentation.friendlyName(for: model)
+    }
+}
+
 @MainActor
 @Observable
 final class CompanionSessionListViewModel {
@@ -373,6 +458,9 @@ final class CompanionSessionHistoryViewModel {
     private(set) var latestRunUsage: ConversationRunUsage?
     private(set) var pendingUploads: [CompanionUpload] = []
     private(set) var isUploadingAttachment = false
+    private(set) var isPreparingDroppedAttachments = false
+    private(set) var stagedDroppedAttachments:
+        [CompanionStagedAttachment] = []
     private(set) var attachmentUploadProgress: Double?
     private(set) var attachmentErrorMessage: String?
     private var failedAttachmentUpload: FailedAttachmentUpload?
@@ -382,6 +470,7 @@ final class CompanionSessionHistoryViewModel {
     private let modelService: any CompanionModelServing
     private let modelSelectionStore: any CompanionModelSelectionStoring
     private let workspaceService: any CompanionWorkspaceServing
+    private let attachmentStager: any CompanionAttachmentStaging
     private let companionURL: URL
     private let pageSize: Int
     private let reconciliationDelayNanoseconds: UInt64
@@ -412,6 +501,7 @@ final class CompanionSessionHistoryViewModel {
         supportsModelSelection: Bool = false,
         modelService: (any CompanionModelServing)? = nil,
         workspaceService: (any CompanionWorkspaceServing)? = nil,
+        attachmentStager: (any CompanionAttachmentStaging)? = nil,
         modelSelectionStore: (
             any CompanionModelSelectionStoring
         )? = nil,
@@ -431,6 +521,8 @@ final class CompanionSessionHistoryViewModel {
             modelSelectionStore ?? CompanionModelSelectionStore()
         self.workspaceService = workspaceService
             ?? CompanionWorkspaceService(companionURL: companionURL)
+        self.attachmentStager =
+            attachmentStager ?? CompanionAttachmentStager()
         self.supportsRunApprovals = supportsRunApprovals
         self.supportsModelSelection = supportsModelSelection
         self.reconciliationDelayNanoseconds =
@@ -470,10 +562,91 @@ final class CompanionSessionHistoryViewModel {
         !isRunActive
             && !isLoading
             && !isUploadingAttachment
+            && !isPreparingDroppedAttachments
             && !isViewingCachedData
             && !isTerminalRefreshPending
             && !isApplyingModelSelection
             && errorMessage == nil
+    }
+
+    func prepareDroppedAttachments(
+        _ sourceURLs: [URL],
+        maximumCount: Int
+    ) async -> Bool {
+        guard
+            !isPreparingDroppedAttachments,
+            !isUploadingAttachment,
+            maximumCount > 0,
+            stagedDroppedAttachments.isEmpty
+        else {
+            return false
+        }
+
+        let selected = Array(sourceURLs.prefix(maximumCount))
+        guard !selected.isEmpty else { return false }
+
+        prepareAttachmentSelection()
+        isPreparingDroppedAttachments = true
+        defer { isPreparingDroppedAttachments = false }
+        do {
+            stagedDroppedAttachments = try await attachmentStager.stage(
+                selected,
+                maximumBytes:
+                    CompanionWorkspaceService.maximumUploadBytes
+            )
+            return !stagedDroppedAttachments.isEmpty
+        } catch {
+            guard !(error is CancellationError) else { return false }
+            attachmentErrorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    var hasStagedDroppedAttachments: Bool {
+        !stagedDroppedAttachments.isEmpty
+    }
+
+    func takeStagedDroppedAttachments() -> [CompanionStagedAttachment] {
+        defer { stagedDroppedAttachments = [] }
+        return stagedDroppedAttachments
+    }
+
+    func discardStagedDroppedAttachments() async {
+        let attachments = takeStagedDroppedAttachments()
+        await attachmentStager.discard(attachments)
+    }
+
+    func uploadDroppedAttachments(
+        _ attachments: [CompanionStagedAttachment],
+        destination: CompanionUploadDestination
+    ) async {
+        for (index, attachment) in attachments.enumerated() {
+            guard !Task.isCancelled else {
+                await attachmentStager.discard(
+                    Array(attachments[index...])
+                )
+                return
+            }
+            let uploaded = await uploadAttachment(
+                fileURL: attachment.fileURL,
+                filename: attachment.filename,
+                contentType: attachment.contentType,
+                destination: destination
+            )
+            guard uploaded else {
+                let firstUnownedIndex =
+                    failedAttachmentUpload?.fileURL
+                        == attachment.fileURL
+                        ? index + 1
+                        : index
+                if firstUnownedIndex < attachments.endIndex {
+                    await attachmentStager.discard(
+                        Array(attachments[firstUnownedIndex...])
+                    )
+                }
+                return
+            }
+        }
     }
 
     func uploadAttachment(
@@ -517,7 +690,7 @@ final class CompanionSessionHistoryViewModel {
             try? FileManager.default.removeItem(at: fileURL)
             return true
         } catch {
-            guard !(error is CancellationError) else {
+            guard !(error is CancellationError), !Task.isCancelled else {
                 try? FileManager.default.removeItem(at: fileURL)
                 return false
             }
@@ -565,6 +738,16 @@ final class CompanionSessionHistoryViewModel {
     }
 
     func prepareAttachmentSelection() {
+        if let failedAttachmentUpload {
+            try? FileManager.default.removeItem(
+                at: failedAttachmentUpload.fileURL
+            )
+        }
+        failedAttachmentUpload = nil
+        attachmentErrorMessage = nil
+    }
+
+    func cancelAttachmentRetry() {
         if let failedAttachmentUpload {
             try? FileManager.default.removeItem(
                 at: failedAttachmentUpload.fileURL
@@ -663,10 +846,15 @@ final class CompanionSessionHistoryViewModel {
     }
 
     var selectedModelDisplayName: String {
+        CompanionModelPresentation.friendlyName(
+            for: selectedModelIdentifier ?? ""
+        )
+    }
+
+    var selectedModelIdentifier: String? {
         selectedModelOption?.model
             ?? selectedModel?.model
             ?? session.model
-            ?? String(localized: "Model")
     }
 
     var selectedModelProviderDisplayName: String? {

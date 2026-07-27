@@ -484,26 +484,42 @@ private struct ChatCodeBlock: View {
                 Button {
                     wrapsCodeBlockLines.toggle()
                 } label: {
-                    Image(systemName: wrapsCodeBlockLines ? "arrow.turn.down.left" : "arrow.left.and.right")
+                    Image(
+                        systemName: wrapsCodeBlockLines
+                            ? "arrow.left.and.right"
+                            : "arrow.turn.down.left"
+                    )
                         .font(.system(size: 18, weight: .semibold))
                         .frame(width: 36, height: 36)
                         .contentTransition(.symbolEffect(.replace))
                 }
                 .buttonStyle(.plain)
+                .hoverEffect(.highlight)
                 .foregroundStyle(SwiftUI.Color.primary)
-                .accessibilityLabel(wrapsCodeBlockLines ? "Disable code line wrapping" : "Enable code line wrapping")
+                .help(
+                    wrapsCodeBlockLines
+                        ? "Disable code line wrapping"
+                        : "Enable code line wrapping"
+                )
+                .accessibilityLabel(
+                    wrapsCodeBlockLines
+                        ? "Disable code line wrapping"
+                        : "Enable code line wrapping"
+                )
 
                 Button {
                     UIPasteboard.general.string = content
                     didCopy = true
                 } label: {
-                    Image(systemName: didCopy ? "checkmark" : "square.on.square")
+                    Image(systemName: didCopy ? "checkmark" : "doc.on.doc")
                         .font(.system(size: 18, weight: .semibold))
-                    .frame(width: 36, height: 36)
-                    .contentTransition(.symbolEffect(.replace))
+                        .frame(width: 36, height: 36)
+                        .contentTransition(.symbolEffect(.replace))
                 }
                 .buttonStyle(.plain)
+                .hoverEffect(.highlight)
                 .foregroundStyle(SwiftUI.Color.primary)
+                .help(didCopy ? "Copied code" : "Copy code")
                 .accessibilityLabel(didCopy ? "Copied code" : "Copy code")
             }
             .padding(.leading, 16)
