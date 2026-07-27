@@ -622,7 +622,7 @@ final class CompanionSessionHistoryViewModel {
     }
 
     func removePendingUpload(_ upload: CompanionUpload) async {
-        guard let id = upload.id?.nilIfEmpty else { return }
+        guard let id = upload.id?.trimmedNonEmptyValue else { return }
         do {
             try await workspaceService.deleteUpload(id: id)
             pendingUploads.removeAll { $0.id == id }
@@ -1001,7 +1001,7 @@ final class CompanionSessionHistoryViewModel {
                     conversationHistory: authoritativeHistory,
                     selection: selectedModel,
                     attachmentIDs: pendingUploads.compactMap {
-                        $0.id?.nilIfEmpty
+                        $0.id?.trimmedNonEmptyValue
                     }
                 )
             )
