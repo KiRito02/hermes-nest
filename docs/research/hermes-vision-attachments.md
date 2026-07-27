@@ -1,6 +1,6 @@
 # Hermes Vision and Attachment Support
 
-Research date: 2026-07-27  
+Research date: 2026-07-27
 Upstream examined: `NousResearch/hermes-agent` `main` at
 [`0fa5e41c86f022bba147797849f0b44865721476`](https://github.com/NousResearch/hermes-agent/commit/0fa5e41c86f022bba147797849f0b44865721476).
 
