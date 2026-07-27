@@ -552,11 +552,10 @@ final class CompanionSessionHistoryViewModel {
 
     var visibleMessages: [ChatMessage] {
         guard visibleStartIndex < allMessages.count else { return [] }
-        return ChatViewModel.transcriptMessages(
-            from: Array(allMessages[visibleStartIndex...]),
-            messageOffset: visibleStartIndex
-        )
-        .map(\.message)
+        return allMessages[visibleStartIndex...].filter { message in
+            message.role != "tool"
+                && !TranscriptTurnClassifier.isToolResultOnlyMessage(message)
+        }
     }
 
     func durableReasoning(
