@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 import SwiftUI
 import UIKit
@@ -1822,8 +1823,7 @@ private struct CompanionUsageView: View {
                 )
                 usageMetric(
                     title: "Cost",
-                    value: viewModel.session.estimatedCost?
-                        .formattedCost() ?? String(localized: "Unavailable")
+                    value: costLabel(viewModel.session.estimatedCost)
                 )
             }
         }
@@ -1856,6 +1856,11 @@ private struct CompanionUsageView: View {
     private func tokenLabel(_ tokens: Int?) -> String {
         guard let tokens else { return String(localized: "Unavailable") }
         return CompanionTokenPresentation.exactCount(tokens)
+    }
+
+    private func costLabel(_ cost: Double?) -> String {
+        guard let cost else { return String(localized: "Unavailable") }
+        return String(format: "$%.4f", cost)
     }
 
     private func usageMetric(
