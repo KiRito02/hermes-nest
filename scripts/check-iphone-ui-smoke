@@ -32,6 +32,9 @@ MESSAGE_ACTIONS = (
 MARKDOWN_RENDERER = (
     ROOT / "HermesMobile/Features/Chat/MarkdownRenderer.swift"
 ).read_text(encoding="utf-8")
+WORKSPACE_MODELS = (
+    ROOT / "HermesMobile/Networking/CompanionWorkspaceModels.swift"
+).read_text(encoding="utf-8")
 LOCALIZATIONS = json.loads(
     (ROOT / "HermesMobile/Resources/Localizable.xcstrings").read_text(
         encoding="utf-8"
@@ -62,6 +65,11 @@ require(
     PROJECT,
     "CoreChatLabView.swift in Sources",
     "core chat fixture target membership",
+)
+require(
+    PROJECT,
+    "CompanionAttachmentStagerTests.swift in Sources",
+    "attachment stager test target membership",
 )
 require(FIXTURE, "CoreChatLabRunService", "local run service")
 require(FIXTURE, "runService: runService", "local run service injection")
@@ -128,8 +136,8 @@ for snippet, description in [
         "authenticated file drag-and-drop entry",
     ),
     (
-        "stageAttachmentFile(from: url)",
-        "local staging before dropped-file destination selection",
+        "viewModel.prepareDroppedAttachments(",
+        "view-model staging before dropped-file destination selection",
     ),
     (
         "showsUploadDestination = true",
@@ -141,6 +149,14 @@ for snippet, description in [
     ),
 ]:
     require(SESSION_VIEW, snippet, description)
+for snippet, description in [
+    ("actor CompanionAttachmentStager", "isolated attachment stager"),
+    (".isRegularFileKey", "regular-file drop validation"),
+    (".isSymbolicLinkKey", "symbolic-link drop rejection"),
+    ("copiedBytes <= maximumBytes", "bounded streaming copy"),
+    ("discardImmediately(staged)", "partial-staging cleanup"),
+]:
+    require(WORKSPACE_MODELS, snippet, description)
 require(
     THEME,
     "struct ChatActionButtonPalette",

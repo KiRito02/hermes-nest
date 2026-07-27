@@ -432,8 +432,6 @@ struct CompanionSessionHistoryView: View {
     @State private var uploadDestination: CompanionUploadDestination?
     @State private var attachmentUploadTask: Task<Void, Never>?
     @State private var droppedAttachmentTask: Task<Void, Never>?
-    @State private var stagedDroppedAttachments: [CompanionStagedDrop] = []
-    @State private var isPreparingDroppedAttachments = false
     @State private var isDropTargeted = false
     @State private var draftMessage = ""
     @State private var isUserInteractingWithScroll = false
@@ -793,27 +791,35 @@ struct CompanionSessionHistoryView: View {
         }
         .sheet(
             isPresented: $showsUploadDestination,
-            onDismiss: discardStagedDroppedAttachments
+            onDismiss: {
+                Task {
+                    await viewModel.discardStagedDroppedAttachments()
+                }
+            }
         ) {
             CompanionUploadDestinationPicker(
                 companionURL: companionURL,
                 service: workspaceService
             ) { destination in
                 uploadDestination = destination
-                if stagedDroppedAttachments.isEmpty {
+                if !viewModel.hasStagedDroppedAttachments {
                     showsUploadDestination = false
                     Task { @MainActor in
                         await Task.yield()
                         showsAttachmentSourcePicker = true
                     }
                 } else {
-                    let droppedAttachments = stagedDroppedAttachments
-                    stagedDroppedAttachments = []
+                    let droppedAttachments =
+                        viewModel.takeStagedDroppedAttachments()
                     showsUploadDestination = false
-                    uploadDroppedAttachments(
-                        droppedAttachments,
-                        to: destination
-                    )
+                    attachmentUploadTask?.cancel()
+                    attachmentUploadTask = Task { @MainActor in
+                        defer { attachmentUploadTask = nil }
+                        await viewModel.uploadDroppedAttachments(
+                            droppedAttachments,
+                            destination: destination
+                        )
+                    }
                 }
             }
         }
@@ -889,14 +895,16 @@ struct CompanionSessionHistoryView: View {
                 }
             }
             Button("Cancel", role: .cancel) {
-                viewModel.clearAttachmentError()
+                viewModel.cancelAttachmentRetry()
             }
         } message: {
             Text(viewModel.attachmentErrorMessage ?? "")
         }
         .onDisappear {
             droppedAttachmentTask?.cancel()
-            discardStagedDroppedAttachments()
+            Task {
+                await viewModel.discardStagedDroppedAttachments()
+            }
         }
     }
 
@@ -916,7 +924,7 @@ struct CompanionSessionHistoryView: View {
 
             if !viewModel.pendingUploads.isEmpty
                 || viewModel.isUploadingAttachment
-                || isPreparingDroppedAttachments {
+                || viewModel.isPreparingDroppedAttachments {
                 attachmentStrip
             }
 
@@ -939,7 +947,7 @@ struct CompanionSessionHistoryView: View {
                 .disabled(
                     viewModel.pendingUploads.count >= 10
                         || viewModel.isUploadingAttachment
-                        || isPreparingDroppedAttachments
+                        || viewModel.isPreparingDroppedAttachments
                 )
                 .accessibilityLabel("Add attachment")
                 .accessibilityHint(
@@ -971,7 +979,7 @@ struct CompanionSessionHistoryView: View {
                 .textFieldStyle(.plain)
                 .disabled(
                     !viewModel.canSend
-                        || isPreparingDroppedAttachments
+                        || viewModel.isPreparingDroppedAttachments
                 )
                 .submitLabel(.send)
                 .onSubmit {
@@ -1007,7 +1015,7 @@ struct CompanionSessionHistoryView: View {
                             in: .whitespacesAndNewlines
                         ).isEmpty
                             || !viewModel.canSend
-                            || isPreparingDroppedAttachments
+                            || viewModel.isPreparingDroppedAttachments
                     )
                     .keyboardShortcut(.return, modifiers: .command)
                     .help("Send message")
@@ -1063,7 +1071,7 @@ struct CompanionSessionHistoryView: View {
                     && supportsUploads
                     && viewModel.pendingUploads.count < 10
                     && !viewModel.isUploadingAttachment
-                    && !isPreparingDroppedAttachments
+                    && !viewModel.isPreparingDroppedAttachments
         }
     }
 
@@ -1117,7 +1125,7 @@ struct CompanionSessionHistoryView: View {
                     .font(.caption)
                 }
 
-                if isPreparingDroppedAttachments {
+                if viewModel.isPreparingDroppedAttachments {
                     Label(
                         "Preparing dropped attachments...",
                         systemImage: "arrow.down.doc"
@@ -1433,7 +1441,7 @@ struct CompanionSessionHistoryView: View {
     private func handleDroppedFiles(_ urls: [URL]) -> Bool {
         guard
             supportsUploads,
-            !isPreparingDroppedAttachments,
+            !viewModel.isPreparingDroppedAttachments,
             !viewModel.isUploadingAttachment,
             viewModel.pendingUploads.count < 10
         else {
@@ -1446,100 +1454,15 @@ struct CompanionSessionHistoryView: View {
 
         droppedAttachmentTask?.cancel()
         droppedAttachmentTask = Task { @MainActor in
-            isPreparingDroppedAttachments = true
-            defer {
-                isPreparingDroppedAttachments = false
-                droppedAttachmentTask = nil
-            }
-
-            var staged: [CompanionStagedDrop] = []
-            do {
-                for url in selected {
-                    try Task.checkCancellation()
-                    let accessed =
-                        url.startAccessingSecurityScopedResource()
-                    defer {
-                        if accessed {
-                            url.stopAccessingSecurityScopedResource()
-                        }
-                    }
-                    let values = try url.resourceValues(
-                        forKeys: [.fileSizeKey, .contentTypeKey]
-                    )
-                    if let size = values.fileSize,
-                       size > CompanionWorkspaceService.maximumUploadBytes {
-                        throw CompanionWorkspaceServiceError.requestTooLarge
-                    }
-                    let stagedURL = try await stageAttachmentFile(from: url)
-                    staged.append(
-                        CompanionStagedDrop(
-                            fileURL: stagedURL,
-                            filename: url.lastPathComponent,
-                            contentType:
-                                values.contentType?.preferredMIMEType
-                                ?? "application/octet-stream"
-                        )
-                    )
-                }
-
-                try Task.checkCancellation()
-                stagedDroppedAttachments = staged
-                viewModel.prepareAttachmentSelection()
+            defer { droppedAttachmentTask = nil }
+            if await viewModel.prepareDroppedAttachments(
+                selected,
+                maximumCount: remaining
+            ) {
                 showsUploadDestination = true
-            } catch {
-                for attachment in staged {
-                    try? FileManager.default.removeItem(
-                        at: attachment.fileURL
-                    )
-                }
-                guard !(error is CancellationError) else { return }
-                viewModel.setAttachmentError(error.localizedDescription)
             }
         }
         return true
-    }
-
-    private func uploadDroppedAttachments(
-        _ attachments: [CompanionStagedDrop],
-        to destination: CompanionUploadDestination
-    ) {
-        attachmentUploadTask?.cancel()
-        attachmentUploadTask = Task { @MainActor in
-            defer { attachmentUploadTask = nil }
-            for (index, attachment) in attachments.enumerated() {
-                guard !Task.isCancelled else {
-                    discardDroppedAttachments(
-                        attachments.suffix(from: index)
-                    )
-                    return
-                }
-                let uploaded = await viewModel.uploadAttachment(
-                    fileURL: attachment.fileURL,
-                    filename: attachment.filename,
-                    contentType: attachment.contentType,
-                    destination: destination
-                )
-                guard uploaded else {
-                    discardDroppedAttachments(
-                        attachments.suffix(from: index + 1)
-                    )
-                    return
-                }
-            }
-        }
-    }
-
-    private func discardStagedDroppedAttachments() {
-        discardDroppedAttachments(stagedDroppedAttachments[...])
-        stagedDroppedAttachments = []
-    }
-
-    private func discardDroppedAttachments(
-        _ attachments: ArraySlice<CompanionStagedDrop>
-    ) {
-        for attachment in attachments {
-            try? FileManager.default.removeItem(at: attachment.fileURL)
-        }
     }
 
     private func stageAttachmentFile(from sourceURL: URL) async throws -> URL {
@@ -1779,12 +1702,6 @@ private struct CompanionComposerControlLabel: View {
             in: Capsule()
         )
     }
-}
-
-private struct CompanionStagedDrop: Sendable {
-    let fileURL: URL
-    let filename: String
-    let contentType: String
 }
 
 private extension CompanionUpload {
