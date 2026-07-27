@@ -1428,7 +1428,9 @@ async def _run_request(
                     + (
                         " For entries whose content_type begins with image/, "
                         "use vision_analyze with the listed path when the "
-                        "user's request requires visual analysis."
+                        "user's request requires visual analysis. If vision "
+                        "analysis is unavailable or fails, tell the user "
+                        "instead of guessing about the image contents."
                         if any(
                             record.content_type.startswith("image/")
                             for record in records

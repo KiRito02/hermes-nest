@@ -798,7 +798,7 @@ struct CompanionSessionHistoryView: View {
             Text(
                 String(
                     localized:
-                        "Images are uploaded securely and analyzed by Hermes Vision; native inline image input is not required."
+                        "Images are uploaded as secure file attachments. Hermes will try Vision analysis; native inline image input is not advertised by Runs."
                 )
             )
         }

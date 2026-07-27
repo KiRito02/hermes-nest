@@ -338,6 +338,10 @@ class RunProxyContractTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("attachment_ids", forwarded)
             self.assertIn(attachment.relative_path, forwarded["instructions"])
             self.assertIn("vision_analyze", forwarded["instructions"])
+            self.assertIn(
+                "instead of guessing about the image contents",
+                forwarded["instructions"],
+            )
             self.assertNotIn(str(host_path), forwarded["instructions"])
 
     async def test_attachment_is_claimed_before_concurrent_gateway_start(

@@ -38,11 +38,12 @@ Issue/PR, not this index.
 | Rich model/provider/reasoning options | implemented | P1 | secret | [#17](https://github.com/KiRito02/hermes-nest/pull/17); live-accepted on Hermes `37a27664` |
 | Jobs | roadmap | P1 | write | Capability-gated scheduled/background work |
 | Skills/toolsets discovery | implemented | P1 | read | Read-only proxy and native discovery in [#18](https://github.com/KiRito02/hermes-nest/pull/18) |
-| Inline images | roadmap | P1 | privacy | The current Runs transport still lacks a verified multimodal fixture; image files use the ordinary attachment path only |
+| Native inline images | roadmap | P1 | privacy | Runs still lacks a verified multimodal fixture; do not depend on incidental content-part passthrough |
+| File-backed image Vision | in-progress | P1 | privacy | [#23](https://github.com/KiRito02/hermes-nest/issues/23): secure upload path plus `vision_analyze`, without promising backend availability |
 | Adaptive iPhone/iPad layout | implemented | P1 | — | [#20](https://github.com/KiRito02/hermes-nest/pull/20): split shell, composer, sheets, transcript |
-| Allowed-root file browse/preview/download | in-progress | P1 | privacy | [#21](https://github.com/KiRito02/hermes-nest/issues/21); Companion-native aliases, no arbitrary filesystem |
-| Streaming upload + turn availability | in-progress | P1 | write | [#21](https://github.com/KiRito02/hermes-nest/issues/21); bounded, cancelable, atomic |
-| Built-in Memory management | in-progress | P1 | privacy | [#21](https://github.com/KiRito02/hermes-nest/issues/21); `MEMORY.md`/`USER.md`, locking and stale-write defense |
+| Allowed-root file browse/preview/download | implemented | P1 | privacy | [#22](https://github.com/KiRito02/hermes-nest/pull/22); Companion-native aliases, no arbitrary filesystem |
+| Streaming upload + turn availability | implemented | P1 | write | [#22](https://github.com/KiRito02/hermes-nest/pull/22); bounded, cancelable, atomic |
+| Built-in Memory management | implemented | P1 | privacy | [#22](https://github.com/KiRito02/hermes-nest/pull/22); `MEMORY.md`/`USER.md`, locking and stale-write defense |
 | Personal app-only signing/sideload workflow | roadmap | P0 | secret | Disable inherited extensions/App Groups in the personal scheme |
 | Arbitrary file delete/terminal/Git mutation | n-a | — | exec | Outside Companion v1 |
 | Hermes Bridge Kanban/Boards | n-a | — | write | WebUI/Bridge-specific |

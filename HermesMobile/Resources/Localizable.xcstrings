@@ -4280,12 +4280,12 @@
         }
       }
     },
-    "Images are uploaded securely and analyzed by Hermes Vision; native inline image input is not required.": {
+    "Images are uploaded as secure file attachments. Hermes will try Vision analysis; native inline image input is not advertised by Runs.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "图片会安全上传并由 Hermes Vision 分析，无需原生内联图片输入。"
+            "value": "图片会作为安全文件附件上传，Hermes 将尝试通过 Vision 分析；Runs 尚未声明支持原生内联图片输入。"
           }
         }
       }
