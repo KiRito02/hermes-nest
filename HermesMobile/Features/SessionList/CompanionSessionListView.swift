@@ -431,6 +431,10 @@ struct CompanionSessionHistoryView: View {
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var uploadDestination: CompanionUploadDestination?
     @State private var attachmentUploadTask: Task<Void, Never>?
+    @State private var droppedAttachmentTask: Task<Void, Never>?
+    @State private var stagedDroppedAttachments: [CompanionStagedDrop] = []
+    @State private var isPreparingDroppedAttachments = false
+    @State private var isDropTargeted = false
     @State private var draftMessage = ""
     @State private var isUserInteractingWithScroll = false
     @State private var restoresComposerFocusAfterPresentation = false
@@ -787,16 +791,29 @@ struct CompanionSessionHistoryView: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showsUploadDestination) {
+        .sheet(
+            isPresented: $showsUploadDestination,
+            onDismiss: discardStagedDroppedAttachments
+        ) {
             CompanionUploadDestinationPicker(
                 companionURL: companionURL,
                 service: workspaceService
             ) { destination in
                 uploadDestination = destination
-                showsUploadDestination = false
-                Task { @MainActor in
-                    await Task.yield()
-                    showsAttachmentSourcePicker = true
+                if stagedDroppedAttachments.isEmpty {
+                    showsUploadDestination = false
+                    Task { @MainActor in
+                        await Task.yield()
+                        showsAttachmentSourcePicker = true
+                    }
+                } else {
+                    let droppedAttachments = stagedDroppedAttachments
+                    stagedDroppedAttachments = []
+                    showsUploadDestination = false
+                    uploadDroppedAttachments(
+                        droppedAttachments,
+                        to: destination
+                    )
                 }
             }
         }
@@ -877,6 +894,10 @@ struct CompanionSessionHistoryView: View {
         } message: {
             Text(viewModel.attachmentErrorMessage ?? "")
         }
+        .onDisappear {
+            droppedAttachmentTask?.cancel()
+            discardStagedDroppedAttachments()
+        }
     }
 
     private var companionComposer: some View {
@@ -894,7 +915,8 @@ struct CompanionSessionHistoryView: View {
             }
 
             if !viewModel.pendingUploads.isEmpty
-                || viewModel.isUploadingAttachment {
+                || viewModel.isUploadingAttachment
+                || isPreparingDroppedAttachments {
                 attachmentStrip
             }
 
@@ -917,6 +939,7 @@ struct CompanionSessionHistoryView: View {
                 .disabled(
                     viewModel.pendingUploads.count >= 10
                         || viewModel.isUploadingAttachment
+                        || isPreparingDroppedAttachments
                 )
                 .accessibilityLabel("Add attachment")
                 .accessibilityHint(
@@ -946,7 +969,10 @@ struct CompanionSessionHistoryView: View {
                 .focused($composerIsFocused)
                 .lineLimit(1...6)
                 .textFieldStyle(.plain)
-                .disabled(!viewModel.canSend)
+                .disabled(
+                    !viewModel.canSend
+                        || isPreparingDroppedAttachments
+                )
                 .submitLabel(.send)
                 .onSubmit {
                     sendDraft()
@@ -979,7 +1005,9 @@ struct CompanionSessionHistoryView: View {
                     .disabled(
                         draftMessage.trimmingCharacters(
                             in: .whitespacesAndNewlines
-                        ).isEmpty || !viewModel.canSend
+                        ).isEmpty
+                            || !viewModel.canSend
+                            || isPreparingDroppedAttachments
                     )
                     .keyboardShortcut(.return, modifiers: .command)
                     .help("Send message")
@@ -1015,6 +1043,28 @@ struct CompanionSessionHistoryView: View {
         .frame(maxWidth: HermesNestDesign.transcriptMaximumWidth)
         .frame(maxWidth: .infinity)
         .background(.regularMaterial)
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(
+                    cornerRadius: HermesNestDesign.composerCornerRadius,
+                    style: .continuous
+                )
+                .stroke(Color.accentColor, lineWidth: 2)
+                .padding(.horizontal, HermesNestDesign.Spacing.large)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            handleDroppedFiles(urls)
+        } isTargeted: { isTargeted in
+            isDropTargeted =
+                isTargeted
+                    && supportsUploads
+                    && viewModel.pendingUploads.count < 10
+                    && !viewModel.isUploadingAttachment
+                    && !isPreparingDroppedAttachments
+        }
     }
 
     private var attachmentStrip: some View {
@@ -1065,6 +1115,15 @@ struct CompanionSessionHistoryView: View {
                         .buttonStyle(.plain)
                     }
                     .font(.caption)
+                }
+
+                if isPreparingDroppedAttachments {
+                    Label(
+                        "Preparing dropped attachments...",
+                        systemImage: "arrow.down.doc"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
         }
@@ -1205,9 +1264,10 @@ struct CompanionSessionHistoryView: View {
         guard let tokens = viewModel.latestRunUsage?.totalTokens else {
             return String(localized: "Usage")
         }
+        let exactTokens = CompanionTokenPresentation.exactCount(tokens)
         return String(
             localized:
-                "\(ContextWindowFormatter.formatTokens(tokens)) tokens"
+                "\(exactTokens) tokens"
         )
     }
 
@@ -1367,6 +1427,118 @@ struct CompanionSessionHistoryView: View {
                     )
                 }
             }
+        }
+    }
+
+    private func handleDroppedFiles(_ urls: [URL]) -> Bool {
+        guard
+            supportsUploads,
+            !isPreparingDroppedAttachments,
+            !viewModel.isUploadingAttachment,
+            viewModel.pendingUploads.count < 10
+        else {
+            return false
+        }
+
+        let remaining = 10 - viewModel.pendingUploads.count
+        let selected = Array(urls.prefix(remaining))
+        guard !selected.isEmpty else { return false }
+
+        droppedAttachmentTask?.cancel()
+        droppedAttachmentTask = Task { @MainActor in
+            isPreparingDroppedAttachments = true
+            defer {
+                isPreparingDroppedAttachments = false
+                droppedAttachmentTask = nil
+            }
+
+            var staged: [CompanionStagedDrop] = []
+            do {
+                for url in selected {
+                    try Task.checkCancellation()
+                    let accessed =
+                        url.startAccessingSecurityScopedResource()
+                    defer {
+                        if accessed {
+                            url.stopAccessingSecurityScopedResource()
+                        }
+                    }
+                    let values = try url.resourceValues(
+                        forKeys: [.fileSizeKey, .contentTypeKey]
+                    )
+                    if let size = values.fileSize,
+                       size > CompanionWorkspaceService.maximumUploadBytes {
+                        throw CompanionWorkspaceServiceError.requestTooLarge
+                    }
+                    let stagedURL = try await stageAttachmentFile(from: url)
+                    staged.append(
+                        CompanionStagedDrop(
+                            fileURL: stagedURL,
+                            filename: url.lastPathComponent,
+                            contentType:
+                                values.contentType?.preferredMIMEType
+                                ?? "application/octet-stream"
+                        )
+                    )
+                }
+
+                try Task.checkCancellation()
+                stagedDroppedAttachments = staged
+                viewModel.prepareAttachmentSelection()
+                showsUploadDestination = true
+            } catch {
+                for attachment in staged {
+                    try? FileManager.default.removeItem(
+                        at: attachment.fileURL
+                    )
+                }
+                guard !(error is CancellationError) else { return }
+                viewModel.setAttachmentError(error.localizedDescription)
+            }
+        }
+        return true
+    }
+
+    private func uploadDroppedAttachments(
+        _ attachments: [CompanionStagedDrop],
+        to destination: CompanionUploadDestination
+    ) {
+        attachmentUploadTask?.cancel()
+        attachmentUploadTask = Task { @MainActor in
+            defer { attachmentUploadTask = nil }
+            for (index, attachment) in attachments.enumerated() {
+                guard !Task.isCancelled else {
+                    discardDroppedAttachments(
+                        attachments.suffix(from: index)
+                    )
+                    return
+                }
+                let uploaded = await viewModel.uploadAttachment(
+                    fileURL: attachment.fileURL,
+                    filename: attachment.filename,
+                    contentType: attachment.contentType,
+                    destination: destination
+                )
+                guard uploaded else {
+                    discardDroppedAttachments(
+                        attachments.suffix(from: index + 1)
+                    )
+                    return
+                }
+            }
+        }
+    }
+
+    private func discardStagedDroppedAttachments() {
+        discardDroppedAttachments(stagedDroppedAttachments[...])
+        stagedDroppedAttachments = []
+    }
+
+    private func discardDroppedAttachments(
+        _ attachments: ArraySlice<CompanionStagedDrop>
+    ) {
+        for attachment in attachments {
+            try? FileManager.default.removeItem(at: attachment.fileURL)
         }
     }
 
@@ -1609,6 +1781,12 @@ private struct CompanionComposerControlLabel: View {
     }
 }
 
+private struct CompanionStagedDrop: Sendable {
+    let fileURL: URL
+    let filename: String
+    let contentType: String
+}
+
 private extension CompanionUpload {
     var presentationSystemImage: String {
         contentType?.lowercased().hasPrefix("image/") == true
@@ -1751,7 +1929,7 @@ private struct CompanionUsageView: View {
 
     private func tokenLabel(_ tokens: Int?) -> String {
         guard let tokens else { return String(localized: "Unavailable") }
-        return ContextWindowFormatter.formatTokens(tokens)
+        return CompanionTokenPresentation.exactCount(tokens)
     }
 
     private func usageMetric(
@@ -1848,7 +2026,7 @@ private struct CompanionModelPickerView: View {
                                     )
 
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text(option.displayName)
+                                        Text(option.presentationName)
                                             .foregroundStyle(.primary)
                                             .lineLimit(2)
                                         HStack(spacing: 6) {
@@ -1903,7 +2081,7 @@ private struct CompanionModelPickerView: View {
         guard !query.isEmpty else { return viewModel.modelGroups }
         return viewModel.modelGroups.compactMap { group in
             let models = group.models.filter {
-                $0.displayName.localizedCaseInsensitiveContains(query)
+                $0.presentationName.localizedCaseInsensitiveContains(query)
                     || $0.model.localizedCaseInsensitiveContains(query)
                     || $0.provider.localizedCaseInsensitiveContains(query)
                     || $0.providerName.localizedCaseInsensitiveContains(query)

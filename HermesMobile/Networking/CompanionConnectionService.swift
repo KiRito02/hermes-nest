@@ -196,73 +196,6 @@ struct CompanionModelSelection: Equatable, Sendable {
     let reasoningEffort: CompanionReasoningEffort?
 }
 
-enum CompanionModelPresentation {
-    static func friendlyName(for identifier: String) -> String {
-        let leaf = identifier
-            .split(separator: "/", omittingEmptySubsequences: true)
-            .last
-            .map(String.init)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            ?? ""
-        guard !leaf.isEmpty else {
-            return String(localized: "Model")
-        }
-
-        let words = leaf.split { character in
-            character == "-"
-                || character == "_"
-                || character == ":"
-                || character.isWhitespace
-        }
-        return words.map(styledWord).joined(separator: " ")
-    }
-
-    private static func styledWord(_ word: Substring) -> String {
-        let value = String(word)
-        let lowercased = value.lowercased()
-        switch lowercased {
-        case "gpt":
-            return "GPT"
-        case "claude":
-            return "Claude"
-        case "sonnet":
-            return "Sonnet"
-        case "opus":
-            return "Opus"
-        case "haiku":
-            return "Haiku"
-        case "codex":
-            return "Codex"
-        case "gemini":
-            return "Gemini"
-        case "qwen":
-            return "Qwen"
-        case "llama":
-            return "Llama"
-        case "hermes":
-            return "Hermes"
-        case "mistral":
-            return "Mistral"
-        case "deepseek":
-            return "DeepSeek"
-        default:
-            if lowercased.hasPrefix("gpt") {
-                return "GPT" + String(value.dropFirst(3))
-            }
-            if lowercased.hasPrefix("qwen") {
-                return "Qwen" + String(value.dropFirst(4))
-            }
-            if !lowercased.dropLast().isEmpty,
-               lowercased.dropLast().allSatisfy(\.isNumber),
-               lowercased.last == "b" {
-                return String(lowercased.dropLast()) + "B"
-            }
-            return value.prefix(1).uppercased()
-                + String(value.dropFirst())
-        }
-    }
-}
-
 struct CompanionModelOption: Identifiable, Equatable, Sendable {
     var id: String {
         "\(provider)/\(model)"
@@ -272,10 +205,6 @@ struct CompanionModelOption: Identifiable, Equatable, Sendable {
     let provider: String
     let providerName: String
     let supportsReasoning: Bool
-
-    var displayName: String {
-        CompanionModelPresentation.friendlyName(for: model)
-    }
 }
 
 struct CompanionModelGroup: Identifiable, Equatable, Sendable {

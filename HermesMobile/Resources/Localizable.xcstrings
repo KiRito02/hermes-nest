@@ -91,6 +91,36 @@
         }
       }
     },
+    "Copies this completed message to the clipboard.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将这条已完成的消息复制到剪贴板。"
+          }
+        }
+      }
+    },
+    "Opens the system share sheet for this completed message.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开系统分享面板来分享这条已完成的消息。"
+          }
+        }
+      }
+    },
+    "Preparing dropped attachments...": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备拖放的附件……"
+          }
+        }
+      }
+    },
     "Current model": {
       "localizations": {
         "zh-Hans": {
@@ -207,6 +237,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "分享消息"
+          }
+        }
+      }
+    },
+    "Search Sessions": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索会话"
           }
         }
       }

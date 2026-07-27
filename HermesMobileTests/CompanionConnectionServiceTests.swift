@@ -545,33 +545,6 @@ final class CompanionConnectionServiceTests: APIClientTestCase {
         XCTAssertTrue(capabilities.supportsBuiltInMemory)
     }
 
-    func testModelPresentationBuildsFriendlyNamesWithoutLosingRawIdentity() {
-        XCTAssertEqual(
-            CompanionModelPresentation.friendlyName(
-                for: "anthropic/claude-sonnet-4.6"
-            ),
-            "Claude Sonnet 4.6"
-        )
-        XCTAssertEqual(
-            CompanionModelPresentation.friendlyName(
-                for: "openai/gpt-5.2-codex"
-            ),
-            "GPT 5.2 Codex"
-        )
-        XCTAssertEqual(
-            CompanionModelPresentation.friendlyName(
-                for: "qwen/qwen3-coder-next"
-            ),
-            "Qwen3 Coder Next"
-        )
-        XCTAssertEqual(
-            CompanionModelPresentation.friendlyName(
-                for: "local/custom_model:8b"
-            ),
-            "Custom Model 8B"
-        )
-    }
-
     func testModelSelectionSupportRequiresCompanionAndGatewayContracts() throws {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase

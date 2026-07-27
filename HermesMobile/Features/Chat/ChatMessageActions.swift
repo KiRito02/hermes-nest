@@ -27,6 +27,9 @@ struct ChatMessageQuickActions: View {
             .accessibilityLabel(
                 didCopy ? "Copied Message" : "Copy Message"
             )
+            .accessibilityHint(
+                "Copies this completed message to the clipboard."
+            )
 
             ShareLink(item: text) {
                 actionIcon(systemImage: "square.and.arrow.up")
@@ -35,6 +38,9 @@ struct ChatMessageQuickActions: View {
             .hoverEffect(.highlight)
             .help("Share Message")
             .accessibilityLabel("Share Message")
+            .accessibilityHint(
+                "Opens the system share sheet for this completed message."
+            )
         }
         .font(.system(size: 14, weight: .medium))
         .foregroundStyle(.secondary)

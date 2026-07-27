@@ -2,6 +2,91 @@ import Foundation
 import Observation
 import SwiftData
 
+enum CompanionModelPresentation {
+    static func friendlyName(for identifier: String) -> String {
+        let leaf = identifier
+            .split(separator: "/", omittingEmptySubsequences: true)
+            .last
+            .map(String.init)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            ?? ""
+        guard !leaf.isEmpty else {
+            return String(localized: "Model")
+        }
+
+        let words = leaf.split { character in
+            character == "-"
+                || character == "_"
+                || character == ":"
+                || character.isWhitespace
+        }
+        return words.map(styledWord).joined(separator: " ")
+    }
+
+    private static func styledWord(_ word: Substring) -> String {
+        let value = String(word)
+        let lowercased = value.lowercased()
+        switch lowercased {
+        case "gpt":
+            return "GPT"
+        case "claude":
+            return "Claude"
+        case "sonnet":
+            return "Sonnet"
+        case "opus":
+            return "Opus"
+        case "haiku":
+            return "Haiku"
+        case "codex":
+            return "Codex"
+        case "gemini":
+            return "Gemini"
+        case "qwen":
+            return "Qwen"
+        case "llama":
+            return "Llama"
+        case "hermes":
+            return "Hermes"
+        case "mistral":
+            return "Mistral"
+        case "deepseek":
+            return "DeepSeek"
+        default:
+            if lowercased.hasPrefix("gpt") {
+                return "GPT" + String(value.dropFirst(3))
+            }
+            if lowercased.hasPrefix("qwen") {
+                return "Qwen" + String(value.dropFirst(4))
+            }
+            if !lowercased.dropLast().isEmpty,
+               lowercased.dropLast().allSatisfy(\.isNumber),
+               lowercased.last == "b" {
+                return String(lowercased.dropLast()) + "B"
+            }
+            return value.prefix(1).uppercased()
+                + String(value.dropFirst())
+        }
+    }
+}
+
+enum CompanionTokenPresentation {
+    static func exactCount(
+        _ tokens: Int,
+        locale: Locale = .current
+    ) -> String {
+        tokens.formatted(
+            .number
+                .locale(locale)
+        )
+    }
+}
+
+extension CompanionModelOption {
+    var presentationName: String {
+        CompanionModelPresentation.friendlyName(for: model)
+    }
+}
+
 @MainActor
 @Observable
 final class CompanionSessionListViewModel {
@@ -664,10 +749,7 @@ final class CompanionSessionHistoryViewModel {
 
     var selectedModelDisplayName: String {
         CompanionModelPresentation.friendlyName(
-            for: selectedModelOption?.model
-                ?? selectedModel?.model
-                ?? session.model
-                ?? ""
+            for: selectedModelIdentifier ?? ""
         )
     }
 

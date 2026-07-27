@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 @testable import HermesMobile
 
@@ -234,5 +235,42 @@ final class ContextWindowIndicatorTests: XCTestCase {
 
     func testFormatTokensMillion() {
         XCTAssertEqual(ContextWindowFormatter.formatTokens(1_500_000), "1.5M")
+    }
+
+    func testCompanionPresentationKeepsTokenCountsExact() {
+        XCTAssertEqual(
+            CompanionTokenPresentation.exactCount(
+                1_234,
+                locale: Locale(identifier: "en_US")
+            ),
+            "1,234"
+        )
+    }
+
+    func testCompanionModelPresentationBuildsFriendlyNames() {
+        XCTAssertEqual(
+            CompanionModelPresentation.friendlyName(
+                for: "anthropic/claude-sonnet-4.6"
+            ),
+            "Claude Sonnet 4.6"
+        )
+        XCTAssertEqual(
+            CompanionModelPresentation.friendlyName(
+                for: "openai/gpt-5.2-codex"
+            ),
+            "GPT 5.2 Codex"
+        )
+        XCTAssertEqual(
+            CompanionModelPresentation.friendlyName(
+                for: "qwen/qwen3-coder-next"
+            ),
+            "Qwen3 Coder Next"
+        )
+        XCTAssertEqual(
+            CompanionModelPresentation.friendlyName(
+                for: "local/custom_model:8b"
+            ),
+            "Custom Model 8B"
+        )
     }
 }

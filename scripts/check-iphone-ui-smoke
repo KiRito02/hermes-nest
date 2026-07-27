@@ -106,7 +106,7 @@ for snippet, description in [
         "quiet shared composer control treatment",
     ),
     (
-        "Text(option.displayName)",
+        "Text(option.presentationName)",
         "friendly primary model picker label",
     ),
     (
@@ -122,6 +122,22 @@ for snippet, description in [
     (
         "restoreComposerFocusIfNeeded",
         "model and usage composer-focus restoration",
+    ),
+    (
+        ".dropDestination(for: URL.self)",
+        "authenticated file drag-and-drop entry",
+    ),
+    (
+        "stageAttachmentFile(from: url)",
+        "local staging before dropped-file destination selection",
+    ),
+    (
+        "showsUploadDestination = true",
+        "authorized upload destination for dropped files",
+    ),
+    (
+        "CompanionTokenPresentation.exactCount",
+        "exact Companion token presentation",
     ),
 ]:
     require(SESSION_VIEW, snippet, description)
@@ -152,6 +168,14 @@ for snippet, description in [
     ('systemImage: "square.and.arrow.up"', "direct Share icon"),
     (".hoverEffect(", "pointer hover feedback"),
     (".chatMinimumHitTarget(", "minimum action hit target"),
+    (
+        "Copies this completed message to the clipboard.",
+        "direct Copy VoiceOver hint",
+    ),
+    (
+        "Opens the system share sheet for this completed message.",
+        "direct Share VoiceOver hint",
+    ),
 ]:
     require(MESSAGE_ACTIONS, snippet, description)
 
@@ -183,6 +207,13 @@ require(
     ]["value"],
     "已复制消息",
     "Simplified-Chinese copied-message label",
+)
+require(
+    LOCALIZATIONS["strings"]["Search Sessions"]["localizations"]["zh-Hans"][
+        "stringUnit"
+    ]["value"],
+    "搜索会话",
+    "Simplified-Chinese keyboard search command",
 )
 
 for snippet, description in [
