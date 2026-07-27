@@ -8,6 +8,8 @@ import hashlib
 import json
 import plistlib
 import re
+import struct
+import zlib
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -98,6 +100,163 @@ def main_app_source_names(project: str) -> set[str]:
     )
 
 
+def png_subject_geometry(
+    path: Path,
+) -> tuple[float, float, float, float] | None:
+    payload = path.read_bytes()
+    if not payload.startswith(b"\x89PNG\r\n\x1a\n"):
+        return None
+
+    width = 0
+    height = 0
+    bit_depth = 0
+    color_type = 0
+    interlace = 0
+    compressed = bytearray()
+    offset = 8
+    while offset + 12 <= len(payload):
+        length = int.from_bytes(payload[offset : offset + 4], "big")
+        kind = payload[offset + 4 : offset + 8]
+        data_start = offset + 8
+        data_end = data_start + length
+        if data_end + 4 > len(payload):
+            return None
+        data = payload[data_start:data_end]
+        offset = data_end + 4
+        if kind == b"IHDR":
+            if len(data) != 13:
+                return None
+            (
+                width,
+                height,
+                bit_depth,
+                color_type,
+                compression,
+                filtering,
+                interlace,
+            ) = struct.unpack(">IIBBBBB", data)
+            if compression != 0 or filtering != 0:
+                return None
+        elif kind == b"IDAT":
+            compressed.extend(data)
+        elif kind == b"IEND":
+            break
+
+    channels = {2: 3, 6: 4}.get(color_type)
+    if (
+        width <= 0
+        or height <= 0
+        or bit_depth != 8
+        or channels is None
+        or interlace != 0
+    ):
+        return None
+
+    try:
+        filtered = zlib.decompress(bytes(compressed))
+    except zlib.error:
+        return None
+    stride = width * channels
+    if len(filtered) != (stride + 1) * height:
+        return None
+
+    rows: list[bytearray] = []
+    cursor = 0
+    previous = bytearray(stride)
+    for _ in range(height):
+        filter_type = filtered[cursor]
+        cursor += 1
+        scanline = bytearray(filtered[cursor : cursor + stride])
+        cursor += stride
+        if filter_type == 1:
+            for index in range(stride):
+                left = scanline[index - channels] if index >= channels else 0
+                scanline[index] = (scanline[index] + left) & 0xFF
+        elif filter_type == 2:
+            for index in range(stride):
+                scanline[index] = (scanline[index] + previous[index]) & 0xFF
+        elif filter_type == 3:
+            for index in range(stride):
+                left = scanline[index - channels] if index >= channels else 0
+                up = previous[index]
+                scanline[index] = (
+                    scanline[index] + ((left + up) // 2)
+                ) & 0xFF
+        elif filter_type == 4:
+            for index in range(stride):
+                left = scanline[index - channels] if index >= channels else 0
+                up = previous[index]
+                upper_left = (
+                    previous[index - channels]
+                    if index >= channels
+                    else 0
+                )
+                estimate = left + up - upper_left
+                left_distance = abs(estimate - left)
+                up_distance = abs(estimate - up)
+                upper_left_distance = abs(estimate - upper_left)
+                predictor = (
+                    left
+                    if left_distance <= up_distance
+                    and left_distance <= upper_left_distance
+                    else (
+                        up
+                        if up_distance <= upper_left_distance
+                        else upper_left
+                    )
+                )
+                scanline[index] = (scanline[index] + predictor) & 0xFF
+        elif filter_type != 0:
+            return None
+        rows.append(scanline)
+        previous = scanline
+
+    corner_size = max(1, min(width, height) // 16)
+    background_samples: list[tuple[int, int, int]] = []
+    for y_start in (0, height - corner_size):
+        for x_start in (0, width - corner_size):
+            for y in range(y_start, y_start + corner_size):
+                row = rows[y]
+                for x in range(x_start, x_start + corner_size):
+                    pixel_start = x * channels
+                    background_samples.append(
+                        tuple(row[pixel_start : pixel_start + 3])
+                    )
+    background = tuple(
+        round(
+            sum(pixel[channel] for pixel in background_samples)
+            / len(background_samples)
+        )
+        for channel in range(3)
+    )
+
+    left = width
+    top = height
+    right = 0
+    bottom = 0
+    for y, row in enumerate(rows):
+        for x in range(width):
+            pixel_start = x * channels
+            pixel = row[pixel_start : pixel_start + 3]
+            if max(
+                abs(pixel[channel] - background[channel])
+                for channel in range(3)
+            ) < 32:
+                continue
+            left = min(left, x)
+            top = min(top, y)
+            right = max(right, x + 1)
+            bottom = max(bottom, y + 1)
+    if right <= left or bottom <= top:
+        return None
+    return (
+        ((left + right) / 2) / width,
+        ((top + bottom) / 2) / height,
+        (right - left) / width,
+        (bottom - top) / height,
+    )
+
+
 def validate_icon_assets(project_root: Path) -> list[str]:
     failures: list[str] = []
     assets = (
@@ -123,6 +282,9 @@ def validate_icon_assets(project_root: Path) -> list[str]:
 
     appearances: set[str] = set()
     appearance_digests: dict[str, str] = {}
+    appearance_geometry: dict[
+        str, tuple[float, float, float, float]
+    ] = {}
     for image in images:
         if not isinstance(image, dict):
             continue
@@ -153,6 +315,9 @@ def validate_icon_assets(project_root: Path) -> list[str]:
                 appearance_digests[appearance] = hashlib.sha256(
                     icon_path.read_bytes()
                 ).hexdigest()
+                geometry = png_subject_geometry(icon_path)
+                if geometry is not None:
+                    appearance_geometry[appearance] = geometry
     if appearances != {"light", "dark", "tinted"}:
         failures.append(
             "App icon must define light, dark, and tinted appearances"
@@ -161,6 +326,23 @@ def validate_icon_assets(project_root: Path) -> list[str]:
         failures.append(
             "App icon appearance variants must contain distinct artwork"
         )
+    if set(appearance_geometry) == {"light", "dark", "tinted"}:
+        light_geometry = appearance_geometry["light"]
+        if any(
+            any(
+                abs(value - reference) > tolerance
+                for value, reference, tolerance in zip(
+                    appearance_geometry[appearance],
+                    light_geometry,
+                    (0.04, 0.04, 0.08, 0.08),
+                )
+            )
+            for appearance in ("dark", "tinted")
+        ):
+            failures.append(
+                "App icon appearance variants must share centered "
+                "subject geometry"
+            )
 
     in_app_icon = assets / "HermesAppIcon.imageset"
     in_app_contents = json.loads(
