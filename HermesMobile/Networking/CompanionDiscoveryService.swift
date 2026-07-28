@@ -307,7 +307,7 @@ actor CompanionDiscoveryService: CompanionDiscoveryServing {
 
     private let companionURL: URL
     private let keychain: any KeychainStoring
-    private let session: URLSession
+    nonisolated let session: URLSession
     private let decoder = JSONDecoder()
 
     init(
@@ -317,7 +317,8 @@ actor CompanionDiscoveryService: CompanionDiscoveryServing {
     ) {
         self.companionURL = companionURL
         self.keychain = keychain
-        self.session = session ?? Self.makeSession()
+        self.session =
+            session ?? CompanionSessionPool.shared.requestSession
     }
 
     func fetch() async throws -> CompanionDiscoveryCatalog {
@@ -422,18 +423,6 @@ actor CompanionDiscoveryService: CompanionDiscoveryServing {
         }
     }
 
-    private nonisolated static func makeSession() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.httpCookieStorage = nil
-        configuration.httpCookieAcceptPolicy = .never
-        configuration.httpShouldSetCookies = false
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        return URLSession(
-            configuration: configuration,
-            delegate: CompanionRedirectBlocker(),
-            delegateQueue: nil
-        )
-    }
 }
 
 @MainActor
