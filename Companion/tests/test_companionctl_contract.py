@@ -510,6 +510,8 @@ class CompanionControlContractTests(unittest.TestCase):
             installed_python.write_text(
                 "#!/bin/sh\n"
                 'printf "%s\\n" "$*" >> "$COMPANIONCTL_COMMAND_LOG"\n'
+                'printf "PYTHONPATH=%s\\n" "$PYTHONPATH" '
+                '>> "$COMPANIONCTL_COMMAND_LOG"\n'
                 'printf "disposable-pairing-secret\\n"\n',
                 encoding="utf-8",
             )
@@ -524,6 +526,7 @@ class CompanionControlContractTests(unittest.TestCase):
                 "180",
                 environment={
                     "COMPANIONCTL_COMMAND_LOG": str(command_log),
+                    "PYTHONPATH": "/existing/python/path",
                 },
             )
             self.assertEqual(0, pairing.returncode, pairing.stderr)
@@ -533,6 +536,14 @@ class CompanionControlContractTests(unittest.TestCase):
             )
             self.assertIn(
                 "-m hermex_companion pairing create --expires-in 180",
+                command_log.read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                (
+                    "PYTHONPATH="
+                    f"{current.resolve() / 'Companion' / 'src'}"
+                    f"{os.pathsep}/existing/python/path"
+                ),
                 command_log.read_text(encoding="utf-8"),
             )
 
