@@ -514,6 +514,123 @@ final class SessionRepositoryTests: CompanionHTTPTestCase {
     }
 
     @MainActor
+    func testCreatedEmptySessionRemainsImmediatelyNavigableWithoutListReload() async throws {
+        let created = SessionSummary(
+            sessionId: "new-session",
+            title: "Untitled Session",
+            messageCount: 0,
+            userMessageCount: 0
+        )
+        XCTAssertFalse(created.shouldAppearInSessionList)
+        let repository = CreateSessionStubRepository(created: created)
+        let viewModel = CompanionSessionListViewModel(
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            )
+        )
+
+        let result = await viewModel.createSession()
+
+        XCTAssertEqual(created, result)
+        XCTAssertTrue(viewModel.sessions.isEmpty)
+        XCTAssertEqual(
+            created,
+            viewModel.sessionForNavigation(id: created.id)
+        )
+        let requests = await repository.recordedCreateRequests
+        XCTAssertEqual([SessionCreateRequest()], requests)
+        let listRequestCount = await repository.listRequestCount
+        XCTAssertEqual(0, listRequestCount)
+    }
+
+    @MainActor
+    func testHistoryHidesRawToolResultsButKeepsTheirToolActivity() async throws {
+        let summary = SessionSummary(
+            sessionId: "tool-session",
+            title: "Tool history"
+        )
+        let toolRequest = ChatMessage(
+            role: "assistant",
+            content: nil,
+            timestamp: 2,
+            messageId: "assistant-tools",
+            toolCalls: [
+                .object([
+                    "id": .string("call-search"),
+                    "type": .string("function"),
+                    "function": .object([
+                        "name": .string("web_search"),
+                        "arguments": .string("{}"),
+                    ]),
+                ]),
+            ]
+        )
+        let rawToolResult = ChatMessage(
+            role: "tool",
+            content: """
+            <untrusted_tool_result source="web_search">
+            {"success":true}
+            </untrusted_tool_result>
+            """,
+            timestamp: 3,
+            messageId: "tool-result",
+            toolCallId: "call-search"
+        )
+        let repository = HistoryStubSessionRepository(
+            detail: summary,
+            history: SessionHistory(
+                sessionID: "tool-session",
+                messages: [
+                    ChatMessage(
+                        role: "user",
+                        content: "Research this",
+                        timestamp: 1,
+                        messageId: "user"
+                    ),
+                    toolRequest,
+                    rawToolResult,
+                    ChatMessage(
+                        role: "assistant",
+                        content: "Final answer",
+                        timestamp: 4,
+                        messageId: "assistant-final"
+                    ),
+                ]
+            )
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: summary,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            )
+        )
+
+        let loaded = await viewModel.load()
+
+        XCTAssertTrue(loaded)
+        XCTAssertEqual(4, viewModel.allMessages.count)
+        XCTAssertEqual(
+            ["user", "assistant", "assistant"],
+            viewModel.visibleMessages.compactMap(\.role)
+        )
+        XCTAssertFalse(viewModel.visibleMessages.contains {
+            $0.content?.contains("<untrusted_tool_result") == true
+        })
+        let activity = viewModel.durableToolActivity(
+            anchoredTo: toolRequest
+        )
+        let toolCalls = activity.flatMap(\.toolCalls)
+        XCTAssertEqual(["web_search"], toolCalls.map(\.name))
+        XCTAssertTrue(
+            toolCalls.first?.preview?.contains(
+                "<untrusted_tool_result"
+            ) == true
+        )
+    }
+
+    @MainActor
     func testFailedRemoteDeleteKeepsSessionInList() async throws {
         let session = SessionSummary(
             sessionId: "session-1",
@@ -635,6 +752,54 @@ final class SessionRepositoryTests: CompanionHTTPTestCase {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
         return URLSession(configuration: configuration)
+    }
+}
+
+private actor CreateSessionStubRepository: SessionRepository {
+    let created: SessionSummary
+    private(set) var recordedCreateRequests: [SessionCreateRequest] = []
+    private(set) var listRequestCount = 0
+
+    init(created: SessionSummary) {
+        self.created = created
+    }
+
+    func listSessions(_ query: SessionListQuery) async throws -> SessionPage {
+        listRequestCount += 1
+        throw SessionRepositoryError.unexpectedResponse
+    }
+
+    func createSession(
+        _ request: SessionCreateRequest
+    ) async throws -> SessionSummary {
+        recordedCreateRequests.append(request)
+        return created
+    }
+
+    func session(id: String) async throws -> SessionSummary {
+        throw SessionRepositoryError.unexpectedResponse
+    }
+
+    func updateSession(
+        id: String,
+        request: SessionUpdateRequest
+    ) async throws -> SessionSummary {
+        throw SessionRepositoryError.unexpectedResponse
+    }
+
+    func deleteSession(id: String) async throws -> Bool {
+        throw SessionRepositoryError.unexpectedResponse
+    }
+
+    func forkSession(
+        id: String,
+        request: SessionForkRequest
+    ) async throws -> SessionSummary {
+        throw SessionRepositoryError.unexpectedResponse
+    }
+
+    func messageHistory(id: String) async throws -> SessionHistory {
+        throw SessionRepositoryError.unexpectedResponse
     }
 }
 

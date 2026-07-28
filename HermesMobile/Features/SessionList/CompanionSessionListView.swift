@@ -12,6 +12,7 @@ struct CompanionSessionListView: View {
     let connection: CompanionConnection
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var viewModel: CompanionSessionListViewModel
     @State private var searchText = ""
     @State private var isConfirmingForget = false
@@ -281,8 +282,7 @@ struct CompanionSessionListView: View {
     }
 
     private var selectedSession: SessionSummary? {
-        guard let selectedSessionID else { return nil }
-        return viewModel.sessions.first { $0.id == selectedSessionID }
+        viewModel.sessionForNavigation(id: selectedSessionID)
     }
 
     private func createSession() {
@@ -290,10 +290,11 @@ struct CompanionSessionListView: View {
         isCreatingSession = true
         Task {
             defer { isCreatingSession = false }
-            if let created = await viewModel.createSession(
-                modelContext: modelContext
-            ) {
+            if let created = await viewModel.createSession() {
                 selectedSessionID = created.id
+                if horizontalSizeClass != .regular {
+                    columnVisibility = .detailOnly
+                }
             }
         }
     }

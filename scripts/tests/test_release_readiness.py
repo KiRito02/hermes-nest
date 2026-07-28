@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import plistlib
+import struct
 import subprocess
 import sys
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
 
 
@@ -364,6 +366,96 @@ class ReleaseReadinessCLITests(unittest.TestCase):
         self.assertIn(
             "App icon appearance variants must contain distinct artwork",
             result.stderr,
+        )
+
+    def test_misaligned_icon_appearance_artwork_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_app_only_fixture(root)
+            icons = (
+                root
+                / "HermesMobile"
+                / "Resources"
+                / "Assets.xcassets"
+                / "AppIcon.appiconset"
+            )
+            self._write_test_png(
+                icons / "hermes_nest_light_icon.png",
+                background=(252, 245, 237),
+                subject=(0, 180, 200),
+                subject_box=(8, 7, 24, 25),
+            )
+            self._write_test_png(
+                icons / "hermes_nest_dark_icon.png",
+                background=(13, 19, 26),
+                subject=(0, 180, 200),
+                subject_box=(2, 2, 12, 12),
+            )
+            self._write_test_png(
+                icons / "hermes_nest_tinted_icon.png",
+                background=(251, 251, 251),
+                subject=(80, 80, 80),
+                subject_box=(8, 7, 24, 25),
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(CHECKER),
+                    "--project-root",
+                    str(root),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn(
+            "App icon appearance variants must share centered subject geometry",
+            result.stderr,
+        )
+
+    @staticmethod
+    def _write_test_png(
+        path: Path,
+        *,
+        background: tuple[int, int, int],
+        subject: tuple[int, int, int],
+        subject_box: tuple[int, int, int, int],
+    ) -> None:
+        width = 32
+        height = 32
+        left, top, right, bottom = subject_box
+        rows = []
+        for y in range(height):
+            row = bytearray()
+            for x in range(width):
+                color = (
+                    subject
+                    if left <= x < right and top <= y < bottom
+                    else background
+                )
+                row.extend(color)
+            rows.append(b"\x00" + bytes(row))
+
+        def chunk(kind: bytes, payload: bytes) -> bytes:
+            checksum = zlib.crc32(kind + payload) & 0xFFFFFFFF
+            return (
+                struct.pack(">I", len(payload))
+                + kind
+                + payload
+                + struct.pack(">I", checksum)
+            )
+
+        path.write_bytes(
+            b"\x89PNG\r\n\x1a\n"
+            + chunk(
+                b"IHDR",
+                struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0),
+            )
+            + chunk(b"IDAT", zlib.compress(b"".join(rows)))
+            + chunk(b"IEND", b"")
         )
 
     @staticmethod

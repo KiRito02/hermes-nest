@@ -97,6 +97,7 @@ final class CompanionSessionListViewModel {
     private(set) var errorMessage: String?
     private(set) var mutationErrorMessage: String?
     private(set) var hasMore = false
+    private var pendingCreatedSession: SessionSummary?
 
     private let repository: any SessionRepository
     private let companionURL: URL
@@ -202,20 +203,28 @@ final class CompanionSessionListViewModel {
         }
     }
 
-    func createSession(modelContext: ModelContext? = nil) async -> SessionSummary? {
+    func createSession() async -> SessionSummary? {
         mutationErrorMessage = nil
         do {
             let created = try await repository.createSession(
                 SessionCreateRequest()
             )
-            resetPagination()
-            await loadInitial(modelContext: modelContext)
+            pendingCreatedSession = created
             return created
         } catch {
             guard !(error is CancellationError) else { return nil }
             mutationErrorMessage = error.localizedDescription
             return nil
         }
+    }
+
+    func sessionForNavigation(id: String?) -> SessionSummary? {
+        guard let id else { return nil }
+        if let listed = sessions.first(where: { $0.id == id }) {
+            return listed
+        }
+        guard pendingCreatedSession?.id == id else { return nil }
+        return pendingCreatedSession
     }
 
     func deleteSession(
@@ -231,6 +240,7 @@ final class CompanionSessionListViewModel {
             resetPagination()
             await loadInitial(modelContext: modelContext)
             sessions.removeAll { $0.sessionId == sessionID }
+            clearPendingCreatedSession(id: sessionID)
             cacheCurrentList(in: modelContext)
             return true
         } catch {
@@ -247,6 +257,7 @@ final class CompanionSessionListViewModel {
         resetPagination()
         await loadInitial(modelContext: modelContext)
         sessions.removeAll { $0.sessionId == id }
+        clearPendingCreatedSession(id: id)
         cacheCurrentList(in: modelContext)
     }
 
@@ -256,6 +267,11 @@ final class CompanionSessionListViewModel {
     ) {
         sessions.removeAll { $0.sessionId == session.sessionId }
         sessions = Self.visibleUniqueSessions([session] + sessions)
+        if sessions.contains(where: { $0.id == session.id }) {
+            clearPendingCreatedSession(id: session.id)
+        } else if pendingCreatedSession?.id == session.id {
+            pendingCreatedSession = session
+        }
         cacheSession(session, in: modelContext)
     }
 
@@ -329,6 +345,11 @@ final class CompanionSessionListViewModel {
     private func resetPagination() {
         nextOffset = 0
         hasMore = false
+    }
+
+    private func clearPendingCreatedSession(id: String) {
+        guard pendingCreatedSession?.id == id else { return }
+        pendingCreatedSession = nil
     }
 
     private func shouldUseCache(for error: Error) -> Bool {
@@ -531,7 +552,10 @@ final class CompanionSessionHistoryViewModel {
 
     var visibleMessages: [ChatMessage] {
         guard visibleStartIndex < allMessages.count else { return [] }
-        return Array(allMessages[visibleStartIndex...])
+        return allMessages[visibleStartIndex...].filter { message in
+            message.role != "tool"
+                && !TranscriptTurnClassifier.isToolResultOnlyMessage(message)
+        }
     }
 
     func durableReasoning(
