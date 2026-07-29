@@ -107,7 +107,7 @@ actor LiveSessionRepository: SessionRepository {
 
     let companionURL: URL
     let keychain: any KeychainStoring
-    let session: URLSession
+    nonisolated let session: URLSession
     let decoder: JSONDecoder
 
     init(
@@ -117,7 +117,8 @@ actor LiveSessionRepository: SessionRepository {
     ) {
         self.companionURL = companionURL
         self.keychain = keychain
-        self.session = session ?? Self.makeSession()
+        self.session =
+            session ?? CompanionSessionPool.shared.requestSession
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -299,18 +300,6 @@ actor LiveSessionRepository: SessionRepository {
         }
     }
 
-    private nonisolated static func makeSession() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.httpCookieStorage = nil
-        configuration.httpCookieAcceptPolicy = .never
-        configuration.httpShouldSetCookies = false
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        return URLSession(
-            configuration: configuration,
-            delegate: CompanionRedirectBlocker(),
-            delegateQueue: nil
-        )
-    }
 }
 
 private struct GatewaySessionListPayload: Decodable {

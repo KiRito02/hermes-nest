@@ -2,6 +2,56 @@ import XCTest
 @testable import HermesMobile
 
 final class CompanionConnectionServiceTests: CompanionHTTPTestCase {
+    func testRepeatedDefaultCompanionServiceGraphsUseTwoBoundedSessionPools() throws {
+        let companionURL = try XCTUnwrap(
+            URL(string: "https://companion.example.test")
+        )
+        var requestSessions: [URLSession] = []
+        var eventSessions: [URLSession] = []
+
+        for _ in 0..<3 {
+            let runService = ConversationRunService(
+                companionURL: companionURL
+            )
+            requestSessions.append(
+                contentsOf: [
+                    LiveCompanionConnectionService().session,
+                    CompanionModelService(
+                        companionURL: companionURL
+                    ).session,
+                    LiveSessionRepository(
+                        companionURL: companionURL
+                    ).session,
+                    runService.session,
+                    CompanionWorkspaceService(
+                        companionURL: companionURL
+                    ).session,
+                    CompanionDiscoveryService(
+                        companionURL: companionURL
+                    ).session,
+                ]
+            )
+            eventSessions.append(runService.eventSession)
+        }
+
+        let requestSession = try XCTUnwrap(requestSessions.first)
+        XCTAssertEqual(18, requestSessions.count)
+        XCTAssertTrue(requestSessions.allSatisfy { $0 === requestSession })
+
+        let eventSession = try XCTUnwrap(eventSessions.first)
+        XCTAssertEqual(3, eventSessions.count)
+        XCTAssertTrue(eventSessions.allSatisfy { $0 === eventSession })
+        XCTAssertFalse(eventSession === requestSession)
+        assertCompanionSessionConfiguration(
+            requestSession,
+            maximumConnectionsPerHost: 2
+        )
+        assertCompanionSessionConfiguration(
+            eventSession,
+            maximumConnectionsPerHost: 1
+        )
+    }
+
     func testMessageAttachmentDecodesOpaqueCompanionDownloadPath() throws {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -1240,6 +1290,49 @@ final class CompanionConnectionServiceTests: CompanionHTTPTestCase {
             httpVersion: nil,
             headerFields: ["Content-Type": "application/json"]
         )!
+    }
+
+    private func assertCompanionSessionConfiguration(
+        _ session: URLSession,
+        maximumConnectionsPerHost: Int,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let configuration = session.configuration
+        XCTAssertNil(
+            configuration.httpCookieStorage,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            .never,
+            configuration.httpCookieAcceptPolicy,
+            file: file,
+            line: line
+        )
+        XCTAssertFalse(
+            configuration.httpShouldSetCookies,
+            file: file,
+            line: line
+        )
+        XCTAssertNil(configuration.urlCache, file: file, line: line)
+        XCTAssertEqual(
+            .reloadIgnoringLocalCacheData,
+            configuration.requestCachePolicy,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            maximumConnectionsPerHost,
+            configuration.httpMaximumConnectionsPerHost,
+            file: file,
+            line: line
+        )
+        XCTAssertTrue(
+            session.delegate is CompanionRedirectBlocker,
+            file: file,
+            line: line
+        )
     }
 
 }

@@ -50,6 +50,7 @@
 		E00600000000000000000004 /* SessionRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00600000000000000000014 /* SessionRepositoryTests.swift */; };
 		E00700000000000000000001 /* SessionRepository+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00700000000000000000011 /* SessionRepository+Lifecycle.swift */; };
 		E00800000000000000000001 /* ConversationRunService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00800000000000000000011 /* ConversationRunService.swift */; };
+		F03100000000000000000001 /* CompanionSessionPool.swift in Sources */ = {isa = PBXBuildFile; fileRef = F03100000000000000000011 /* CompanionSessionPool.swift */; };
 		F02100000000000000000001 /* CompanionWorkspaceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02100000000000000000011 /* CompanionWorkspaceService.swift */; };
 		F02200000000000000000001 /* CompanionWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02200000000000000000011 /* CompanionWorkspaceView.swift */; };
 		F02300000000000000000001 /* CompanionMemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02300000000000000000011 /* CompanionMemoryView.swift */; };
@@ -377,6 +378,7 @@
 		E00600000000000000000014 /* SessionRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRepositoryTests.swift; sourceTree = "<group>"; };
 		E00700000000000000000011 /* SessionRepository+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionRepository+Lifecycle.swift"; sourceTree = "<group>"; };
 		E00800000000000000000011 /* ConversationRunService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationRunService.swift; sourceTree = "<group>"; };
+		F03100000000000000000011 /* CompanionSessionPool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionSessionPool.swift; sourceTree = "<group>"; };
 		F02100000000000000000011 /* CompanionWorkspaceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionWorkspaceService.swift; sourceTree = "<group>"; };
 		F02200000000000000000011 /* CompanionWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionWorkspaceView.swift; sourceTree = "<group>"; };
 		F02300000000000000000011 /* CompanionMemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionMemoryView.swift; sourceTree = "<group>"; };
@@ -859,6 +861,7 @@
 				E00600000000000000000011 /* SessionRepository.swift */,
 				E00700000000000000000011 /* SessionRepository+Lifecycle.swift */,
 				E00800000000000000000011 /* ConversationRunService.swift */,
+				F03100000000000000000011 /* CompanionSessionPool.swift */,
 				F02400000000000000000011 /* CompanionWorkspaceModels.swift */,
 				F02100000000000000000011 /* CompanionWorkspaceService.swift */,
 				C04000000000000000000011 /* APIClient+Sessions.swift */,
@@ -1317,6 +1320,7 @@
 				E00600000000000000000001 /* SessionRepository.swift in Sources */,
 				E00700000000000000000001 /* SessionRepository+Lifecycle.swift in Sources */,
 				E00800000000000000000001 /* ConversationRunService.swift in Sources */,
+				F03100000000000000000001 /* CompanionSessionPool.swift in Sources */,
 				F02400000000000000000001 /* CompanionWorkspaceModels.swift in Sources */,
 				F02100000000000000000001 /* CompanionWorkspaceService.swift in Sources */,
 				F02200000000000000000001 /* CompanionWorkspaceView.swift in Sources */,

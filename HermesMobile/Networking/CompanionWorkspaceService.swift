@@ -6,7 +6,7 @@ actor CompanionWorkspaceService: CompanionWorkspaceServing {
 
     private let companionURL: URL
     private let keychain: any KeychainStoring
-    private let session: URLSession
+    nonisolated let session: URLSession
     private let decoder = JSONDecoder()
 
     init(
@@ -16,7 +16,8 @@ actor CompanionWorkspaceService: CompanionWorkspaceServing {
     ) {
         self.companionURL = companionURL
         self.keychain = keychain
-        self.session = session ?? Self.makeSession()
+        self.session =
+            session ?? CompanionSessionPool.shared.requestSession
     }
 
     func roots() async throws -> [CompanionWorkspaceRoot] {
@@ -557,18 +558,6 @@ actor CompanionWorkspaceService: CompanionWorkspaceServing {
         }
     }
 
-    private static func makeSession() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.httpCookieStorage = nil
-        configuration.httpCookieAcceptPolicy = .never
-        configuration.httpShouldSetCookies = false
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        return URLSession(
-            configuration: configuration,
-            delegate: CompanionRedirectBlocker(),
-            delegateQueue: nil
-        )
-    }
 }
 
 private struct CompanionWorkspaceRootsEnvelope: Decodable {

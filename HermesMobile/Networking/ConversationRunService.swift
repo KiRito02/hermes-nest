@@ -547,17 +547,24 @@ actor ConversationRunService: ConversationRunServing {
 
     private let companionURL: URL
     private let keychain: any KeychainStoring
-    private let session: URLSession
+    nonisolated let session: URLSession
+    nonisolated let eventSession: URLSession
     private let decoder: JSONDecoder
 
     init(
         companionURL: URL,
         keychain: any KeychainStoring = KeychainStore(),
-        session: URLSession? = nil
+        session: URLSession? = nil,
+        eventSession: URLSession? = nil
     ) {
         self.companionURL = companionURL
         self.keychain = keychain
-        self.session = session ?? Self.makeSession()
+        self.session =
+            session ?? CompanionSessionPool.shared.requestSession
+        self.eventSession =
+            eventSession
+            ?? session
+            ?? CompanionSessionPool.shared.eventSession
 
         let decoder = JSONDecoder()
         self.decoder = decoder
@@ -702,7 +709,7 @@ actor ConversationRunService: ConversationRunServing {
             forHTTPHeaderField: "Authorization"
         )
 
-        let session = self.session
+        let session = eventSession
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -948,18 +955,6 @@ actor ConversationRunService: ConversationRunServing {
         }
     }
 
-    private nonisolated static func makeSession() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.httpCookieStorage = nil
-        configuration.httpCookieAcceptPolicy = .never
-        configuration.httpShouldSetCookies = false
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        return URLSession(
-            configuration: configuration,
-            delegate: CompanionRedirectBlocker(),
-            delegateQueue: nil
-        )
-    }
 }
 
 private struct RunHistoryMessage: Encodable {

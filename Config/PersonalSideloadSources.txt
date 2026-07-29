@@ -18,6 +18,7 @@ CompanionDiscoveryService.swift
 CompanionDiscoveryView.swift
 CompanionMemoryView.swift
 CompanionPresentationSupport.swift
+CompanionSessionPool.swift
 CompanionSessionListView.swift
 CompanionSessionListViewModel.swift
 CompanionWorkspaceModels.swift
