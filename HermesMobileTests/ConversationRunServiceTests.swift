@@ -701,6 +701,7 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         XCTAssertEqual("session-1", startRequests[0].sessionID)
         XCTAssertEqual(["run-1"], statusRunIDs)
         XCTAssertEqual(.completed, viewModel.runState)
+        XCTAssertNil(viewModel.runStatusText)
         XCTAssertEqual(100, viewModel.latestRunUsage?.totalTokens)
     }
 
@@ -754,6 +755,7 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         XCTAssertTrue(didSelectModel)
         XCTAssertTrue(didSelectReasoning)
         XCTAssertTrue(didSend)
+        XCTAssertNil(viewModel.runStatusText)
 
         let locks = await modelService.lockedSelections
         XCTAssertEqual(2, locks.count)

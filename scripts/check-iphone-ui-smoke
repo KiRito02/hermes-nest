@@ -87,7 +87,7 @@ for forbidden in ["URLSession", "Keychain", "API_SERVER_KEY", "deviceCredential"
         )
 
 attachment_entry = SESSION_VIEW.split(
-    "composerInputLayout {", maxsplit=1
+    "private var companionComposer: some View", maxsplit=1
 )[1].split("TextField(", maxsplit=1)[0]
 for snippet, description in [
     ("showsAttachmentUnavailable = true", "visible attachment explanation action"),
@@ -109,10 +109,21 @@ if "Menu {" in attachment_entry or ".disabled(true)" in attachment_entry:
 for snippet, description in [
     ("ChatActionButtonPalette.resolve", "explicit send-button palette"),
     ("CompanionSendButtonStyle()", "custom high-contrast send style"),
-    ("ViewThatFits(in: .horizontal)", "width-adaptive composer controls"),
     (
-        "CompanionComposerControlLabel",
-        "quiet shared composer control treatment",
+        ".scrollDismissesKeyboard(.interactively)",
+        "interactive transcript keyboard dismissal",
+    ),
+    (
+        "dismissComposerKeyboard()",
+        "empty-transcript keyboard dismissal",
+    ),
+    (
+        "compactComposerContextMenu",
+        "consolidated model, reasoning, and usage menu",
+    ),
+    (
+        "dynamicTypeSize.isAccessibilitySize",
+        "accessibility-size composer fallback",
     ),
     (
         "Text(option.presentationName)",
@@ -150,6 +161,20 @@ for snippet, description in [
     ),
 ]:
     require(SESSION_VIEW, snippet, description)
+
+composer = SESSION_VIEW.split(
+    "private var companionComposer: some View", maxsplit=1
+)[1].split("private var attachmentStrip: some View", maxsplit=1)[0]
+if ".background(.regularMaterial)" in composer:
+    raise SystemExit(
+        "The chat composer must float above the transcript instead of "
+        "painting a full-width material slab."
+    )
+if "\n            modelControls\n" in composer:
+    raise SystemExit(
+        "Model, reasoning, and usage must not remain as a persistent "
+        "three-control row above the input."
+    )
 for snippet, description in [
     ("actor CompanionAttachmentStager", "isolated attachment stager"),
     (".isRegularFileKey", "regular-file drop validation"),

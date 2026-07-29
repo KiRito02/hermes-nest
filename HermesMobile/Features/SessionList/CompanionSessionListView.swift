@@ -622,7 +622,14 @@ struct CompanionSessionHistoryView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
-        .background(HermesNestDesign.canvas)
+        .scrollDismissesKeyboard(.interactively)
+        .background {
+            HermesNestDesign.canvas
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    dismissComposerKeyboard()
+                }
+        }
         .background {
             ZStack {
                 ChatScrollObserver(
@@ -924,7 +931,10 @@ struct CompanionSessionHistoryView: View {
     }
 
     private var companionComposer: some View {
-        VStack(spacing: HermesNestDesign.Spacing.small) {
+        VStack(
+            alignment: .leading,
+            spacing: HermesNestDesign.Spacing.small
+        ) {
             if let status = viewModel.runStatusText {
                 Text(status)
                     .font(HermesNestDesign.Typography.metadata)
@@ -943,7 +953,24 @@ struct CompanionSessionHistoryView: View {
                 attachmentStrip
             }
 
-            modelControls
+            if let error = viewModel.modelSelectionErrorMessage {
+                HStack(spacing: 8) {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .lineLimit(2)
+                    Spacer(minLength: 8)
+                    if viewModel.modelGroups.isEmpty {
+                        Button("Retry") {
+                            Task {
+                                await viewModel.loadModelOptions(refresh: true)
+                            }
+                        }
+                        .font(HermesNestDesign.Typography.control)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             composerInputLayout {
                 Button {
@@ -1038,34 +1065,35 @@ struct CompanionSessionHistoryView: View {
                     .accessibilityIdentifier("companion.run.send")
                 }
             }
-            .padding(.horizontal, HermesNestDesign.Spacing.large)
-            .padding(.vertical, HermesNestDesign.Spacing.medium)
-            .background(
-                HermesNestDesign.sidebar,
-                in: RoundedRectangle(
-                    cornerRadius: HermesNestDesign.composerCornerRadius,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: HermesNestDesign.composerCornerRadius,
-                    style: .continuous
-                )
-                .stroke(HermesNestDesign.subtleBorder, lineWidth: 0.5)
-            }
-            .shadow(
-                color: .black.opacity(0.08),
-                radius: 14,
-                y: 4
-            )
+
+            compactComposerContextMenu
         }
+        .padding(.horizontal, HermesNestDesign.Spacing.medium)
+        .padding(.vertical, 10)
+        .background(
+            HermesNestDesign.sidebar,
+            in: RoundedRectangle(
+                cornerRadius: HermesNestDesign.composerCornerRadius,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: HermesNestDesign.composerCornerRadius,
+                style: .continuous
+            )
+            .stroke(HermesNestDesign.subtleBorder, lineWidth: 0.5)
+        }
+        .shadow(
+            color: .black.opacity(0.08),
+            radius: 14,
+            y: 4
+        )
         .padding(.horizontal, HermesNestDesign.Spacing.large)
         .padding(.top, HermesNestDesign.Spacing.small)
         .padding(.bottom, HermesNestDesign.Spacing.xSmall)
         .frame(maxWidth: HermesNestDesign.transcriptMaximumWidth)
         .frame(maxWidth: .infinity)
-        .background(.regularMaterial)
         .overlay {
             if isDropTargeted {
                 RoundedRectangle(
@@ -1152,80 +1180,25 @@ struct CompanionSessionHistoryView: View {
         }
     }
 
-    @ViewBuilder
-    private var modelControls: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let error = viewModel.modelSelectionErrorMessage {
-                HStack(spacing: 8) {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .lineLimit(2)
-                    Spacer(minLength: 8)
-                    if viewModel.modelGroups.isEmpty {
-                        Button("Retry") {
-                            Task {
-                                await viewModel.loadModelOptions(refresh: true)
-                            }
-                        }
-                        .font(HermesNestDesign.Typography.control)
-                    }
+    private var compactComposerContextMenu: some View {
+        Menu {
+            if !viewModel.modelGroups.isEmpty
+                || viewModel.isLoadingModelOptions {
+                Button {
+                    preserveComposerFocus()
+                    showsModelPicker = true
+                } label: {
+                    Label("Choose model", systemImage: "cpu")
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            adaptiveModelControls
-        }
-    }
-
-    @ViewBuilder
-    private var adaptiveModelControls: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            VStack(alignment: .leading, spacing: 6) {
-                modelControlItems
-            }
-        } else {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 6) {
-                    modelControlItems
-                    Spacer(minLength: 0)
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    modelControlItems
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var modelControlItems: some View {
-        if !viewModel.modelGroups.isEmpty
-            || viewModel.isLoadingModelOptions {
-            Button {
-                preserveComposerFocus()
-                showsModelPicker = true
-            } label: {
-                CompanionComposerControlLabel(
-                    title: viewModel.selectedModelDisplayName,
-                    systemImage: "cpu",
-                    showsDisclosure: true,
-                    isLoading: viewModel.isLoadingModelOptions
+                .disabled(
+                    !viewModel.canChangeModel
+                        || viewModel.modelGroups.isEmpty
                 )
+                .accessibilityIdentifier("companion.model.picker")
             }
-            .buttonStyle(.chatTactile(.compactControl))
-            .hoverEffect(.highlight)
-            .help("Choose model")
-            .disabled(
-                !viewModel.canChangeModel
-                    || viewModel.modelGroups.isEmpty
-            )
-            .accessibilityLabel("Choose model")
-            .accessibilityValue(viewModel.selectedModelDisplayName)
-            .accessibilityIdentifier("companion.model.picker")
 
             if viewModel.selectedModelSupportsReasoning {
-                Menu {
+                Section("Reasoning") {
                     ForEach(
                         CompanionReasoningEffort.allCases,
                         id: \.self
@@ -1247,40 +1220,59 @@ struct CompanionSessionHistoryView: View {
                                 Text(effort.displayName)
                             }
                         }
+                        .disabled(!viewModel.canChangeModel)
                     }
-                } label: {
-                    CompanionComposerControlLabel(
-                        title: viewModel.selectedReasoningDisplayName,
-                        systemImage: "brain",
-                        showsDisclosure: true
-                    )
                 }
-                .buttonStyle(.chatTactile(.compactControl))
-                .hoverEffect(.highlight)
-                .help("Choose reasoning effort")
-                .disabled(!viewModel.canChangeModel)
-                .accessibilityLabel("Choose reasoning effort")
-                .accessibilityIdentifier("companion.reasoning.picker")
             }
-        }
 
-        Button {
-            preserveComposerFocus()
-            showsUsage = true
+            Divider()
+
+            Button {
+                preserveComposerFocus()
+                showsUsage = true
+            } label: {
+                Label(usageControlLabel, systemImage: "chart.bar.xaxis")
+            }
+            .accessibilityIdentifier("companion.usage")
         } label: {
-            CompanionComposerControlLabel(
-                title: usageControlLabel,
-                systemImage: "chart.bar.xaxis"
-            )
+            HStack(spacing: 5) {
+                if viewModel.isLoadingModelOptions {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "brain")
+                }
+
+                Text(composerContextLabel)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+            }
+            .font(HermesNestDesign.Typography.control)
+            .foregroundStyle(.secondary)
+            .frame(minHeight: 24)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.chatTactile(.compactControl))
+        .buttonStyle(.plain)
         .hoverEffect(.highlight)
         .help("Model and token usage")
         .accessibilityLabel("Model and token usage")
+        .accessibilityValue(composerContextLabel)
         .accessibilityHint(
-            "Shows exact run and session usage. Context occupancy is shown only when Hermes reports it."
+            "Choose the model or reasoning effort, or view exact token usage."
         )
-        .accessibilityIdentifier("companion.usage")
+    }
+
+    private var composerContextLabel: String {
+        guard viewModel.selectedModelSupportsReasoning else {
+            return viewModel.selectedModelDisplayName
+        }
+        return [
+            viewModel.selectedModelDisplayName,
+            viewModel.selectedReasoningDisplayName
+        ].joined(separator: " · ")
     }
 
     private var usageControlLabel: String {
@@ -1296,7 +1288,9 @@ struct CompanionSessionHistoryView: View {
 
     private var composerInputLayout: AnyLayout {
         if dynamicTypeSize.isAccessibilitySize {
-            return AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+            return AnyLayout(
+                VStackLayout(alignment: .leading, spacing: 10)
+            )
         }
         return AnyLayout(HStackLayout(alignment: .bottom, spacing: 10))
     }
@@ -1312,6 +1306,10 @@ struct CompanionSessionHistoryView: View {
                 composerIsFocused = false
             }
         }
+    }
+
+    private func dismissComposerKeyboard() {
+        composerIsFocused = false
     }
 
     private func preserveComposerFocus() {
@@ -1667,51 +1665,6 @@ struct CompanionMessageRow: View, Equatable {
             in: .whitespacesAndNewlines
         )
         return trimmed.isEmpty ? nil : content
-    }
-}
-
-private struct CompanionComposerControlLabel: View {
-    let title: String
-    let systemImage: String
-    var showsDisclosure = false
-    var isLoading = false
-
-    var body: some View {
-        HStack(spacing: 5) {
-            if isLoading {
-                ProgressView()
-                    .controlSize(.small)
-            } else {
-                Image(systemName: systemImage)
-            }
-
-            Text(title)
-                .lineLimit(1)
-                .truncationMode(.middle)
-
-            if showsDisclosure {
-                Image(systemName: "chevron.down")
-                    .font(.caption2.weight(.semibold))
-            }
-        }
-        .font(HermesNestDesign.Typography.control)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 9)
-        .frame(minHeight: 32)
-        .background(
-            HermesNestDesign.raisedSurface,
-            in: Capsule()
-        )
-        .overlay {
-            Capsule()
-                .stroke(HermesNestDesign.subtleBorder, lineWidth: 0.5)
-        }
-        .contentShape(Capsule())
-        .chatMinimumHitTarget(
-            horizontalPadding: 4,
-            verticalPadding: 6,
-            in: Capsule()
-        )
     }
 }
 

@@ -931,21 +931,21 @@ final class CompanionSessionHistoryViewModel {
         case .idle:
             return nil
         case .starting:
-            return String(localized: "Starting...")
+            return nil
         case .streaming:
-            return String(localized: "Hermes is responding")
+            return nil
         case .waitingForApproval:
             return String(localized: "Hermes is waiting for your approval")
         case .transportDisconnected:
             return String(localized: "Live response disconnected · checking run")
         case .stopping:
-            return String(localized: "Stopping...")
+            return nil
         case .completed:
-            return String(localized: "Completed")
+            return nil
         case .failed(let message):
             return message ?? String(localized: "Run failed")
         case .cancelled:
-            return String(localized: "Cancelled")
+            return nil
         }
     }
 
