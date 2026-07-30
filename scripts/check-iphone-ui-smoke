@@ -114,6 +114,13 @@ for snippet, description in [
         "interactive transcript keyboard dismissal",
     ),
     (
+        ".defaultScrollAnchor(\n"
+        "            ChatScrollPolicy.initialTranscriptAnchor,\n"
+        "            for: .initialOffset\n"
+        "        )",
+        "initial-only transcript bottom anchor",
+    ),
+    (
         "dismissComposerKeyboard()",
         "empty-transcript keyboard dismissal",
     ),
@@ -161,6 +168,11 @@ for snippet, description in [
     ),
 ]:
     require(SESSION_VIEW, snippet, description)
+if ".defaultScrollAnchor(.bottom)" in SESSION_VIEW:
+    raise SystemExit(
+        "The Companion transcript must not reuse its initial bottom anchor "
+        "for keyboard-driven container size changes."
+    )
 
 composer = SESSION_VIEW.split(
     "private var companionComposer: some View", maxsplit=1

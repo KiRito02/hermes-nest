@@ -645,7 +645,10 @@ struct CompanionSessionHistoryView: View {
             \.chatIsUserInteractingWithScroll,
             isUserInteractingWithScroll
         )
-        .defaultScrollAnchor(.bottom)
+        .defaultScrollAnchor(
+            ChatScrollPolicy.initialTranscriptAnchor,
+            for: .initialOffset
+        )
         .safeAreaInset(edge: .bottom, spacing: 0) {
             companionComposer
         }
