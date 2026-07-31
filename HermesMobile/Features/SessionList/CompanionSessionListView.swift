@@ -5,6 +5,81 @@ import UIKit
 import UniformTypeIdentifiers
 import PhotosUI
 
+private struct CompanionNavigationAppearanceCompletionObserver:
+    UIViewControllerRepresentable
+{
+    let action: @MainActor () -> Void
+
+    func makeUIViewController(
+        context: Context
+    ) -> CompanionNavigationAppearanceObserverViewController {
+        CompanionNavigationAppearanceObserverViewController(action: action)
+    }
+
+    func updateUIViewController(
+        _ uiViewController:
+            CompanionNavigationAppearanceObserverViewController,
+        context: Context
+    ) {
+        uiViewController.action = action
+    }
+}
+
+@MainActor
+private final class CompanionNavigationAppearanceObserverViewController:
+    UIViewController
+{
+    var action: @MainActor () -> Void
+
+    private var isAwaitingTransitionCompletion = false
+    private var didReportAppearance = false
+
+    init(action: @escaping @MainActor () -> Void) {
+        self.action = action
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+        view.accessibilityElementsHidden = true
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        guard !didReportAppearance,
+              let coordinator = transitionCoordinator
+        else {
+            return
+        }
+        isAwaitingTransitionCompletion = true
+        coordinator.animate(alongsideTransition: nil) { [weak self] context in
+            guard let self else { return }
+            isAwaitingTransitionCompletion = false
+            guard !context.isCancelled else { return }
+            reportAppearanceIfNeeded()
+        }
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard !isAwaitingTransitionCompletion else { return }
+        reportAppearanceIfNeeded()
+    }
+
+    private func reportAppearanceIfNeeded() {
+        guard !didReportAppearance else { return }
+        didReportAppearance = true
+        action()
+    }
+}
+
 /// Native Companion-backed session management and paged history presentation.
 @MainActor
 struct CompanionSessionListView: View {
@@ -780,7 +855,7 @@ struct CompanionSessionHistoryView: View {
             }
         }
         .background {
-            NavigationAppearanceCompletionObserver {
+            CompanionNavigationAppearanceCompletionObserver {
                 didCompleteInitialAppearance = true
             }
             .allowsHitTesting(false)
