@@ -12,6 +12,7 @@ ChatScrollPolicy.swift
 ChatTactileButtonStyle.swift
 ChatTimelineAccessorySurface.swift
 ChatTranscriptSupportingViews.swift
+CompanionActiveRunStore.swift
 CompanionConnectionManager.swift
 CompanionConnectionService.swift
 CompanionDiscoveryService.swift

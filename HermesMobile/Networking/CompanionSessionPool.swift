@@ -15,16 +15,19 @@ final class CompanionSessionPool: @unchecked Sendable {
         let redirectBlocker = CompanionRedirectBlocker()
         requestSession = Self.makeSession(
             maximumConnectionsPerHost: 2,
+            supportsLongLivedRequests: false,
             redirectBlocker: redirectBlocker
         )
         eventSession = Self.makeSession(
             maximumConnectionsPerHost: 1,
+            supportsLongLivedRequests: true,
             redirectBlocker: redirectBlocker
         )
     }
 
     private static func makeSession(
         maximumConnectionsPerHost: Int,
+        supportsLongLivedRequests: Bool,
         redirectBlocker: CompanionRedirectBlocker
     ) -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
@@ -35,6 +38,12 @@ final class CompanionSessionPool: @unchecked Sendable {
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.httpMaximumConnectionsPerHost =
             maximumConnectionsPerHost
+        if supportsLongLivedRequests {
+            configuration.timeoutIntervalForRequest =
+                .greatestFiniteMagnitude
+            configuration.timeoutIntervalForResource =
+                .greatestFiniteMagnitude
+        }
         return URLSession(
             configuration: configuration,
             delegate: redirectBlocker,

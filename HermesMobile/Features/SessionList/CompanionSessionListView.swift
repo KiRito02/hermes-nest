@@ -486,7 +486,8 @@ struct CompanionSessionHistoryView: View {
                 supportsRunApprovals: supportsRunApprovals,
                 supportsModelSelection: supportsModelSelection,
                 modelService: modelService,
-                workspaceService: resolvedWorkspaceService
+                workspaceService: resolvedWorkspaceService,
+                activeRunStore: CompanionActiveRunStore.shared
             )
         )
     }
@@ -724,6 +725,9 @@ struct CompanionSessionHistoryView: View {
             if viewModel.allMessages.isEmpty {
                 await viewModel.load(modelContext: modelContext)
             }
+            await viewModel.resumeRunObservation(
+                modelContext: modelContext
+            )
             await viewModel.loadModelOptions()
             if supportsUploads {
                 await viewModel.restorePendingUploads()
@@ -907,6 +911,7 @@ struct CompanionSessionHistoryView: View {
         .onDisappear {
             droppedAttachmentTask?.cancel()
             attachmentUploadTask?.cancel()
+            viewModel.suspendRunObservation()
             viewModel.cancelAttachmentRetry()
             Task {
                 await viewModel.discardStagedDroppedAttachments()

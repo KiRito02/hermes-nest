@@ -645,6 +645,7 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
             "text/event-stream",
             request.value(forHTTPHeaderField: "Accept")
         )
+        XCTAssertGreaterThan(request.timeoutInterval, 24 * 60 * 60)
         XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
 
         guard
@@ -656,6 +657,43 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         }
         XCTAssertEqual("future.transport", terminal.transportEvent)
         XCTAssertEqual("run.completed", terminal.event)
+    }
+
+    func testSharedEventSessionDoesNotExpireAnIdleRunStream() {
+        let configuration =
+            CompanionSessionPool.shared.eventSession.configuration
+
+        XCTAssertGreaterThan(
+            configuration.timeoutIntervalForRequest,
+            24 * 60 * 60
+        )
+        XCTAssertGreaterThan(
+            configuration.timeoutIntervalForResource,
+            24 * 60 * 60
+        )
+    }
+
+    func testActiveRunStoreSurvivesProcessStoreRecreation() async throws {
+        let suiteName = "CompanionActiveRunStoreTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let key = CompanionActiveRunKey(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            sessionID: "session-1"
+        )
+        let record = CompanionActiveRunRecord(
+            runID: "run-1",
+            stopState: .confirmedStopping
+        )
+
+        let firstStore = CompanionActiveRunStore(defaults: defaults)
+        await firstStore.store(record, for: key)
+        let recreatedStore = CompanionActiveRunStore(defaults: defaults)
+
+        let restored = await recreatedStore.activeRun(for: key)
+        XCTAssertEqual(record, restored)
     }
 
     @MainActor
@@ -703,6 +741,774 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         XCTAssertEqual(.completed, viewModel.runState)
         XCTAssertNil(viewModel.runStatusText)
         XCTAssertEqual(100, viewModel.latestRunUsage?.totalTokens)
+    }
+
+    @MainActor
+    func testDisconnectRefreshesReasoningWhileSameRunIsStillRunning() async throws {
+        let session = try makeSessionSummary()
+        let runningHistory = [
+            ChatMessage(
+                role: "user",
+                content: "Compare the models",
+                timestamp: 1,
+                messageId: "user-1"
+            ),
+            ChatMessage(
+                role: "assistant",
+                content: nil,
+                timestamp: 2,
+                messageId: "reasoning-1",
+                reasoning: "Checking the current model documentation.",
+                toolCalls: [
+                    .object([
+                        "id": .string("tool-1"),
+                        "function": .object([
+                            "name": .string("web_search"),
+                            "arguments": .string(#"{"q":"models"}"#),
+                        ]),
+                    ])
+                ]
+            ),
+            ChatMessage(
+                role: "tool",
+                content: "Current model documentation",
+                timestamp: 3,
+                messageId: "tool-result-1",
+                toolCallId: "tool-1"
+            ),
+        ]
+        let repository = RunHistoryRepositoryStub(
+            session: session,
+            historyMessagesByCall: [2: runningHistory]
+        )
+        let runService = RunServiceStub(
+            eventResult: .disconnect,
+            statuses: [
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .running,
+                    sessionID: "session-1",
+                    lastEvent: "reasoning.available",
+                    output: nil,
+                    errorMessage: nil
+                )
+            ]
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: runService,
+            reconciliationDelayNanoseconds: 100_000_000
+        )
+        await viewModel.load()
+
+        let didSend = await viewModel.send("Compare the models")
+        XCTAssertTrue(didSend)
+        await waitUntil {
+            viewModel.durableReasoningGroups.map(\.text) == [
+                "Checking the current model documentation."
+            ]
+        }
+
+        let startRequests = await runService.startRequests
+        XCTAssertEqual(1, startRequests.count)
+        XCTAssertEqual("run-1", viewModel.activeRunID)
+        XCTAssertEqual(
+            "web_search",
+            viewModel.durableToolCallGroups.first?.toolCalls.first?.name
+        )
+        viewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testRecreatedChatRestoresRunWithoutResubmittingPrompt() async throws {
+        let session = try makeSessionSummary()
+        let activeRunStore = ActiveRunStoreStub()
+        let firstViewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: RunHistoryRepositoryStub(session: session),
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: RunServiceStub(
+                eventResult: .holdOpen,
+                statuses: []
+            ),
+            activeRunStore: activeRunStore
+        )
+        await firstViewModel.load()
+        let didSend = await firstViewModel.send("Keep working")
+        XCTAssertTrue(didSend)
+        firstViewModel.suspendRunObservation()
+
+        let restoredHistory = [
+            ChatMessage(
+                role: "user",
+                content: "Keep working",
+                timestamp: 1,
+                messageId: "user-1"
+            ),
+            ChatMessage(
+                role: "assistant",
+                content: nil,
+                timestamp: 2,
+                messageId: "reasoning-1",
+                reasoning: "Continuing the long-running analysis."
+            ),
+        ]
+        let restoredRepository = RunHistoryRepositoryStub(
+            session: session,
+            historyMessagesByCall: [1: restoredHistory]
+        )
+        let restoredRunService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: [
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .running,
+                    sessionID: "session-1",
+                    lastEvent: "reasoning.available",
+                    output: nil,
+                    errorMessage: nil
+                )
+            ]
+        )
+        let restoredViewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: restoredRepository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: restoredRunService,
+            activeRunStore: activeRunStore,
+            reconciliationDelayNanoseconds: 100_000_000
+        )
+
+        await restoredViewModel.load()
+        await restoredViewModel.resumeRunObservation()
+        await waitUntil {
+            restoredViewModel.activeRunID == "run-1"
+                && restoredViewModel.runState == .transportDisconnected
+        }
+
+        let statusWaitStart = ContinuousClock.now
+        while (await restoredRunService.statusRunIDs).isEmpty,
+              ContinuousClock.now - statusWaitStart < .seconds(1) {
+            await Task.yield()
+        }
+
+        let restoredStartRequests = await restoredRunService.startRequests
+        let restoredStatusRunIDs = await restoredRunService.statusRunIDs
+        XCTAssertTrue(restoredStartRequests.isEmpty)
+        XCTAssertEqual(["run-1"], restoredStatusRunIDs)
+        XCTAssertFalse(restoredViewModel.canSend)
+        restoredViewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testRecreatedChatRetainsStopLatch() async throws {
+        let session = try makeSessionSummary()
+        let activeRunStore = ActiveRunStoreStub()
+        let key = CompanionActiveRunKey(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            sessionID: "session-1"
+        )
+        await activeRunStore.store(
+            CompanionActiveRunRecord(
+                runID: "run-1",
+                stopState: .deliveryUnknown
+            ),
+            for: key
+        )
+        let runService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: [
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .stopping,
+                    sessionID: "session-1",
+                    lastEvent: "run.stopping",
+                    output: nil,
+                    errorMessage: nil
+                )
+            ]
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: RunHistoryRepositoryStub(session: session),
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: runService,
+            activeRunStore: activeRunStore
+        )
+
+        await viewModel.load()
+        await viewModel.resumeRunObservation()
+        XCTAssertFalse(viewModel.canRequestStop)
+        await viewModel.stopRun()
+
+        let stopCallCount = await runService.stopCallCount
+        XCTAssertEqual(0, stopCallCount)
+        viewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testCancelledResumeDoesNotStartAnOrphanReconciliation() async throws {
+        let session = try makeSessionSummary()
+        let activeRunStore = ActiveRunStoreStub(
+            activeRunDelayNanoseconds: 100_000_000
+        )
+        let key = CompanionActiveRunKey(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            sessionID: "session-1"
+        )
+        await activeRunStore.store(
+            CompanionActiveRunRecord(
+                runID: "run-1",
+                stopState: .notRequested
+            ),
+            for: key
+        )
+        let runService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: []
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: RunHistoryRepositoryStub(session: session),
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: runService,
+            activeRunStore: activeRunStore
+        )
+
+        let resumeTask = Task {
+            await viewModel.resumeRunObservation()
+        }
+        try await Task.sleep(nanoseconds: 10_000_000)
+        resumeTask.cancel()
+        await resumeTask.value
+
+        XCTAssertNil(viewModel.activeRunID)
+        let statusRunIDs = await runService.statusRunIDs
+        XCTAssertTrue(statusRunIDs.isEmpty)
+    }
+
+    @MainActor
+    func testRunningHistoryRejectsSameLengthStaleReplacement() async throws {
+        let session = try makeSessionSummary()
+        let currentHistory = [
+            ChatMessage(
+                role: "user",
+                content: "Question",
+                timestamp: 1,
+                messageId: "user-1"
+            ),
+            ChatMessage(
+                role: "assistant",
+                content: "Newest value",
+                timestamp: 2,
+                messageId: "assistant-1"
+            ),
+        ]
+        let staleHistory = [
+            currentHistory[0],
+            ChatMessage(
+                role: "assistant",
+                content: "Staler value",
+                timestamp: 2,
+                messageId: "assistant-1"
+            ),
+        ]
+        let repository = RunHistoryRepositoryStub(
+            session: session,
+            historyMessagesByCall: [
+                1: currentHistory,
+                2: staleHistory,
+            ]
+        )
+        let activeRunStore = ActiveRunStoreStub()
+        let key = CompanionActiveRunKey(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            sessionID: "session-1"
+        )
+        await activeRunStore.store(
+            CompanionActiveRunRecord(
+                runID: "run-1",
+                stopState: .notRequested
+            ),
+            for: key
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: RunServiceStub(
+                eventResult: .holdOpen,
+                statuses: [
+                    ConversationRunSnapshot(
+                        runID: "run-1",
+                        state: .running,
+                        sessionID: "session-1",
+                        lastEvent: "message.delta",
+                        output: nil,
+                        errorMessage: nil
+                    )
+                ]
+            ),
+            activeRunStore: activeRunStore
+        )
+
+        await viewModel.load()
+        await viewModel.resumeRunObservation()
+        await waitUntil {
+            viewModel.activeRunID == "run-1"
+        }
+        let historyWaitStart = ContinuousClock.now
+        while (await repository.historyCallCount) < 2,
+              ContinuousClock.now - historyWaitStart < .seconds(1) {
+            await Task.yield()
+        }
+
+        XCTAssertEqual("Newest value", viewModel.allMessages.last?.content)
+        viewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testRunningHistoryRejectsSameCountStaleToolReplacement() async throws {
+        let session = try makeSessionSummary()
+        let currentToolCalls: [JSONValue] = [
+            .object([
+                "id": .string("tool-1"),
+                "function": .object([
+                    "name": .string("web_search")
+                ]),
+            ])
+        ]
+        let staleToolCalls: [JSONValue] = [
+            .object([
+                "id": .string("tool-1"),
+                "function": .object([
+                    "name": .string("read_file")
+                ]),
+            ])
+        ]
+        let currentHistory = [
+            ChatMessage(
+                role: "assistant",
+                content: nil,
+                timestamp: 1,
+                messageId: "assistant-1",
+                toolCalls: currentToolCalls
+            )
+        ]
+        let staleHistory = [
+            ChatMessage(
+                role: "assistant",
+                content: nil,
+                timestamp: 1,
+                messageId: "assistant-1",
+                toolCalls: staleToolCalls
+            )
+        ]
+        let repository = RunHistoryRepositoryStub(
+            session: session,
+            historyMessagesByCall: [
+                1: currentHistory,
+                2: staleHistory,
+            ]
+        )
+        let activeRunStore = ActiveRunStoreStub()
+        let key = CompanionActiveRunKey(
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            sessionID: "session-1"
+        )
+        await activeRunStore.store(
+            CompanionActiveRunRecord(
+                runID: "run-1",
+                stopState: .notRequested
+            ),
+            for: key
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: RunServiceStub(
+                eventResult: .holdOpen,
+                statuses: [
+                    ConversationRunSnapshot(
+                        runID: "run-1",
+                        state: .running,
+                        sessionID: "session-1",
+                        lastEvent: "tool.started",
+                        output: nil,
+                        errorMessage: nil
+                    )
+                ]
+            ),
+            activeRunStore: activeRunStore
+        )
+
+        await viewModel.load()
+        await viewModel.resumeRunObservation()
+        await waitUntil {
+            viewModel.activeRunID == "run-1"
+        }
+        let historyWaitStart = ContinuousClock.now
+        while (await repository.historyCallCount) < 2,
+              ContinuousClock.now - historyWaitStart < .seconds(1) {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(
+            currentToolCalls,
+            viewModel.allMessages.last?.toolCalls
+        )
+        viewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testPersistedAssistantTextReplacesDisconnectedStreamCopy() async throws {
+        let session = try makeSessionSummary()
+        let repository = RunHistoryRepositoryStub(
+            session: session,
+            historyMessagesByCall: [
+                2: [
+                    ChatMessage(
+                        role: "user",
+                        content: "Answer slowly",
+                        timestamp: 1,
+                        messageId: "user-1"
+                    ),
+                    ChatMessage(
+                        role: "assistant",
+                        content: "Partial answer",
+                        timestamp: 2,
+                        messageId: "assistant-1"
+                    ),
+                ]
+            ]
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: RunServiceStub(
+                eventResult: .deltasThenWait(["Partial answer"], 10_000_000),
+                statuses: [
+                    ConversationRunSnapshot(
+                        runID: "run-1",
+                        state: .running,
+                        sessionID: "session-1",
+                        lastEvent: "message.delta",
+                        output: nil,
+                        errorMessage: nil
+                    )
+                ]
+            ),
+            reconciliationDelayNanoseconds: 100_000_000
+        )
+        await viewModel.load()
+
+        let didSend = await viewModel.send("Answer slowly")
+        XCTAssertTrue(didSend)
+        await waitUntil {
+            viewModel.allMessages.last?.content == "Partial answer"
+        }
+
+        XCTAssertNil(viewModel.streamingMessage)
+        viewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testPartialPersistedAssistantTextKeepsNewerStreamSuffix() async throws {
+        let session = try makeSessionSummary()
+        let repository = RunHistoryRepositoryStub(
+            session: session,
+            historyMessagesByCall: [
+                2: [
+                    ChatMessage(
+                        role: "user",
+                        content: "Answer slowly",
+                        timestamp: 1,
+                        messageId: "user-1"
+                    ),
+                    ChatMessage(
+                        role: "assistant",
+                        content: "Hello",
+                        timestamp: 2,
+                        messageId: "assistant-1"
+                    ),
+                ]
+            ]
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: RunServiceStub(
+                eventResult: .deltasThenWait(["Hello world"], 10_000_000),
+                statuses: [
+                    ConversationRunSnapshot(
+                        runID: "run-1",
+                        state: .running,
+                        sessionID: "session-1",
+                        lastEvent: "message.delta",
+                        output: nil,
+                        errorMessage: nil
+                    )
+                ]
+            ),
+            reconciliationDelayNanoseconds: 100_000_000
+        )
+        await viewModel.load()
+
+        let didSend = await viewModel.send("Answer slowly")
+        XCTAssertTrue(didSend)
+        await waitUntil {
+            viewModel.allMessages.last?.content == "Hello"
+        }
+
+        XCTAssertEqual(" world", viewModel.streamingMessage?.content)
+        viewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testConflictingPersistedAssistantTextDropsStreamCopy() async throws {
+        let session = try makeSessionSummary()
+        let repository = RunHistoryRepositoryStub(
+            session: session,
+            historyMessagesByCall: [
+                2: [
+                    ChatMessage(
+                        role: "user",
+                        content: "Answer slowly",
+                        timestamp: 1,
+                        messageId: "user-1"
+                    ),
+                    ChatMessage(
+                        role: "assistant",
+                        content: "Saved answer",
+                        timestamp: 2,
+                        messageId: "assistant-1"
+                    ),
+                ]
+            ]
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: RunServiceStub(
+                eventResult: .deltasThenWait(["Stream answer"], 10_000_000),
+                statuses: [
+                    ConversationRunSnapshot(
+                        runID: "run-1",
+                        state: .running,
+                        sessionID: "session-1",
+                        lastEvent: "message.delta",
+                        output: nil,
+                        errorMessage: nil
+                    )
+                ]
+            ),
+            reconciliationDelayNanoseconds: 100_000_000
+        )
+        await viewModel.load()
+
+        let didSend = await viewModel.send("Answer slowly")
+        XCTAssertTrue(didSend)
+        await waitUntil {
+            viewModel.allMessages.last?.content == "Saved answer"
+        }
+
+        XCTAssertNil(viewModel.streamingMessage)
+        viewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testReasoningOnlyHistoryUpdateKeepsNewerStreamText() async throws {
+        let session = try makeSessionSummary()
+        let initialHistory = [
+            ChatMessage(
+                role: "user",
+                content: "Earlier question",
+                timestamp: 1,
+                messageId: "user-old"
+            ),
+            ChatMessage(
+                role: "assistant",
+                content: "Earlier answer",
+                timestamp: 2,
+                messageId: "assistant-old"
+            ),
+        ]
+        let enrichedHistory = [
+            initialHistory[0],
+            ChatMessage(
+                role: "assistant",
+                content: "Earlier answer",
+                timestamp: 2,
+                messageId: "assistant-old",
+                reasoning: "Reviewing the prior answer."
+            ),
+            ChatMessage(
+                role: "user",
+                content: "Continue",
+                timestamp: 3,
+                messageId: "user-current"
+            ),
+        ]
+        let repository = RunHistoryRepositoryStub(
+            session: session,
+            historyMessagesByCall: [
+                1: initialHistory,
+                2: enrichedHistory,
+            ]
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: RunServiceStub(
+                eventResult: .deltasThenWait(["New suffix"], 10_000_000),
+                statuses: [
+                    ConversationRunSnapshot(
+                        runID: "run-1",
+                        state: .running,
+                        sessionID: "session-1",
+                        lastEvent: "reasoning.available",
+                        output: nil,
+                        errorMessage: nil
+                    )
+                ]
+            ),
+            reconciliationDelayNanoseconds: 100_000_000
+        )
+        await viewModel.load()
+
+        let didSend = await viewModel.send("Continue")
+        XCTAssertTrue(didSend)
+        await waitUntil {
+            viewModel.durableReasoningGroups.map(\.text) == [
+                "Reviewing the prior answer."
+            ]
+        }
+
+        XCTAssertEqual("New suffix", viewModel.streamingMessage?.content)
+        viewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testMissingRecoveredRunClearsStaleLivePresentation() async throws {
+        let session = try makeSessionSummary()
+        let authoritativeHistory = [
+            ChatMessage(
+                role: "user",
+                content: "Inspect",
+                timestamp: 1,
+                messageId: "user-1"
+            ),
+            ChatMessage(
+                role: "assistant",
+                content: "Saved answer",
+                timestamp: 2,
+                messageId: "assistant-1"
+            ),
+        ]
+        let reasoning = ConversationRunEvent.data(
+            ConversationRunEventData(
+                transportEvent: nil,
+                event: "reasoning.available",
+                runID: "run-1",
+                delta: nil,
+                text: "Stale live reasoning",
+                output: nil,
+                error: nil,
+                timestamp: 2
+            )
+        )
+        let tool = ConversationRunEvent.data(
+            ConversationRunEventData(
+                transportEvent: nil,
+                event: "tool.started",
+                runID: "run-1",
+                delta: nil,
+                output: nil,
+                error: nil,
+                tool: "web_search",
+                timestamp: 3
+            )
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: RunHistoryRepositoryStub(
+                session: session,
+                historyMessagesByCall: [2: authoritativeHistory]
+            ),
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: RunServiceStub(
+                eventResult: .eventsThenWait(
+                    [
+                        .data(
+                            ConversationRunEventData(
+                                transportEvent: nil,
+                                event: "message.delta",
+                                runID: "run-1",
+                                delta: "Stale live answer",
+                                output: nil,
+                                error: nil,
+                                timestamp: 1
+                            )
+                        ),
+                        reasoning,
+                        tool,
+                    ],
+                    10_000_000
+                ),
+                statuses: [],
+                statusError: .runNotFound
+            ),
+            reconciliationDelayNanoseconds: 100_000_000
+        )
+        await viewModel.load()
+
+        let didSend = await viewModel.send("Inspect")
+        XCTAssertTrue(didSend)
+        await waitUntil { viewModel.activeRunID == nil }
+
+        XCTAssertEqual("Saved answer", viewModel.allMessages.last?.content)
+        XCTAssertNil(viewModel.streamingMessage)
+        XCTAssertTrue(viewModel.reasoningText.isEmpty)
+        XCTAssertTrue(viewModel.liveToolCalls.isEmpty)
     }
 
     @MainActor
@@ -2234,6 +3040,53 @@ private actor RunHistoryRepositoryStub: SessionRepository {
     }
 }
 
+private actor ActiveRunStoreStub: CompanionActiveRunStoring {
+    private var records: [CompanionActiveRunKey: CompanionActiveRunRecord] = [:]
+    private let activeRunDelayNanoseconds: UInt64
+
+    init(activeRunDelayNanoseconds: UInt64 = 0) {
+        self.activeRunDelayNanoseconds = activeRunDelayNanoseconds
+    }
+
+    func activeRun(
+        for key: CompanionActiveRunKey
+    ) async -> CompanionActiveRunRecord? {
+        if activeRunDelayNanoseconds > 0 {
+            try? await Task.sleep(
+                nanoseconds: activeRunDelayNanoseconds
+            )
+        }
+        return records[key]
+    }
+
+    func store(
+        _ record: CompanionActiveRunRecord,
+        for key: CompanionActiveRunKey
+    ) async {
+        records[key] = record
+    }
+
+    func updateStopState(
+        _ state: CompanionStopRecoveryState,
+        runID: String,
+        for key: CompanionActiveRunKey
+    ) async {
+        guard var record = records[key], record.runID == runID else {
+            return
+        }
+        record.stopState = state
+        records[key] = record
+    }
+
+    func clear(
+        runID: String,
+        for key: CompanionActiveRunKey
+    ) async {
+        guard records[key]?.runID == runID else { return }
+        records[key] = nil
+    }
+}
+
 private actor RunServiceStub: ConversationRunServing {
     struct ApprovalRequest: Sendable {
         let runID: String
@@ -2261,6 +3114,7 @@ private actor RunServiceStub: ConversationRunServing {
     private(set) var stopCallCount = 0
     private(set) var approvalRequests: [ApprovalRequest] = []
     private let stopError: ConversationRunServiceError?
+    private let statusError: ConversationRunServiceError?
     private let approvalError: ConversationRunServiceError?
     private let statusDelayNanoseconds: UInt64
     private let stopDelayNanoseconds: UInt64
@@ -2269,6 +3123,7 @@ private actor RunServiceStub: ConversationRunServing {
     init(
         eventResult: EventResult,
         statuses: [ConversationRunSnapshot],
+        statusError: ConversationRunServiceError? = nil,
         stopError: ConversationRunServiceError? = nil,
         approvalError: ConversationRunServiceError? = nil,
         statusDelayNanoseconds: UInt64 = 0,
@@ -2277,6 +3132,7 @@ private actor RunServiceStub: ConversationRunServing {
     ) {
         self.eventResult = eventResult
         self.statuses = statuses
+        self.statusError = statusError
         self.stopError = stopError
         self.approvalError = approvalError
         self.statusDelayNanoseconds = statusDelayNanoseconds
@@ -2302,6 +3158,9 @@ private actor RunServiceStub: ConversationRunServing {
         statusRunIDs.append(runID)
         if statusDelayNanoseconds > 0 {
             try? await Task.sleep(nanoseconds: statusDelayNanoseconds)
+        }
+        if let statusError {
+            throw statusError
         }
         guard !statuses.isEmpty else {
             throw ConversationRunServiceError.unexpectedResponse

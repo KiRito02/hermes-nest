@@ -45,6 +45,7 @@
 		D01600000000000000000003 /* CompanionDiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D01600000000000000000013 /* CompanionDiscoveryTests.swift */; };
 		E00600000000000000000001 /* SessionRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00600000000000000000011 /* SessionRepository.swift */; };
 		E00600000000000000000002 /* CompanionSessionListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00600000000000000000012 /* CompanionSessionListViewModel.swift */; };
+		E03300000000000000000001 /* CompanionActiveRunStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E03300000000000000000011 /* CompanionActiveRunStore.swift */; };
 		E00600000000000000000003 /* CompanionSessionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00600000000000000000013 /* CompanionSessionListView.swift */; };
 		E02700000000000000000001 /* CompanionPresentationSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E02700000000000000000011 /* CompanionPresentationSupport.swift */; };
 		E00600000000000000000004 /* SessionRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00600000000000000000014 /* SessionRepositoryTests.swift */; };
@@ -373,6 +374,7 @@
 		D01600000000000000000013 /* CompanionDiscoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionDiscoveryTests.swift; sourceTree = "<group>"; };
 		E00600000000000000000011 /* SessionRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRepository.swift; sourceTree = "<group>"; };
 		E00600000000000000000012 /* CompanionSessionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionSessionListViewModel.swift; sourceTree = "<group>"; };
+		E03300000000000000000011 /* CompanionActiveRunStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionActiveRunStore.swift; sourceTree = "<group>"; };
 		E00600000000000000000013 /* CompanionSessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionSessionListView.swift; sourceTree = "<group>"; };
 		E02700000000000000000011 /* CompanionPresentationSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionPresentationSupport.swift; sourceTree = "<group>"; };
 		E00600000000000000000014 /* SessionRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRepositoryTests.swift; sourceTree = "<group>"; };
@@ -981,6 +983,7 @@
 		1A2B3C4D5E6F7000000000C5 /* SessionList */ = {
 			isa = PBXGroup;
 			children = (
+				E03300000000000000000011 /* CompanionActiveRunStore.swift */,
 				E00600000000000000000013 /* CompanionSessionListView.swift */,
 				E00600000000000000000012 /* CompanionSessionListViewModel.swift */,
 				E02700000000000000000011 /* CompanionPresentationSupport.swift */,
@@ -1381,6 +1384,7 @@
 				031031031031031031031007 /* MarkdownMathFormatter+Support.swift in Sources */,
 				1A2B3C4D5E6F7000000000D0 /* SessionRowView.swift in Sources */,
 				E00600000000000000000002 /* CompanionSessionListViewModel.swift in Sources */,
+				E03300000000000000000001 /* CompanionActiveRunStore.swift in Sources */,
 				E00600000000000000000003 /* CompanionSessionListView.swift in Sources */,
 				E02700000000000000000001 /* CompanionPresentationSupport.swift in Sources */,
 				D01600000000000000000002 /* CompanionDiscoveryView.swift in Sources */,

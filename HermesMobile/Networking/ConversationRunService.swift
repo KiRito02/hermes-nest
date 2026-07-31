@@ -550,12 +550,14 @@ actor ConversationRunService: ConversationRunServing {
     nonisolated let session: URLSession
     nonisolated let eventSession: URLSession
     private let decoder: JSONDecoder
+    private let eventConnectTimeoutNanoseconds: UInt64
 
     init(
         companionURL: URL,
         keychain: any KeychainStoring = KeychainStore(),
         session: URLSession? = nil,
-        eventSession: URLSession? = nil
+        eventSession: URLSession? = nil,
+        eventConnectTimeoutNanoseconds: UInt64 = 15_000_000_000
     ) {
         self.companionURL = companionURL
         self.keychain = keychain
@@ -565,6 +567,8 @@ actor ConversationRunService: ConversationRunServing {
             eventSession
             ?? session
             ?? CompanionSessionPool.shared.eventSession
+        self.eventConnectTimeoutNanoseconds =
+            eventConnectTimeoutNanoseconds
 
         let decoder = JSONDecoder()
         self.decoder = decoder
@@ -695,6 +699,7 @@ actor ConversationRunService: ConversationRunServing {
         )
         request.httpMethod = "GET"
         request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = .greatestFiniteMagnitude
         request.setValue(
             "text/event-stream",
             forHTTPHeaderField: "Accept"
@@ -710,10 +715,26 @@ actor ConversationRunService: ConversationRunServing {
         )
 
         let session = eventSession
+        let connectTimeoutNanoseconds = eventConnectTimeoutNanoseconds
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let (bytes, response) = try await session.bytes(for: request)
+                    let connectTask = Task {
+                        try await session.bytes(for: request)
+                    }
+                    let timeoutTask = Task {
+                        try? await Task.sleep(
+                            nanoseconds: connectTimeoutNanoseconds
+                        )
+                        guard !Task.isCancelled else { return }
+                        connectTask.cancel()
+                    }
+                    defer { timeoutTask.cancel() }
+                    let (bytes, response) = try await withTaskCancellationHandler {
+                        try await connectTask.value
+                    } onCancel: {
+                        connectTask.cancel()
+                    }
                     guard let httpResponse = response as? HTTPURLResponse else {
                         throw ConversationRunServiceError.unexpectedResponse
                     }

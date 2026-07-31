@@ -489,6 +489,7 @@ final class CompanionSessionHistoryViewModel {
 
     private let repository: any SessionRepository
     private let runService: any ConversationRunServing
+    private let activeRunStore: any CompanionActiveRunStoring
     private let modelService: any CompanionModelServing
     private let modelSelectionStore: any CompanionModelSelectionStoring
     private let workspaceService: any CompanionWorkspaceServing
@@ -508,7 +509,7 @@ final class CompanionSessionHistoryViewModel {
         ConversationRunDeltaBuffer()
     @ObservationIgnored private var fastForwardedDelta = ""
     private var isStopRequestInFlight = false
-    private var hasRequestedStop = false
+    private var stopRecoveryState: CompanionStopRecoveryState = .notRequested
     private var terminalOutputFallback: String?
     private var nextToolOrdinal = 0
     private var isTerminalRefreshPending = false
@@ -527,6 +528,9 @@ final class CompanionSessionHistoryViewModel {
         modelSelectionStore: (
             any CompanionModelSelectionStoring
         )? = nil,
+        activeRunStore: (
+            any CompanionActiveRunStoring
+        )? = nil,
         reconciliationDelayNanoseconds: UInt64 = 1_000_000_000
     ) {
         self.session = session
@@ -536,6 +540,7 @@ final class CompanionSessionHistoryViewModel {
         self.runService = runService ?? ConversationRunService(
             companionURL: companionURL
         )
+        self.activeRunStore = activeRunStore ?? CompanionActiveRunStore()
         self.modelService = modelService ?? CompanionModelService(
             companionURL: companionURL
         )
@@ -581,6 +586,15 @@ final class CompanionSessionHistoryViewModel {
 
     var isRunActive: Bool {
         activeRunID != nil || runState == .starting
+    }
+
+    private var activeRunKey: CompanionActiveRunKey? {
+        session.sessionId.map {
+            CompanionActiveRunKey(
+                companionURL: companionURL,
+                sessionID: $0
+            )
+        }
     }
 
     var canSend: Bool {
@@ -849,7 +863,7 @@ final class CompanionSessionHistoryViewModel {
     }
 
     var canRequestStop: Bool {
-        activeRunID != nil && !hasRequestedStop
+        activeRunID != nil && stopRecoveryState == .notRequested
     }
 
     var canChangeModel: Bool {
@@ -918,7 +932,7 @@ final class CompanionSessionHistoryViewModel {
         return supportsRunApprovals
             && pendingApproval.choices.contains(choice)
             && !isApprovalSubmissionInFlight
-            && !hasRequestedStop
+            && stopRecoveryState == .notRequested
     }
 
     var terminalHistoryRetryMessage: String {
@@ -1007,6 +1021,42 @@ final class CompanionSessionHistoryViewModel {
             }
             return false
         }
+    }
+
+    func resumeRunObservation(
+        modelContext: ModelContext? = nil
+    ) async {
+        guard !Task.isCancelled else { return }
+        guard runTask == nil, reconciliationTask == nil else { return }
+
+        if let activeRunID {
+            runState = .transportDisconnected
+            beginReconciliation(
+                runID: activeRunID,
+                modelContext: modelContext
+            )
+            return
+        }
+
+        guard let activeRunKey else { return }
+        let storedRun = await activeRunStore.activeRun(for: activeRunKey)
+        guard !Task.isCancelled, let storedRun else { return }
+
+        activeRunID = storedRun.runID
+        stopRecoveryState = storedRun.stopState
+        runState = storedRun.stopState == .confirmedStopping
+            ? .stopping
+            : .transportDisconnected
+        beginReconciliation(
+            runID: storedRun.runID,
+            modelContext: modelContext
+        )
+    }
+
+    func suspendRunObservation() {
+        guard activeRunID != nil else { return }
+        flushPendingDelta(forceAll: true)
+        cancelRunTasks()
     }
 
     func loadOlderMessages() {
@@ -1151,6 +1201,12 @@ final class CompanionSessionHistoryViewModel {
             guard try await repository.deleteSession(id: sessionID) else {
                 throw SessionRepositoryError.unexpectedResponse
             }
+            if let activeRunID, let activeRunKey {
+                await activeRunStore.clear(
+                    runID: activeRunID,
+                    for: activeRunKey
+                )
+            }
             return true
         } catch {
             guard !(error is CancellationError) else { return false }
@@ -1198,7 +1254,7 @@ final class CompanionSessionHistoryViewModel {
         approvalSubmissionChoice = nil
         deltaBuffer.removeAll()
         fastForwardedDelta = ""
-        hasRequestedStop = false
+        stopRecoveryState = .notRequested
         terminalOutputFallback = nil
         latestRunUsage = nil
         nextToolOrdinal = 0
@@ -1225,6 +1281,16 @@ final class CompanionSessionHistoryViewModel {
         }
 
         activeRunID = started.runID
+        await activeRunStore.store(
+            CompanionActiveRunRecord(
+                runID: started.runID,
+                stopState: .notRequested
+            ),
+            for: CompanionActiveRunKey(
+                companionURL: companionURL,
+                sessionID: sessionID
+            )
+        )
         pendingUploads = []
         runState = .streaming
         runTask = Task { [weak self] in
@@ -1320,20 +1386,39 @@ final class CompanionSessionHistoryViewModel {
         guard
             let runID = activeRunID,
             !isStopRequestInFlight,
-            !hasRequestedStop
+            stopRecoveryState == .notRequested
         else {
             return
         }
         isStopRequestInFlight = true
-        hasRequestedStop = true
-        runState = .stopping
+        stopRecoveryState = .deliveryUnknown
+        runState = .transportDisconnected
         defer { isStopRequestInFlight = false }
+
+        if let activeRunKey {
+            await activeRunStore.updateStopState(
+                .deliveryUnknown,
+                runID: runID,
+                for: activeRunKey
+            )
+            if Task.isCancelled {
+                stopRecoveryState = .notRequested
+                runState = .streaming
+                await activeRunStore.updateStopState(
+                    .notRequested,
+                    runID: runID,
+                    for: activeRunKey
+                )
+                return
+            }
+        }
 
         do {
             let snapshot = try await runService.stop(runID: runID)
             guard activeRunID == runID else { return }
             terminalOutputFallback = snapshot.output
             applyRunSnapshot(snapshot)
+            await persistStopStateIfNeeded(snapshot, runID: runID)
             if snapshot.state.isTerminal {
                 await finishRun(
                     runID: runID,
@@ -1612,6 +1697,10 @@ final class CompanionSessionHistoryViewModel {
                     terminalOutputFallback = snapshot.output
                         ?? terminalOutputFallback
                     applyRunSnapshot(snapshot)
+                    await persistStopStateIfNeeded(
+                        snapshot,
+                        runID: runID
+                    )
                     if snapshot.state.isTerminal {
                         reconciliationTask = nil
                         await finishRun(
@@ -1620,7 +1709,25 @@ final class CompanionSessionHistoryViewModel {
                         )
                         return
                     }
+                    await refreshHistoryDuringRun(
+                        runID: runID,
+                        modelContext: modelContext
+                    )
                 } catch is CancellationError {
+                    return
+                } catch let error as ConversationRunServiceError
+                    where error == .runNotFound {
+                    if let activeRunKey {
+                        await activeRunStore.clear(
+                            runID: runID,
+                            for: activeRunKey
+                        )
+                    }
+                    guard activeRunID == runID else { return }
+                    activeRunID = nil
+                    runState = .idle
+                    clearRecoveredRunPresentation()
+                    _ = await load(modelContext: modelContext)
                     return
                 } catch {
                     guard activeRunID == runID else { return }
@@ -1630,6 +1737,296 @@ final class CompanionSessionHistoryViewModel {
                     nanoseconds: reconciliationDelayNanoseconds
                 )
             }
+        }
+    }
+
+    private func refreshHistoryDuringRun(
+        runID: String,
+        modelContext: ModelContext?
+    ) async {
+        guard let sessionID = session.sessionId else { return }
+
+        do {
+            let history = try await repository.messageHistory(id: sessionID)
+            guard activeRunID == runID else { return }
+            guard let mergedMessages = mergeRunningHistory(
+                history.messages
+            ) else {
+                return
+            }
+
+            let previousMessages = allMessages
+            let previousReasoning = durableReasoningGroups
+            let previousToolActivity = durableToolCallGroups
+            apply(mergedMessages)
+            cache(
+                mergedMessages,
+                sessionID: history.sessionID,
+                in: modelContext
+            )
+            if durableReasoningGroups != previousReasoning {
+                reasoningText = ""
+            }
+            if durableToolCallGroups != previousToolActivity {
+                liveToolCalls = []
+            }
+            reconcileStreamedAssistantText(
+                previousMessages,
+                mergedMessages
+            )
+            markStreamingTranscriptChanged()
+        } catch is CancellationError {
+            return
+        } catch {
+            // Status remains authoritative. A later reconciliation pass can
+            // retry transcript history without changing the run lifecycle.
+        }
+    }
+
+    private func mergeRunningHistory(
+        _ candidate: [ChatMessage]
+    ) -> [ChatMessage]? {
+        guard candidate.count >= allMessages.count else { return nil }
+        var merged = candidate
+
+        for (index, current) in allMessages.enumerated() {
+            if current.messageId?.hasPrefix("local-") == true {
+                let persisted = candidate.contains {
+                    $0.role == current.role && $0.content == current.content
+                }
+                guard persisted else { return nil }
+                continue
+            }
+
+            guard let message = mergeRunningMessage(
+                current,
+                candidate[index]
+            ) else {
+                return nil
+            }
+            merged[index] = message
+        }
+
+        return merged == allMessages ? nil : merged
+    }
+
+    private func mergeRunningMessage(
+        _ current: ChatMessage,
+        _ candidate: ChatMessage
+    ) -> ChatMessage? {
+        guard identitiesMatch(current.role, candidate.role) else { return nil }
+        guard identitiesMatch(current.messageId, candidate.messageId) else {
+            return nil
+        }
+        guard identitiesMatch(current.toolCallId, candidate.toolCallId) else {
+            return nil
+        }
+        guard identitiesMatch(current.toolUseId, candidate.toolUseId) else {
+            return nil
+        }
+        guard identitiesMatch(current.name, candidate.name) else { return nil }
+        guard identitiesMatch(current.timestamp, candidate.timestamp) else {
+            return nil
+        }
+        guard growingTextsAreCompatible(
+            current.content,
+            candidate.content
+        ) else {
+            return nil
+        }
+        guard growingTextsAreCompatible(
+            current.reasoning,
+            candidate.reasoning
+        ) else {
+            return nil
+        }
+        guard jsonCollectionsAreCompatible(
+            current.toolCalls,
+            candidate.toolCalls
+        ) else {
+            return nil
+        }
+        guard jsonCollectionsAreCompatible(
+            current.contentParts,
+            candidate.contentParts
+        ) else {
+            return nil
+        }
+        guard collectionsAreCompatible(
+            current.attachments,
+            candidate.attachments
+        ) else {
+            return nil
+        }
+
+        return ChatMessage(
+            role: candidate.role ?? current.role,
+            content: preferredGrowingText(current.content, candidate.content),
+            timestamp: candidate.timestamp ?? current.timestamp,
+            messageId: candidate.messageId ?? current.messageId,
+            name: candidate.name ?? current.name,
+            toolCallId: candidate.toolCallId ?? current.toolCallId,
+            toolUseId: candidate.toolUseId ?? current.toolUseId,
+            toolCalls: preferredJSONCollection(
+                current.toolCalls,
+                candidate.toolCalls
+            ),
+            contentParts: preferredJSONCollection(
+                current.contentParts,
+                candidate.contentParts
+            ),
+            reasoning: preferredGrowingText(
+                current.reasoning,
+                candidate.reasoning
+            ),
+            attachments: preferredCollection(
+                current.attachments,
+                candidate.attachments
+            )
+        )
+    }
+
+    private func identitiesMatch<T: Equatable>(
+        _ current: T?,
+        _ candidate: T?
+    ) -> Bool {
+        current == nil || candidate == nil || current == candidate
+    }
+
+    private func growingTextsAreCompatible(
+        _ current: String?,
+        _ candidate: String?
+    ) -> Bool {
+        guard let current, let candidate else { return true }
+        return candidate.hasPrefix(current) || current.hasPrefix(candidate)
+    }
+
+    private func preferredGrowingText(
+        _ current: String?,
+        _ candidate: String?
+    ) -> String? {
+        guard let current else { return candidate }
+        guard let candidate else { return current }
+        if candidate.hasPrefix(current) { return candidate }
+        return current
+    }
+
+    private func jsonCollectionsAreCompatible(
+        _ current: [JSONValue]?,
+        _ candidate: [JSONValue]?
+    ) -> Bool {
+        guard let current, let candidate else { return true }
+        return jsonArray(candidate, contains: current)
+            || jsonArray(current, contains: candidate)
+    }
+
+    private func preferredJSONCollection(
+        _ current: [JSONValue]?,
+        _ candidate: [JSONValue]?
+    ) -> [JSONValue]? {
+        guard let current else { return candidate }
+        guard let candidate else { return current }
+        return jsonArray(candidate, contains: current) ? candidate : current
+    }
+
+    private func jsonArray(
+        _ superset: [JSONValue],
+        contains subset: [JSONValue]
+    ) -> Bool {
+        guard superset.count >= subset.count else { return false }
+        return zip(subset, superset).allSatisfy { pair in
+            jsonValue(pair.1, contains: pair.0)
+        }
+    }
+
+    private func jsonValue(
+        _ superset: JSONValue,
+        contains subset: JSONValue
+    ) -> Bool {
+        if superset == subset { return true }
+        switch (superset, subset) {
+        case (.object(let candidate), .object(let current)):
+            return current.allSatisfy { pair in
+                guard let candidateValue = candidate[pair.0] else {
+                    return false
+                }
+                return jsonValue(candidateValue, contains: pair.1)
+            }
+        case (.array(let candidate), .array(let current)):
+            return jsonArray(candidate, contains: current)
+        default:
+            return false
+        }
+    }
+
+    private func collectionsAreCompatible<Element: Equatable>(
+        _ current: [Element]?,
+        _ candidate: [Element]?
+    ) -> Bool {
+        guard let current, let candidate else { return true }
+        return collection(candidate, hasPrefix: current)
+            || collection(current, hasPrefix: candidate)
+    }
+
+    private func collection<Element: Equatable>(
+        _ collection: [Element],
+        hasPrefix prefix: [Element]
+    ) -> Bool {
+        guard collection.count >= prefix.count else { return false }
+        return zip(prefix, collection).allSatisfy { pair in
+            pair.0 == pair.1
+        }
+    }
+
+    private func preferredCollection<Element: Equatable>(
+        _ current: [Element]?,
+        _ candidate: [Element]?
+    ) -> [Element]? {
+        guard let current else { return candidate }
+        guard let candidate else { return current }
+        return collection(candidate, hasPrefix: current) ? candidate : current
+    }
+
+    private func reconcileStreamedAssistantText(
+        _ previous: [ChatMessage],
+        _ current: [ChatMessage]
+    ) {
+        for (index, message) in current.enumerated() {
+            guard
+                message.role == "assistant",
+                let content = message.content,
+                content.trimmedNonEmptyValue != nil
+            else {
+                continue
+            }
+            let previousContent: String
+            if index < previous.count,
+               previous[index].role == "assistant" {
+                previousContent = previous[index].content ?? ""
+            } else {
+                previousContent = ""
+            }
+            guard content != previousContent else { continue }
+
+            let persistedDelta = content.hasPrefix(previousContent)
+                ? String(content.dropFirst(previousContent.count))
+                : content
+            consumePersistedAssistantPrefix(persistedDelta)
+        }
+    }
+
+    private func consumePersistedAssistantPrefix(_ persisted: String) {
+        guard !persisted.isEmpty, !streamedAssistantText.isEmpty else {
+            return
+        }
+        if streamedAssistantText.hasPrefix(persisted) {
+            streamedAssistantText.removeFirst(persisted.count)
+        } else if persisted.hasPrefix(streamedAssistantText) {
+            streamedAssistantText = ""
+        } else {
+            // The persisted transcript is authoritative when it conflicts
+            // with the disconnected stream copy.
+            streamedAssistantText = ""
         }
     }
 
@@ -1643,6 +2040,7 @@ final class CompanionSessionHistoryViewModel {
             terminalOutputFallback = snapshot.output
                 ?? terminalOutputFallback
             applyRunSnapshot(snapshot)
+            await persistStopStateIfNeeded(snapshot, runID: runID)
             if snapshot.state.isTerminal {
                 await finishRun(
                     runID: runID,
@@ -1659,6 +2057,21 @@ final class CompanionSessionHistoryViewModel {
                 modelContext: modelContext
             )
         }
+    }
+
+    private func persistStopStateIfNeeded(
+        _ snapshot: ConversationRunSnapshot,
+        runID: String
+    ) async {
+        guard snapshot.state == .stopping else { return }
+        stopRecoveryState = .confirmedStopping
+        runState = .stopping
+        guard let activeRunKey else { return }
+        await activeRunStore.updateStopState(
+            .confirmedStopping,
+            runID: runID,
+            for: activeRunKey
+        )
     }
 
     private func applyRunSnapshot(_ snapshot: ConversationRunSnapshot) {
@@ -1709,6 +2122,13 @@ final class CompanionSessionHistoryViewModel {
         modelContext: ModelContext?
     ) async {
         guard activeRunID == runID else { return }
+        if let activeRunKey {
+            await activeRunStore.clear(
+                runID: runID,
+                for: activeRunKey
+            )
+            guard activeRunID == runID else { return }
+        }
         flushPendingDelta(forceAll: true)
         if let terminalOutputFallback,
            !terminalOutputFallback.isEmpty {
@@ -1735,7 +2155,7 @@ final class CompanionSessionHistoryViewModel {
             apply(messagesBeforeRefresh)
             needsTerminalHistoryRetry = true
         }
-        hasRequestedStop = false
+        stopRecoveryState = .notRequested
         terminalOutputFallback = nil
         isTerminalRefreshPending = false
     }
@@ -1757,6 +2177,18 @@ final class CompanionSessionHistoryViewModel {
         streamedAssistantText = ""
         reasoningText = ""
         liveToolCalls = []
+    }
+
+    private func clearRecoveredRunPresentation() {
+        clearTerminalFallbackPresentation()
+        deltaBuffer.removeAll()
+        fastForwardedDelta = ""
+        pendingApproval = nil
+        approvalErrorMessage = nil
+        approvalSubmissionChoice = nil
+        terminalOutputFallback = nil
+        stopRecoveryState = .notRequested
+        markStreamingTranscriptChanged()
     }
 
     private func cancelRunTasks() {
