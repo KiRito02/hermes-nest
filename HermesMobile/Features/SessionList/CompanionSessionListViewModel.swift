@@ -465,6 +465,7 @@ final class CompanionSessionHistoryViewModel {
     private(set) var streamedAssistantText = ""
     private(set) var reasoningText = ""
     private(set) var liveToolCalls: [ToolCall] = []
+    private(set) var streamingFollowTrigger = 0
     private(set) var durableReasoningGroups: [ReasoningGroup] = []
     private(set) var durableToolCallGroups: [ToolCallGroup] = []
     private(set) var needsTerminalHistoryRetry = false
@@ -1495,6 +1496,7 @@ final class CompanionSessionHistoryViewModel {
                     if event == "reasoning.available",
                        let text = payload.text {
                         reasoningText = text
+                        markStreamingTranscriptChanged()
                     }
                     if event == "tool.started" {
                         applyToolStarted(payload, runID: runID)
@@ -1589,6 +1591,7 @@ final class CompanionSessionHistoryViewModel {
         fastForwardedDelta = ""
         guard !published.isEmpty else { return }
         streamedAssistantText += published
+        markStreamingTranscriptChanged()
         if !deltaBuffer.isEmpty {
             scheduleDeltaFlush()
         }
@@ -1710,6 +1713,7 @@ final class CompanionSessionHistoryViewModel {
         if let terminalOutputFallback,
            !terminalOutputFallback.isEmpty {
             streamedAssistantText = terminalOutputFallback
+            markStreamingTranscriptChanged()
         }
         let messagesBeforeRefresh = allMessages
         isTerminalRefreshPending = true
@@ -1779,6 +1783,7 @@ final class CompanionSessionHistoryViewModel {
                 ?? liveToolCalls[index].name
             liveToolCalls[index].preview = payload.preview
                 ?? liveToolCalls[index].preview
+            markStreamingTranscriptChanged()
             return
         }
         liveToolCalls.append(
@@ -1791,6 +1796,7 @@ final class CompanionSessionHistoryViewModel {
                     ?? Date().timeIntervalSince1970
             )
         )
+        markStreamingTranscriptChanged()
     }
 
     private func applyToolCompleted(
@@ -1812,6 +1818,7 @@ final class CompanionSessionHistoryViewModel {
             liveToolCalls[index].duration = payload.duration
             liveToolCalls[index].isError = payload.isError
             liveToolCalls[index].isCompleted = true
+            markStreamingTranscriptChanged()
             return
         }
 
@@ -1831,6 +1838,11 @@ final class CompanionSessionHistoryViewModel {
                     ?? Date().timeIntervalSince1970
             )
         )
+        markStreamingTranscriptChanged()
+    }
+
+    private func markStreamingTranscriptChanged() {
+        streamingFollowTrigger &+= 1
     }
 
     private func apply(_ messages: [ChatMessage]) {

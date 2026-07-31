@@ -115,10 +115,42 @@ for snippet, description in [
     ),
     (
         ".defaultScrollAnchor(\n"
-        "            ChatScrollPolicy.initialTranscriptAnchor,\n"
-        "            for: .initialOffset\n"
-        "        )",
+        "                ChatScrollPolicy.initialTranscriptAnchor,\n"
+        "                for: .initialOffset\n"
+        "            )",
         "initial-only transcript bottom anchor",
+    ),
+    (
+        "ChatScrollPolicy.sizeChangeAnchor(\n"
+        "                    shouldFollowLatestMessage: shouldFollowLatestMessage\n"
+        "                ),\n"
+        "                for: .sizeChanges",
+        "conditional Companion transcript size-change anchor",
+    ),
+    ("ScrollViewReader { proxy in", "Companion transcript scroll proxy"),
+    (
+        ".id(transcriptBottomAnchorID)",
+        "Companion transcript bottom target",
+    ),
+    (
+        ".onChange(of: viewModel.visibleMessages.last?.id)",
+        "window-safe new-message Companion transcript follow trigger",
+    ),
+    (
+        ".onChange(of: viewModel.streamingFollowTrigger)",
+        "streaming Companion transcript follow trigger",
+    ),
+    (
+        "UIResponder.keyboardWillShowNotification",
+        "keyboard Companion transcript follow trigger",
+    ),
+    (
+        "prepareTranscriptForExplicitSend()",
+        "explicit-send Companion transcript follow reset",
+    ),
+    (
+        "isUserInitiated: isExplicitSend",
+        "explicit-send Companion transcript interaction bypass",
     ),
     (
         "dismissComposerKeyboard()",

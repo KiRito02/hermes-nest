@@ -415,6 +415,7 @@ struct CompanionSessionHistoryView: View {
     let onDeleted: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel: CompanionSessionHistoryViewModel
@@ -436,9 +437,16 @@ struct CompanionSessionHistoryView: View {
     @State private var droppedAttachmentTask: Task<Void, Never>?
     @State private var isDropTargeted = false
     @State private var draftMessage = ""
+    @State private var shouldFollowLatestMessage = true
+    @State private var isScrolledNearBottom = true
     @State private var isUserInteractingWithScroll = false
+    @State private var userScrollCooldownUntil: Date?
+    @State private var followScrollGeneration = 0
+    @State private var pendingExplicitSendFollow = false
     @State private var restoresComposerFocusAfterPresentation = false
     @FocusState private var composerIsFocused: Bool
+
+    private let transcriptBottomAnchorID = "companion-transcript-bottom"
 
     init(
         session: SessionSummary,
@@ -484,171 +492,208 @@ struct CompanionSessionHistoryView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(
-                alignment: .leading,
-                spacing: HermesNestDesign.Spacing.medium
-            ) {
-                if viewModel.isViewingCachedData {
-                    CompanionOfflineCacheBanner()
-                }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: HermesNestDesign.Spacing.medium
+                ) {
+                    if viewModel.isViewingCachedData {
+                        CompanionOfflineCacheBanner()
+                    }
 
-                if viewModel.needsTerminalHistoryRetry {
-                    VStack(
-                        alignment: .leading,
-                        spacing: HermesNestDesign.Spacing.small
-                    ) {
-                        Label(
-                            "Final response is shown from the run stream.",
-                            systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
+                    if viewModel.needsTerminalHistoryRetry {
+                        VStack(
+                            alignment: .leading,
+                            spacing: HermesNestDesign.Spacing.small
+                        ) {
+                            Label(
+                                "Final response is shown from the run stream.",
+                                systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
+                            )
+                            .font(HermesNestDesign.Typography.control)
+
+                            Text(viewModel.terminalHistoryRetryMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+
+                            Button("Retry History") {
+                                Task {
+                                    await viewModel.retryTerminalHistory(
+                                        modelContext: modelContext
+                                    )
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            .orange.opacity(0.12),
+                            in: RoundedRectangle(cornerRadius: 12)
                         )
-                        .font(HermesNestDesign.Typography.control)
+                        .accessibilityIdentifier("companion.run.history-retry")
+                    }
 
-                        Text(viewModel.terminalHistoryRetryMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                    if let mutationErrorMessage = viewModel.mutationErrorMessage {
+                        Label(
+                            mutationErrorMessage,
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
 
-                        Button("Retry History") {
+                    if viewModel.hasOlderMessages {
+                        Button {
+                            viewModel.loadOlderMessages()
+                        } label: {
+                            Label("Load earlier messages", systemImage: "arrow.up")
+                        }
+                        .buttonStyle(.bordered)
+                        .frame(maxWidth: .infinity)
+                    }
+
+                    ForEach(viewModel.visibleMessages) { message in
+                        CompanionMessageRow(
+                            message: message,
+                            reasoningGroups: viewModel.durableReasoning(
+                                anchoredTo: message
+                            ),
+                            toolCallGroups: viewModel.durableToolActivity(
+                                anchoredTo: message
+                            ),
+                            transcriptMediaCacheNamespace:
+                                companionURL.absoluteString,
+                            loadAttachment: {
+                                try? await workspaceService.downloadAttachment(
+                                    path: $0
+                                )
+                            }
+                        )
+                        .equatable()
+                    }
+
+                    if !viewModel.reasoningText.isEmpty {
+                        DisclosureGroup("Reasoning") {
+                            Text(viewModel.reasoningText)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                                .frame(
+                                    maxWidth: .infinity,
+                                    alignment: .leading
+                                )
+                        }
+                        .accessibilityIdentifier("companion.run.reasoning")
+                    }
+
+                    ForEach(viewModel.liveToolCalls) { toolCall in
+                        ToolCallCardView(toolCall: toolCall)
+                    }
+
+                    if let approval = viewModel.pendingApproval {
+                        CompanionRunApprovalCard(
+                            approval: approval,
+                            submissionChoice:
+                                viewModel.approvalSubmissionChoice,
+                            errorMessage:
+                                viewModel.approvalErrorMessage,
+                            canRespond: viewModel.canRespondToApproval
+                        ) { choice in
                             Task {
-                                await viewModel.retryTerminalHistory(
+                                await viewModel.respondToApproval(
+                                    choice,
                                     modelContext: modelContext
                                 )
                             }
                         }
-                        .buttonStyle(.bordered)
+                    } else if viewModel.approvalContextUnavailable {
+                        CompanionRunApprovalUnavailableCard()
                     }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        .orange.opacity(0.12),
-                        in: RoundedRectangle(cornerRadius: 12)
-                    )
-                    .accessibilityIdentifier("companion.run.history-retry")
-                }
 
-                if let mutationErrorMessage = viewModel.mutationErrorMessage {
-                    Label(
-                        mutationErrorMessage,
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                if viewModel.hasOlderMessages {
-                    Button {
-                        viewModel.loadOlderMessages()
-                    } label: {
-                        Label("Load earlier messages", systemImage: "arrow.up")
+                    if let streamingMessage = viewModel.streamingMessage {
+                        MessageBubbleView(
+                            message: streamingMessage,
+                            transcriptMediaCacheNamespace: companionURL.absoluteString,
+                            isStreaming: viewModel.isRunActive
+                        )
+                        .accessibilityLabel("Streaming assistant response")
                     }
-                    .buttonStyle(.bordered)
-                    .frame(maxWidth: .infinity)
-                }
 
-                ForEach(viewModel.visibleMessages) { message in
-                    CompanionMessageRow(
-                        message: message,
-                        reasoningGroups: viewModel.durableReasoning(
-                            anchoredTo: message
-                        ),
-                        toolCallGroups: viewModel.durableToolActivity(
-                            anchoredTo: message
-                        ),
-                        transcriptMediaCacheNamespace:
-                            companionURL.absoluteString,
-                        loadAttachment: {
-                            try? await workspaceService.downloadAttachment(
-                                path: $0
-                            )
-                        }
-                    )
-                    .equatable()
+                    Color.clear
+                        .frame(height: 1)
+                        .id(transcriptBottomAnchorID)
+                        .allowsHitTesting(false)
                 }
-
-                if !viewModel.reasoningText.isEmpty {
-                    DisclosureGroup("Reasoning") {
-                        Text(viewModel.reasoningText)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                            .frame(
-                                maxWidth: .infinity,
-                                alignment: .leading
-                            )
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(
+                    maxWidth: HermesNestDesign.transcriptMaximumWidth,
+                    alignment: .leading
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.interactively)
+            .background {
+                HermesNestDesign.canvas
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        dismissComposerKeyboard()
                     }
-                    .accessibilityIdentifier("companion.run.reasoning")
-                }
-
-                ForEach(viewModel.liveToolCalls) { toolCall in
-                    ToolCallCardView(toolCall: toolCall)
-                }
-
-                if let approval = viewModel.pendingApproval {
-                    CompanionRunApprovalCard(
-                        approval: approval,
-                        submissionChoice:
-                            viewModel.approvalSubmissionChoice,
-                        errorMessage:
-                            viewModel.approvalErrorMessage,
-                        canRespond: viewModel.canRespondToApproval
-                    ) { choice in
-                        Task {
-                            await viewModel.respondToApproval(
-                                choice,
-                                modelContext: modelContext
-                            )
-                        }
-                    }
-                } else if viewModel.approvalContextUnavailable {
-                    CompanionRunApprovalUnavailableCard()
-                }
-
-                if let streamingMessage = viewModel.streamingMessage {
-                    MessageBubbleView(
-                        message: streamingMessage,
-                        transcriptMediaCacheNamespace: companionURL.absoluteString,
+            }
+            .background {
+                ZStack {
+                    ChatScrollObserver(
                         isStreaming: viewModel.isRunActive
-                    )
-                    .accessibilityLabel("Streaming assistant response")
+                    ) { metrics in
+                        updateScrollMetrics(metrics)
+                    }
+                    ChatVerticalScrollAxisGuard()
                 }
+                .accessibilityHidden(true)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(
-                maxWidth: HermesNestDesign.transcriptMaximumWidth,
-                alignment: .leading
+            .environment(
+                \.chatIsUserInteractingWithScroll,
+                isUserInteractingWithScroll
             )
-            .frame(maxWidth: .infinity)
-        }
-        .scrollIndicators(.hidden)
-        .scrollDismissesKeyboard(.interactively)
-        .background {
-            HermesNestDesign.canvas
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    dismissComposerKeyboard()
+            .defaultScrollAnchor(
+                ChatScrollPolicy.initialTranscriptAnchor,
+                for: .initialOffset
+            )
+            .defaultScrollAnchor(
+                ChatScrollPolicy.sizeChangeAnchor(
+                    shouldFollowLatestMessage: shouldFollowLatestMessage
+                ),
+                for: .sizeChanges
+            )
+            .onChange(of: viewModel.visibleMessages.last?.id) {
+                let isExplicitSend = pendingExplicitSendFollow
+                guard shouldFollowLatestMessage || isExplicitSend else {
+                    return
                 }
-        }
-        .background {
-            ZStack {
-                ChatScrollObserver(
-                    isStreaming: viewModel.isRunActive
-                ) { metrics in
-                    isUserInteractingWithScroll = metrics.isUserInteracting
-                }
-                ChatVerticalScrollAxisGuard()
+                pendingExplicitSendFollow = false
+                scheduleFollowScroll(
+                    proxy,
+                    animated: true,
+                    isUserInitiated: isExplicitSend
+                )
             }
-            .accessibilityHidden(true)
+            .onChange(of: viewModel.streamingFollowTrigger) {
+                guard shouldFollowLatestMessage else { return }
+                scheduleFollowScroll(proxy, animated: true)
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: UIResponder.keyboardWillShowNotification
+                )
+            ) { _ in
+                guard isScrolledNearBottom else { return }
+                scheduleFollowScroll(proxy, animated: false)
+            }
         }
-        .environment(
-            \.chatIsUserInteractingWithScroll,
-            isUserInteractingWithScroll
-        )
-        .defaultScrollAnchor(
-            ChatScrollPolicy.initialTranscriptAnchor,
-            for: .initialOffset
-        )
         .safeAreaInset(edge: .bottom, spacing: 0) {
             companionComposer
         }
@@ -1300,6 +1345,7 @@ struct CompanionSessionHistoryView: View {
 
     private func sendDraft() {
         let draft = draftMessage
+        prepareTranscriptForExplicitSend()
         Task {
             if await viewModel.send(
                 draft,
@@ -1307,6 +1353,82 @@ struct CompanionSessionHistoryView: View {
             ) {
                 draftMessage = ""
                 composerIsFocused = false
+            } else {
+                pendingExplicitSendFollow = false
+            }
+        }
+    }
+
+    private func updateScrollMetrics(_ metrics: ChatScrollMetrics) {
+        let isNearBottom = ChatScrollPolicy.isNearBottom(
+            distanceFromBottom: metrics.distanceFromBottom,
+            isStreaming: viewModel.isRunActive
+        )
+        isScrolledNearBottom = isNearBottom
+        isUserInteractingWithScroll = metrics.isUserInteracting
+
+        if metrics.isUserInteracting {
+            userScrollCooldownUntil = ChatScrollPolicy.cooldownDeadline()
+        }
+
+        if isNearBottom {
+            shouldFollowLatestMessage = true
+        } else if metrics.isUserInteracting {
+            shouldFollowLatestMessage = false
+        }
+    }
+
+    private var isAutoFollowScrollPaused: Bool {
+        ChatScrollPolicy.isAutoScrollPaused(
+            isUserInteracting: isUserInteractingWithScroll,
+            cooldownUntil: userScrollCooldownUntil
+        )
+    }
+
+    private func prepareTranscriptForExplicitSend() {
+        shouldFollowLatestMessage = true
+        userScrollCooldownUntil = nil
+        pendingExplicitSendFollow = true
+    }
+
+    private func scheduleFollowScroll(
+        _ proxy: ScrollViewProxy,
+        animated: Bool,
+        isUserInitiated: Bool = false
+    ) {
+        guard isUserInitiated || !isAutoFollowScrollPaused else { return }
+
+        if isUserInitiated {
+            userScrollCooldownUntil = nil
+        }
+
+        followScrollGeneration += 1
+        let generation = followScrollGeneration
+        Task { @MainActor in
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 16_000_000)
+            guard
+                !Task.isCancelled,
+                generation == followScrollGeneration,
+                isUserInitiated || !isAutoFollowScrollPaused
+            else {
+                return
+            }
+
+            if isUserInitiated {
+                shouldFollowLatestMessage = true
+            }
+
+            if animated {
+                withAnimation(
+                    viewModel.isRunActive
+                        ? ChatMotion.streamingFollow(reduceMotion: reduceMotion)
+                        : ChatMotion.scrollToLatest(reduceMotion: reduceMotion)
+                ) {
+                    proxy.scrollTo(transcriptBottomAnchorID, anchor: .bottom)
+                }
+            } else {
+                proxy.scrollTo(transcriptBottomAnchorID, anchor: .bottom)
             }
         }
     }

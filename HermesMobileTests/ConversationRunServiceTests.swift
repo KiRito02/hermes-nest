@@ -1304,6 +1304,66 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
     }
 
     @MainActor
+    func testLatestVisibleMessageIdentityChangesAtPageLimit() async throws {
+        let session = try makeSessionSummary()
+        let history = (0..<50).map { index in
+            ChatMessage(
+                role: index.isMultiple(of: 2) ? "user" : "assistant",
+                content: "Message \(index)",
+                timestamp: Double(index),
+                messageId: "message-\(index)"
+            )
+        }
+        let repository = RunHistoryRepositoryStub(
+            session: session,
+            historyMessagesByCall: [1: history]
+        )
+        let runService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: [
+                ConversationRunSnapshot(
+                    runID: "run-1",
+                    state: .cancelled,
+                    sessionID: "session-1",
+                    lastEvent: "run.cancelled",
+                    output: nil,
+                    errorMessage: nil
+                )
+            ]
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            pageSize: 50,
+            runService: runService,
+            reconciliationDelayNanoseconds: 0
+        )
+
+        await viewModel.load()
+        let previousLastMessageID = viewModel.visibleMessages.last?.id
+        let didSend = await viewModel.send("Newest")
+
+        XCTAssertTrue(didSend)
+        XCTAssertEqual(50, viewModel.visibleMessages.count)
+        XCTAssertNotEqual(
+            previousLastMessageID,
+            viewModel.visibleMessages.last?.id
+        )
+        XCTAssertEqual("Newest", viewModel.visibleMessages.last?.content)
+
+        let latestMessageID = viewModel.visibleMessages.last?.id
+        viewModel.loadOlderMessages()
+        XCTAssertEqual(51, viewModel.visibleMessages.count)
+        XCTAssertEqual(latestMessageID, viewModel.visibleMessages.last?.id)
+
+        await viewModel.stopRun()
+        await waitUntil { viewModel.activeRunID == nil }
+    }
+
+    @MainActor
     func testRawDeltasAreCoalescedBeforeSwiftUIPublication() async throws {
         let session = try makeSessionSummary()
         let repository = RunHistoryRepositoryStub(session: session)
@@ -1330,13 +1390,22 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
             reconciliationDelayNanoseconds: 0
         )
         await viewModel.load()
+        let initialFollowTrigger = viewModel.streamingFollowTrigger
         let didSend = await viewModel.send("Stream")
         XCTAssertTrue(didSend)
 
         try await Task.sleep(nanoseconds: 10_000_000)
         XCTAssertEqual("", viewModel.streamedAssistantText)
+        XCTAssertEqual(
+            initialFollowTrigger,
+            viewModel.streamingFollowTrigger
+        )
         try await Task.sleep(nanoseconds: 60_000_000)
         XCTAssertEqual("ABC", viewModel.streamedAssistantText)
+        XCTAssertGreaterThan(
+            viewModel.streamingFollowTrigger,
+            initialFollowTrigger
+        )
 
         await viewModel.stopRun()
         await waitUntil { viewModel.activeRunID == nil }
@@ -1474,6 +1543,7 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
             reconciliationDelayNanoseconds: 0
         )
         await viewModel.load()
+        let initialFollowTrigger = viewModel.streamingFollowTrigger
         let didSend = await viewModel.send("Inspect")
         XCTAssertTrue(didSend)
         await waitUntil {
@@ -1485,6 +1555,10 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         XCTAssertEqual("read_file", viewModel.liveToolCalls[0].name)
         XCTAssertTrue(viewModel.liveToolCalls[0].isCompleted)
         XCTAssertEqual(0.25, viewModel.liveToolCalls[0].duration)
+        XCTAssertGreaterThan(
+            viewModel.streamingFollowTrigger,
+            initialFollowTrigger
+        )
 
         await viewModel.stopRun()
         await waitUntil { viewModel.activeRunID == nil }
