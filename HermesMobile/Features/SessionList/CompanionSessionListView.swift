@@ -598,52 +598,7 @@ struct CompanionSessionHistoryView: View {
                     alignment: .leading,
                     spacing: HermesNestDesign.Spacing.medium
                 ) {
-                    if viewModel.isViewingCachedData {
-                        CompanionOfflineCacheBanner()
-                    }
-
-                    if viewModel.needsTerminalHistoryRetry {
-                        VStack(
-                            alignment: .leading,
-                            spacing: HermesNestDesign.Spacing.small
-                        ) {
-                            Label(
-                                "Final response is shown from the run stream.",
-                                systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
-                            )
-                            .font(HermesNestDesign.Typography.control)
-
-                            Text(viewModel.terminalHistoryRetryMessage)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-
-                            Button("Retry History") {
-                                Task {
-                                    await viewModel.retryTerminalHistory(
-                                        modelContext: modelContext
-                                    )
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            .orange.opacity(0.12),
-                            in: RoundedRectangle(cornerRadius: 12)
-                        )
-                        .accessibilityIdentifier("companion.run.history-retry")
-                    }
-
-                    if let mutationErrorMessage = viewModel.mutationErrorMessage {
-                        Label(
-                            mutationErrorMessage,
-                            systemImage: "exclamationmark.triangle"
-                        )
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                    transcriptStatusContent
 
                     if viewModel.hasOlderMessages {
                         Button {
@@ -1071,6 +1026,56 @@ struct CompanionSessionHistoryView: View {
             Task {
                 await viewModel.discardStagedDroppedAttachments()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var transcriptStatusContent: some View {
+        if viewModel.isViewingCachedData {
+            CompanionOfflineCacheBanner()
+        }
+
+        if viewModel.needsTerminalHistoryRetry {
+            VStack(
+                alignment: .leading,
+                spacing: HermesNestDesign.Spacing.small
+            ) {
+                Label(
+                    "Final response is shown from the run stream.",
+                    systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
+                )
+                .font(HermesNestDesign.Typography.control)
+
+                Text(viewModel.terminalHistoryRetryMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Button("Retry History") {
+                    Task {
+                        await viewModel.retryTerminalHistory(
+                            modelContext: modelContext
+                        )
+                    }
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                .orange.opacity(0.12),
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+            .accessibilityIdentifier("companion.run.history-retry")
+        }
+
+        if let mutationErrorMessage = viewModel.mutationErrorMessage {
+            Label(
+                mutationErrorMessage,
+                systemImage: "exclamationmark.triangle"
+            )
+            .font(.footnote)
+            .foregroundStyle(.red)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
