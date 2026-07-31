@@ -1503,7 +1503,10 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
 
         let didSend = await viewModel.send("Inspect")
         XCTAssertTrue(didSend)
-        await waitUntil { viewModel.activeRunID == nil }
+        await waitUntil {
+            viewModel.activeRunID == nil
+                && viewModel.allMessages.last?.content == "Saved answer"
+        }
 
         XCTAssertEqual("Saved answer", viewModel.allMessages.last?.content)
         XCTAssertNil(viewModel.streamingMessage)
