@@ -758,7 +758,6 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
                 content: nil,
                 timestamp: 2,
                 messageId: "reasoning-1",
-                reasoning: "Checking the current model documentation.",
                 toolCalls: [
                     .object([
                         "id": .string("tool-1"),
@@ -767,7 +766,8 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
                             "arguments": .string(#"{"q":"models"}"#),
                         ]),
                     ])
-                ]
+                ],
+                reasoning: "Checking the current model documentation."
             ),
             ChatMessage(
                 role: "tool",
@@ -808,7 +808,7 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         let didSend = await viewModel.send("Compare the models")
         XCTAssertTrue(didSend)
         await waitUntil {
-            viewModel.durableReasoningGroups.map(\.text) == [
+            viewModel.durableReasoningGroups.map { group in group.text } == [
                 "Checking the current model documentation."
             ]
         }
