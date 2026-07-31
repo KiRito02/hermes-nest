@@ -544,6 +544,11 @@ enum ConversationRunServiceError: LocalizedError, Equatable {
 
 actor ConversationRunService: ConversationRunServing {
     static let maximumResponseBytes = 2 * 1024 * 1024
+    /// Gateway sends an idle run keepalive every 30 seconds. Foundation can
+    /// wait for the first response byte before completing `bytes(for:)`, so the
+    /// connect guard must leave margin beyond that verified interval.
+    static let defaultEventConnectTimeoutNanoseconds: UInt64 =
+        45_000_000_000
 
     private let companionURL: URL
     private let keychain: any KeychainStoring
@@ -557,7 +562,8 @@ actor ConversationRunService: ConversationRunServing {
         keychain: any KeychainStoring = KeychainStore(),
         session: URLSession? = nil,
         eventSession: URLSession? = nil,
-        eventConnectTimeoutNanoseconds: UInt64 = 15_000_000_000
+        eventConnectTimeoutNanoseconds: UInt64 =
+            ConversationRunService.defaultEventConnectTimeoutNanoseconds
     ) {
         self.companionURL = companionURL
         self.keychain = keychain

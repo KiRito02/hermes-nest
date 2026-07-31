@@ -671,6 +671,11 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
             configuration.timeoutIntervalForResource,
             24 * 60 * 60
         )
+        XCTAssertGreaterThan(
+            ConversationRunService.defaultEventConnectTimeoutNanoseconds,
+            30_000_000_000,
+            "The first-byte guard must outlast the Gateway idle keepalive."
+        )
     }
 
     func testActiveRunStoreSurvivesProcessStoreRecreation() async throws {
@@ -906,6 +911,527 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         XCTAssertEqual(["run-1"], restoredStatusRunIDs)
         XCTAssertFalse(restoredViewModel.canSend)
         restoredViewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testNavigationReusesLiveRunViewModelAndEventStream() async throws {
+        let session = try makeSessionSummary()
+        let reasoning = ConversationRunEvent.data(
+            ConversationRunEventData(
+                transportEvent: nil,
+                event: "reasoning.available",
+                runID: "run-1",
+                delta: nil,
+                text: "Still working on the same live run.",
+                output: nil,
+                error: nil,
+                timestamp: 2
+            )
+        )
+        let runService = RunServiceStub(
+            eventResult: .eventBatchesThenWait(
+                [],
+                [reasoning],
+                50_000_000,
+                5_000_000_000
+            ),
+            statuses: []
+        )
+        let companionURL = try XCTUnwrap(
+            URL(string: "https://companion.example.test")
+        )
+        let registry = CompanionSessionHistoryViewModelRegistry()
+        let firstViewModel = registry.viewModel(for: session) {
+            CompanionSessionHistoryViewModel(
+                session: session,
+                repository: RunHistoryRepositoryStub(session: session),
+                companionURL: companionURL,
+                runService: runService
+            )
+        }
+
+        await firstViewModel.load()
+        let didSend = await firstViewModel.send("Keep the live stream")
+        XCTAssertTrue(didSend)
+
+        let reopenedViewModel = registry.viewModel(for: session) {
+            XCTFail("Reopening the same chat must reuse its live view model")
+            return firstViewModel
+        }
+
+        XCTAssertTrue(firstViewModel === reopenedViewModel)
+        await waitUntil {
+            reopenedViewModel.reasoningText
+                == "Still working on the same live run."
+        }
+        XCTAssertTrue(reopenedViewModel.hasLiveTranscriptContent)
+        XCTAssertEqual(.streaming, reopenedViewModel.runState)
+        let eventRunIDs = await runService.eventRunIDs
+        XCTAssertEqual(["run-1"], eventRunIDs)
+        reopenedViewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testRegistryPreservesLiveSessionWhileBrowsingInactiveChats() async throws {
+        let companionURL = try XCTUnwrap(
+            URL(string: "https://companion.example.test")
+        )
+        let registry = CompanionSessionHistoryViewModelRegistry()
+        let firstSession = try makeSessionSummary(id: "session-0")
+        let firstRunService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: []
+        )
+        let firstViewModel = registry.viewModel(for: firstSession) {
+            CompanionSessionHistoryViewModel(
+                session: firstSession,
+                repository: RunHistoryRepositoryStub(session: firstSession),
+                companionURL: companionURL,
+                runService: firstRunService
+            )
+        }
+
+        await firstViewModel.load()
+        let didStartFirstRun = await firstViewModel.send(
+            "Keep this stream open"
+        )
+        XCTAssertTrue(didStartFirstRun)
+        await waitForEventStreamStart(firstRunService)
+
+        for index in 1...4 {
+            let session = try makeSessionSummary(id: "session-\(index)")
+            _ = registry.viewModel(for: session) {
+                CompanionSessionHistoryViewModel(
+                    session: session,
+                    repository: RunHistoryRepositoryStub(session: session),
+                    companionURL: companionURL,
+                    runService: RunServiceStub(
+                        eventResult: .holdOpen,
+                        statuses: []
+                    )
+                )
+            }
+        }
+
+        let reopenedViewModel = registry.viewModel(for: firstSession) {
+            XCTFail("Inactive browsing must not evict a live event stream")
+            return firstViewModel
+        }
+
+        XCTAssertTrue(firstViewModel === reopenedViewModel)
+        let terminatedRunIDs = await firstRunService.eventTerminationRunIDs
+        XCTAssertTrue(terminatedRunIDs.isEmpty)
+        registry.removeAll()
+    }
+
+    @MainActor
+    func testEvictedViewModelCannotSendUntilReadopted() async throws {
+        let companionURL = try XCTUnwrap(
+            URL(string: "https://companion.example.test")
+        )
+        let registry = CompanionSessionHistoryViewModelRegistry()
+        let firstSession = try makeSessionSummary(id: "session-retained")
+        let firstRunService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: []
+        )
+        let retainedViewModel = registry.viewModel(for: firstSession) {
+            CompanionSessionHistoryViewModel(
+                session: firstSession,
+                repository: RunHistoryRepositoryStub(session: firstSession),
+                companionURL: companionURL,
+                runService: firstRunService
+            )
+        }
+
+        for index in 1...(CompanionSessionPool.maximumConcurrentEventStreams + 1) {
+            let session = try makeSessionSummary(id: "inactive-\(index)")
+            _ = registry.viewModel(for: session) {
+                CompanionSessionHistoryViewModel(
+                    session: session,
+                    repository: RunHistoryRepositoryStub(session: session),
+                    companionURL: companionURL,
+                    runService: RunServiceStub(
+                        eventResult: .holdOpen,
+                        statuses: []
+                    )
+                )
+            }
+        }
+
+        let didSendWhileEvicted = await retainedViewModel.send(
+            "Must not start outside registry accounting"
+        )
+        XCTAssertFalse(didSendWhileEvicted)
+        let evictedStartRequests = await firstRunService.startRequests
+        XCTAssertTrue(evictedStartRequests.isEmpty)
+
+        registry.adopt(retainedViewModel, sessionID: firstSession.id)
+        let didSendAfterReadoption = await retainedViewModel.send(
+            "Now start under registry accounting"
+        )
+        XCTAssertTrue(didSendAfterReadoption)
+        await waitForEventStreamStart(firstRunService)
+        registry.removeAll()
+    }
+
+    @MainActor
+    func testRegistryRejectsFifthRunWithoutEvictingLiveStreams() async throws {
+        let companionURL = try XCTUnwrap(
+            URL(string: "https://companion.example.test")
+        )
+        let registry = CompanionSessionHistoryViewModelRegistry()
+        var viewModels: [CompanionSessionHistoryViewModel] = []
+        var runServices: [RunServiceStub] = []
+
+        for index in 0..<CompanionSessionPool.maximumConcurrentEventStreams {
+            let session = try makeSessionSummary(id: "session-\(index)")
+            let runService = RunServiceStub(
+                eventResult: .holdOpen,
+                statuses: []
+            )
+            let viewModel = registry.viewModel(for: session) {
+                CompanionSessionHistoryViewModel(
+                    session: session,
+                    repository: RunHistoryRepositoryStub(session: session),
+                    companionURL: companionURL,
+                    runService: runService
+                )
+            }
+            await viewModel.load()
+            let didStartRun = await viewModel.send(
+                "Keep stream \(index) open"
+            )
+            XCTAssertTrue(didStartRun)
+            await waitForEventStreamStart(runService)
+            viewModels.append(viewModel)
+            runServices.append(runService)
+        }
+
+        let fifthSession = try makeSessionSummary(id: "session-overflow")
+        let fifthRunService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: []
+        )
+        let fifthViewModel = registry.viewModel(for: fifthSession) {
+            CompanionSessionHistoryViewModel(
+                session: fifthSession,
+                repository: RunHistoryRepositoryStub(session: fifthSession),
+                companionURL: companionURL,
+                runService: fifthRunService
+            )
+        }
+
+        let didStartFifthRun = await fifthViewModel.send(
+            "Do not exceed the event capacity"
+        )
+        XCTAssertFalse(didStartFifthRun)
+        XCTAssertNotNil(fifthViewModel.mutationErrorMessage)
+        let fifthStartRequests = await fifthRunService.startRequests
+        XCTAssertTrue(fifthStartRequests.isEmpty)
+
+        for runService in runServices {
+            let terminatedRunIDs = await runService.eventTerminationRunIDs
+            XCTAssertTrue(terminatedRunIDs.isEmpty)
+        }
+
+        let firstViewModel = try XCTUnwrap(viewModels.first)
+        let firstSession = firstViewModel.session
+        let reopenedViewModel = registry.viewModel(for: firstSession) {
+            XCTFail("Capacity admission must not evict a live stream")
+            return firstViewModel
+        }
+        XCTAssertTrue(firstViewModel === reopenedViewModel)
+        registry.removeAll()
+    }
+
+    @MainActor
+    func testRegistryRejectsFifthSimultaneousPendingStart() async throws {
+        let companionURL = try XCTUnwrap(
+            URL(string: "https://companion.example.test")
+        )
+        let registry = CompanionSessionHistoryViewModelRegistry()
+        var pendingServices: [RunServiceStub] = []
+        var pendingTasks: [Task<Bool, Never>] = []
+
+        for index in 0..<CompanionSessionPool.maximumConcurrentEventStreams {
+            let session = try makeSessionSummary(id: "pending-\(index)")
+            let runService = RunServiceStub(
+                eventResult: .holdOpen,
+                statuses: [],
+                holdsStartUntilReleased: true
+            )
+            let viewModel = registry.viewModel(for: session) {
+                CompanionSessionHistoryViewModel(
+                    session: session,
+                    repository: RunHistoryRepositoryStub(session: session),
+                    companionURL: companionURL,
+                    runService: runService
+                )
+            }
+            let sendTask = Task {
+                await viewModel.send("Pending run \(index)")
+            }
+            await waitForRunStartRequest(runService)
+            pendingServices.append(runService)
+            pendingTasks.append(sendTask)
+        }
+
+        let fifthSession = try makeSessionSummary(id: "pending-overflow")
+        let fifthRunService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: []
+        )
+        let fifthViewModel = registry.viewModel(for: fifthSession) {
+            CompanionSessionHistoryViewModel(
+                session: fifthSession,
+                repository: RunHistoryRepositoryStub(session: fifthSession),
+                companionURL: companionURL,
+                runService: fifthRunService
+            )
+        }
+        let didStartFifthRun = await fifthViewModel.send(
+            "Do not create a fifth pending run"
+        )
+
+        XCTAssertFalse(didStartFifthRun)
+        XCTAssertNotNil(fifthViewModel.mutationErrorMessage)
+        let fifthStartRequests = await fifthRunService.startRequests
+        XCTAssertTrue(fifthStartRequests.isEmpty)
+
+        for runService in pendingServices {
+            await runService.releaseStart()
+        }
+        for sendTask in pendingTasks {
+            let didStartRun = await sendTask.value
+            XCTAssertTrue(didStartRun)
+        }
+        registry.removeAll()
+    }
+
+    @MainActor
+    func testRegistryOwnerTeardownCancelsLiveObservation() async throws {
+        let session = try makeSessionSummary()
+        let companionURL = try XCTUnwrap(
+            URL(string: "https://companion.example.test")
+        )
+        let runService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: []
+        )
+        let registry = CompanionSessionHistoryViewModelRegistry()
+        let viewModel = registry.viewModel(for: session) {
+            CompanionSessionHistoryViewModel(
+                session: session,
+                repository: RunHistoryRepositoryStub(session: session),
+                companionURL: companionURL,
+                runService: runService
+            )
+        }
+
+        await viewModel.load()
+        let didStartRun = await viewModel.send("Keep this stream open")
+        XCTAssertTrue(didStartRun)
+        await waitForEventStreamStart(runService)
+        registry.suspendObservations()
+        await waitForEventStreamTermination(runService)
+
+        let terminatedRunIDs = await runService.eventTerminationRunIDs
+        XCTAssertEqual(["run-1"], terminatedRunIDs)
+
+        let reopenedViewModel = registry.viewModel(for: session) {
+            XCTFail("Owner reappearance must reuse the tracked view model")
+            return viewModel
+        }
+        XCTAssertTrue(viewModel === reopenedViewModel)
+        registry.removeAll()
+    }
+
+    @MainActor
+    func testDelayedStartOwnerTeardownSkipsEventStream() async throws {
+        let session = try makeSessionSummary()
+        let companionURL = try XCTUnwrap(
+            URL(string: "https://companion.example.test")
+        )
+        let runService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: [],
+            holdsStartUntilReleased: true
+        )
+        let registry = CompanionSessionHistoryViewModelRegistry()
+        let viewModel = registry.viewModel(for: session) {
+            CompanionSessionHistoryViewModel(
+                session: session,
+                repository: RunHistoryRepositoryStub(session: session),
+                companionURL: companionURL,
+                runService: runService
+            )
+        }
+        await viewModel.load()
+
+        let sendTask = Task {
+            await viewModel.send("Start while leaving")
+        }
+        await waitForRunStartRequest(runService)
+        registry.suspendObservations()
+        await runService.releaseStart()
+        let didStartRun = await sendTask.value
+
+        XCTAssertTrue(didStartRun)
+        XCTAssertEqual("run-1", viewModel.activeRunID)
+        XCTAssertEqual(.transportDisconnected, viewModel.runState)
+        let eventRunIDs = await runService.eventRunIDs
+        XCTAssertTrue(eventRunIDs.isEmpty)
+        registry.removeAll()
+    }
+
+    @MainActor
+    func testDelayedStartReappearanceRestoresEventStream() async throws {
+        let session = try makeSessionSummary()
+        let companionURL = try XCTUnwrap(
+            URL(string: "https://companion.example.test")
+        )
+        let runService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: [],
+            holdsStartUntilReleased: true
+        )
+        let registry = CompanionSessionHistoryViewModelRegistry()
+        let viewModel = registry.viewModel(for: session) {
+            CompanionSessionHistoryViewModel(
+                session: session,
+                repository: RunHistoryRepositoryStub(session: session),
+                companionURL: companionURL,
+                runService: runService
+            )
+        }
+        await viewModel.load()
+
+        let sendTask = Task {
+            await viewModel.send("Start while briefly away")
+        }
+        await waitForRunStartRequest(runService)
+        registry.suspendObservations()
+        let reopenedViewModel = registry.viewModel(for: session) {
+            XCTFail("Reappearance must reuse the tracked view model")
+            return viewModel
+        }
+        await reopenedViewModel.resumeRunObservation()
+        await runService.releaseStart()
+        let didStartRun = await sendTask.value
+        await waitForEventStreamStart(runService)
+
+        XCTAssertTrue(didStartRun)
+        XCTAssertTrue(viewModel === reopenedViewModel)
+        XCTAssertEqual(.streaming, reopenedViewModel.runState)
+        let eventRunIDs = await runService.eventRunIDs
+        XCTAssertEqual(["run-1"], eventRunIDs)
+        registry.removeAll()
+    }
+
+    @MainActor
+    func testRegistryRetainsDelayedStartAtFullEventCapacity() async throws {
+        let companionURL = try XCTUnwrap(
+            URL(string: "https://companion.example.test")
+        )
+        let registry = CompanionSessionHistoryViewModelRegistry()
+        let firstSession = try makeSessionSummary(id: "session-starting")
+        let firstRunService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: [],
+            holdsStartUntilReleased: true
+        )
+        let firstViewModel = registry.viewModel(for: firstSession) {
+            CompanionSessionHistoryViewModel(
+                session: firstSession,
+                repository: RunHistoryRepositoryStub(session: firstSession),
+                companionURL: companionURL,
+                runService: firstRunService
+            )
+        }
+        await firstViewModel.load()
+        let firstSendTask = Task {
+            await firstViewModel.send("Start before eviction")
+        }
+        await waitForRunStartRequest(firstRunService)
+        var oldestLiveSession: SessionSummary?
+        var oldestLiveViewModel: CompanionSessionHistoryViewModel?
+        var oldestLiveRunService: RunServiceStub?
+
+        for index in 1..<CompanionSessionPool.maximumConcurrentEventStreams {
+            let session = try makeSessionSummary(id: "session-live-\(index)")
+            let runService = RunServiceStub(
+                eventResult: .holdOpen,
+                statuses: []
+            )
+            let viewModel = registry.viewModel(for: session) {
+                CompanionSessionHistoryViewModel(
+                    session: session,
+                    repository: RunHistoryRepositoryStub(session: session),
+                    companionURL: companionURL,
+                    runService: runService
+                )
+            }
+            let didStartRun = await viewModel.send("Fill slot \(index)")
+            XCTAssertTrue(didStartRun)
+            await waitForEventStreamStart(runService)
+            if index == 1 {
+                oldestLiveSession = session
+                oldestLiveViewModel = viewModel
+                oldestLiveRunService = runService
+            }
+        }
+
+        let overflowSession = try makeSessionSummary(id: "session-overflow")
+        let overflowRunService = RunServiceStub(
+            eventResult: .holdOpen,
+            statuses: []
+        )
+        let overflowViewModel = registry.viewModel(for: overflowSession) {
+            CompanionSessionHistoryViewModel(
+                session: overflowSession,
+                repository: RunHistoryRepositoryStub(
+                    session: overflowSession
+                ),
+                companionURL: companionURL,
+                runService: overflowRunService
+            )
+        }
+
+        let didStartOverflowRun = await overflowViewModel.send(
+            "Fifth pending run must be rejected"
+        )
+        XCTAssertFalse(didStartOverflowRun)
+        let overflowStartRequests = await overflowRunService.startRequests
+        XCTAssertTrue(overflowStartRequests.isEmpty)
+
+        let reopenedStartingViewModel = registry.viewModel(for: firstSession) {
+            XCTFail("A pending start must retain its registry identity")
+            return firstViewModel
+        }
+        await firstRunService.releaseStart()
+        let didStartFirstRun = await firstSendTask.value
+        await waitForEventStreamStart(firstRunService)
+        XCTAssertTrue(didStartFirstRun)
+        XCTAssertTrue(firstViewModel === reopenedStartingViewModel)
+        XCTAssertEqual(.streaming, firstViewModel.runState)
+        let eventRunIDs = await firstRunService.eventRunIDs
+        XCTAssertEqual(["run-1"], eventRunIDs)
+
+        let retainedLiveSession = try XCTUnwrap(oldestLiveSession)
+        let retainedLiveViewModel = try XCTUnwrap(oldestLiveViewModel)
+        let retainedLiveRunService = try XCTUnwrap(oldestLiveRunService)
+        let reopenedLiveViewModel = registry.viewModel(
+            for: retainedLiveSession
+        ) {
+            XCTFail("A rejected fifth run must not evict a live stream")
+            return retainedLiveViewModel
+        }
+        XCTAssertTrue(retainedLiveViewModel === reopenedLiveViewModel)
+        let terminatedRunIDs = await retainedLiveRunService
+            .eventTerminationRunIDs
+        XCTAssertTrue(terminatedRunIDs.isEmpty)
+        registry.removeAll()
     }
 
     @MainActor
@@ -2832,7 +3358,9 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         )
     }
 
-    private func makeSessionSummary() throws -> SessionSummary {
+    private func makeSessionSummary(
+        id: String = "session-1"
+    ) throws -> SessionSummary {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(
@@ -2840,12 +3368,57 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
             from: Data(
                 """
                 {
-                  "session_id": "session-1",
+                  "session_id": "\(id)",
                   "title": "Run test",
                   "source": "api_server"
                 }
                 """.utf8
             )
+        )
+    }
+
+    @MainActor
+    private func waitForRunStartRequest(
+        _ runService: RunServiceStub
+    ) async {
+        let deadline = ContinuousClock.now + .seconds(1)
+        while (await runService.startRequests).isEmpty,
+              ContinuousClock.now < deadline {
+            await Task.yield()
+        }
+        let requests = await runService.startRequests
+        XCTAssertFalse(requests.isEmpty, "Expected the run start request")
+    }
+
+    @MainActor
+    private func waitForEventStreamStart(
+        _ runService: RunServiceStub
+    ) async {
+        let deadline = ContinuousClock.now + .seconds(1)
+        while (await runService.eventRunIDs).isEmpty,
+              ContinuousClock.now < deadline {
+            await Task.yield()
+        }
+        let runIDs = await runService.eventRunIDs
+        XCTAssertFalse(
+            runIDs.isEmpty,
+            "Expected the live event stream to start"
+        )
+    }
+
+    @MainActor
+    private func waitForEventStreamTermination(
+        _ runService: RunServiceStub
+    ) async {
+        let deadline = ContinuousClock.now + .seconds(1)
+        while (await runService.eventTerminationRunIDs).isEmpty,
+              ContinuousClock.now < deadline {
+            await Task.yield()
+        }
+        let runIDs = await runService.eventTerminationRunIDs
+        XCTAssertFalse(
+            runIDs.isEmpty,
+            "Expected the live event stream to terminate"
         )
     }
 
@@ -3113,15 +3686,20 @@ private actor RunServiceStub: ConversationRunServing {
     private let eventResult: EventResult
     private var statuses: [ConversationRunSnapshot]
     private(set) var startRequests: [ConversationRunStartRequest] = []
+    private(set) var eventRunIDs: [String] = []
+    private(set) var eventTerminationRunIDs: [String] = []
     private(set) var statusRunIDs: [String] = []
     private(set) var stopCallCount = 0
     private(set) var approvalRequests: [ApprovalRequest] = []
     private let stopError: ConversationRunServiceError?
     private let statusError: ConversationRunServiceError?
     private let approvalError: ConversationRunServiceError?
+    private let holdsStartUntilReleased: Bool
     private let statusDelayNanoseconds: UInt64
     private let stopDelayNanoseconds: UInt64
     private let approvalDelayNanoseconds: UInt64
+    private var startContinuation: CheckedContinuation<Void, Never>?
+    private var isStartReleased = false
 
     init(
         eventResult: EventResult,
@@ -3129,6 +3707,7 @@ private actor RunServiceStub: ConversationRunServing {
         statusError: ConversationRunServiceError? = nil,
         stopError: ConversationRunServiceError? = nil,
         approvalError: ConversationRunServiceError? = nil,
+        holdsStartUntilReleased: Bool = false,
         statusDelayNanoseconds: UInt64 = 0,
         stopDelayNanoseconds: UInt64 = 0,
         approvalDelayNanoseconds: UInt64 = 0
@@ -3138,6 +3717,7 @@ private actor RunServiceStub: ConversationRunServing {
         self.statusError = statusError
         self.stopError = stopError
         self.approvalError = approvalError
+        self.holdsStartUntilReleased = holdsStartUntilReleased
         self.statusDelayNanoseconds = statusDelayNanoseconds
         self.stopDelayNanoseconds = stopDelayNanoseconds
         self.approvalDelayNanoseconds = approvalDelayNanoseconds
@@ -3147,6 +3727,11 @@ private actor RunServiceStub: ConversationRunServing {
         _ request: ConversationRunStartRequest
     ) async throws -> ConversationRunSnapshot {
         startRequests.append(request)
+        if holdsStartUntilReleased, !isStartReleased {
+            await withCheckedContinuation { continuation in
+                startContinuation = continuation
+            }
+        }
         return ConversationRunSnapshot(
             runID: "run-1",
             state: .started,
@@ -3155,6 +3740,12 @@ private actor RunServiceStub: ConversationRunServing {
             output: nil,
             errorMessage: nil
         )
+    }
+
+    func releaseStart() {
+        isStartReleased = true
+        startContinuation?.resume()
+        startContinuation = nil
     }
 
     func status(runID: String) async throws -> ConversationRunSnapshot {
@@ -3214,6 +3805,7 @@ private actor RunServiceStub: ConversationRunServing {
     func events(
         runID: String
     ) async throws -> AsyncThrowingStream<ConversationRunEvent, Error> {
+        eventRunIDs.append(runID)
         let result = eventResult
         return AsyncThrowingStream { continuation in
             switch result {
@@ -3223,7 +3815,11 @@ private actor RunServiceStub: ConversationRunServing {
                         .transportDisconnected
                 )
             case .holdOpen:
-                continuation.onTermination = { _ in }
+                continuation.onTermination = { [weak self] _ in
+                    Task {
+                        await self?.recordEventTermination(runID)
+                    }
+                }
             case .deltasThenWait(let deltas, let delay):
                 let task = Task {
                     for delta in deltas {
@@ -3294,6 +3890,10 @@ private actor RunServiceStub: ConversationRunServing {
                 continuation.onTermination = { _ in task.cancel() }
             }
         }
+    }
+
+    private func recordEventTermination(_ runID: String) {
+        eventTerminationRunIDs.append(runID)
     }
 }
 

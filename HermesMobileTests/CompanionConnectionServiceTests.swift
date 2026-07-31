@@ -48,7 +48,8 @@ final class CompanionConnectionServiceTests: CompanionHTTPTestCase {
         )
         assertCompanionSessionConfiguration(
             eventSession,
-            maximumConnectionsPerHost: 1
+            maximumConnectionsPerHost:
+                CompanionSessionPool.maximumConcurrentEventStreams
         )
     }
 

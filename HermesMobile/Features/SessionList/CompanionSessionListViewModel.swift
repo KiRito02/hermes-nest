@@ -439,6 +439,143 @@ private struct FailedAttachmentUpload: Sendable {
     let destination: CompanionUploadDestination
 }
 
+/// Keeps a session's presentation model alive while its run event stream is
+/// active, even when compact navigation temporarily removes the detail view,
+/// with four observed runs plus one bounded foreground browsing entry.
+/// Gateway run event queues are single-use, so recreating the view model after
+/// a pop can recover through status polling but cannot restore the live SSE.
+@MainActor
+final class CompanionSessionHistoryViewModelRegistry {
+    private struct Entry {
+        let viewModel: CompanionSessionHistoryViewModel
+        var lastAccess: UInt64
+    }
+
+    /// Four entries may own run observations; one extra entry represents the
+    /// currently browsed, non-running chat when every event slot is occupied.
+    private let maximumEntries =
+        CompanionSessionPool.maximumConcurrentEventStreams + 1
+    private var entries: [String: Entry] = [:]
+    private var accessSequence: UInt64 = 0
+
+    func viewModel(
+        for session: SessionSummary,
+        make: () -> CompanionSessionHistoryViewModel
+    ) -> CompanionSessionHistoryViewModel {
+        accessSequence &+= 1
+        if var existing = entries[session.id] {
+            existing.lastAccess = accessSequence
+            entries[session.id] = existing
+            configureRunAdmission(
+                for: existing.viewModel,
+                sessionID: session.id
+            )
+            evictOverflow(keeping: session.id)
+            return existing.viewModel
+        }
+
+        let viewModel = make()
+        configureRunAdmission(for: viewModel, sessionID: session.id)
+        entries[session.id] = Entry(
+            viewModel: viewModel,
+            lastAccess: accessSequence
+        )
+        evictOverflow(keeping: session.id)
+        return viewModel
+    }
+
+    func remove(sessionID: String) {
+        guard let entry = entries.removeValue(forKey: sessionID) else {
+            return
+        }
+        entry.viewModel.revokeRunStartAdmission()
+        entry.viewModel.suspendRunObservation()
+    }
+
+    func adopt(
+        _ viewModel: CompanionSessionHistoryViewModel,
+        sessionID: String
+    ) {
+        accessSequence &+= 1
+        if let existing = entries[sessionID],
+           existing.viewModel !== viewModel {
+            existing.viewModel.revokeRunStartAdmission()
+            existing.viewModel.suspendRunObservation()
+        }
+        configureRunAdmission(for: viewModel, sessionID: sessionID)
+        entries[sessionID] = Entry(
+            viewModel: viewModel,
+            lastAccess: accessSequence
+        )
+        evictOverflow(keeping: sessionID)
+    }
+
+    func suspendObservations() {
+        for entry in entries.values {
+            entry.viewModel.suspendRunObservation()
+        }
+    }
+
+    func removeAll() {
+        for entry in entries.values {
+            entry.viewModel.revokeRunStartAdmission()
+            entry.viewModel.suspendRunObservation()
+        }
+        entries.removeAll()
+    }
+
+    private func evictOverflow(keeping retainedSessionID: String) {
+        let candidates = entries
+            .filter { key, _ in key != retainedSessionID }
+            .sorted { lhs, rhs in
+                let lhsPriority = evictionPriority(
+                    for: lhs.value.viewModel
+                )
+                let rhsPriority = evictionPriority(
+                    for: rhs.value.viewModel
+                )
+                if lhsPriority != rhsPriority {
+                    return lhsPriority < rhsPriority
+                }
+                return lhs.value.lastAccess < rhs.value.lastAccess
+            }
+        let removalCount = max(0, entries.count - maximumEntries)
+        for (sessionID, _) in candidates.prefix(removalCount) {
+            remove(sessionID: sessionID)
+        }
+    }
+
+    private func evictionPriority(
+        for viewModel: CompanionSessionHistoryViewModel
+    ) -> Int {
+        if !viewModel.isRunActive {
+            return 0
+        }
+        // A started run has an authoritative ID and can recover through status
+        // polling. A pending start has no discoverable identity yet, so retain
+        // it until the start response is recorded.
+        return viewModel.runState == .starting ? 2 : 1
+    }
+
+    private func configureRunAdmission(
+        for viewModel: CompanionSessionHistoryViewModel,
+        sessionID: String
+    ) {
+        viewModel.configureRunStartAdmission { [weak self] in
+            guard let self else { return true }
+            let occupiedSlots = self.entries.reduce(into: 0) {
+                count, entry in
+                guard entry.key != sessionID else { return }
+                if entry.value.viewModel.isRunActive {
+                    count += 1
+                }
+            }
+            return occupiedSlots
+                < CompanionSessionPool.maximumConcurrentEventStreams
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class CompanionSessionHistoryViewModel {
@@ -485,6 +622,7 @@ final class CompanionSessionHistoryViewModel {
         [CompanionStagedAttachment] = []
     private(set) var attachmentUploadProgress: Double?
     private(set) var attachmentErrorMessage: String?
+    private(set) var hasLoadedAuthoritativeHistory = false
     private var failedAttachmentUpload: FailedAttachmentUpload?
 
     private let repository: any SessionRepository
@@ -505,6 +643,9 @@ final class CompanionSessionHistoryViewModel {
     private var terminalUsageRefreshTask: Task<Void, Never>?
     private var terminalUsageRefreshRunID: String?
     private var deltaFlushTask: Task<Void, Never>?
+    private var runObservationGeneration: UInt64 = 0
+    private var isRunObservationRequested = true
+    private var runStartAdmission: (() -> Bool)?
     @ObservationIgnored private var deltaBuffer =
         ConversationRunDeltaBuffer()
     @ObservationIgnored private var fastForwardedDelta = ""
@@ -513,6 +654,7 @@ final class CompanionSessionHistoryViewModel {
     private var terminalOutputFallback: String?
     private var nextToolOrdinal = 0
     private var isTerminalRefreshPending = false
+    private var isHistoryRequestInFlight = false
 
     init(
         session: SessionSummary,
@@ -564,6 +706,34 @@ final class CompanionSessionHistoryViewModel {
         }
     }
 
+    /// Primes cache-backed rows before a navigation transition completes. The
+    /// network reconcile starts afterward so the first transcript layout owns
+    /// a stable content height and bottom anchor.
+    func prepareInitialMessageLoad(modelContext: ModelContext?) {
+        guard
+            !hasLoadedAuthoritativeHistory,
+            !isHistoryRequestInFlight,
+            let sessionID = session.sessionId
+        else {
+            return
+        }
+
+        isLoading = true
+        guard allMessages.isEmpty else { return }
+        let cached = cachedMessages(sessionID: sessionID, in: modelContext)
+        guard !cached.isEmpty else { return }
+        apply(cached)
+        isViewingCachedData = true
+    }
+
+    func configureRunStartAdmission(_ admission: @escaping () -> Bool) {
+        runStartAdmission = admission
+    }
+
+    func revokeRunStartAdmission() {
+        runStartAdmission = { false }
+    }
+
     func durableReasoning(
         anchoredTo message: ChatMessage
     ) -> [ReasoningGroup] {
@@ -586,6 +756,14 @@ final class CompanionSessionHistoryViewModel {
 
     var isRunActive: Bool {
         activeRunID != nil || runState == .starting
+    }
+
+    var hasLiveTranscriptContent: Bool {
+        !reasoningText.isEmpty
+            || !liveToolCalls.isEmpty
+            || pendingApproval != nil
+            || approvalContextUnavailable
+            || streamingMessage != nil
     }
 
     private var activeRunKey: CompanionActiveRunKey? {
@@ -976,12 +1154,19 @@ final class CompanionSessionHistoryViewModel {
 
     @discardableResult
     func load(modelContext: ModelContext? = nil) async -> Bool {
-        guard let sessionID = session.sessionId, !isLoading else {
+        guard
+            let sessionID = session.sessionId,
+            !isHistoryRequestInFlight
+        else {
             return false
         }
+        isHistoryRequestInFlight = true
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer {
+            isHistoryRequestInFlight = false
+            isLoading = false
+        }
 
         let cached = cachedMessages(sessionID: sessionID, in: modelContext)
         if allMessages.isEmpty, !cached.isEmpty {
@@ -996,6 +1181,7 @@ final class CompanionSessionHistoryViewModel {
             )
             session = resolvedSession
             apply(history.messages)
+            hasLoadedAuthoritativeHistory = true
             isViewingCachedData = false
             cache(
                 history.messages,
@@ -1027,6 +1213,7 @@ final class CompanionSessionHistoryViewModel {
         modelContext: ModelContext? = nil
     ) async {
         guard !Task.isCancelled else { return }
+        isRunObservationRequested = true
         guard runTask == nil, reconciliationTask == nil else { return }
 
         if let activeRunID {
@@ -1054,8 +1241,11 @@ final class CompanionSessionHistoryViewModel {
     }
 
     func suspendRunObservation() {
-        guard activeRunID != nil else { return }
-        flushPendingDelta(forceAll: true)
+        isRunObservationRequested = false
+        runObservationGeneration &+= 1
+        if activeRunID != nil {
+            flushPendingDelta(forceAll: true)
+        }
         cancelRunTasks()
     }
 
@@ -1066,7 +1256,8 @@ final class CompanionSessionHistoryViewModel {
     func loadModelOptions(refresh: Bool = false) async {
         guard
             supportsModelSelection,
-            !isLoadingModelOptions
+            !isLoadingModelOptions,
+            refresh || modelGroups.isEmpty
         else {
             return
         }
@@ -1235,6 +1426,14 @@ final class CompanionSessionHistoryViewModel {
             in: .whitespacesAndNewlines
         )
         guard !trimmed.isEmpty else { return false }
+        guard runStartAdmission?() ?? true else {
+            mutationErrorMessage =
+                "\(CompanionSessionPool.maximumConcurrentEventStreams) "
+                + "other conversations are already running. "
+                + "Wait for one to finish before sending."
+            return false
+        }
+        mutationErrorMessage = nil
 
         cancelRunTasks()
         let authoritativeHistory = allMessages
@@ -1258,6 +1457,7 @@ final class CompanionSessionHistoryViewModel {
         terminalOutputFallback = nil
         latestRunUsage = nil
         nextToolOrdinal = 0
+        let observationGeneration = runObservationGeneration
         runState = .starting
         errorMessage = nil
 
@@ -1292,6 +1492,12 @@ final class CompanionSessionHistoryViewModel {
             )
         )
         pendingUploads = []
+        guard observationGeneration == runObservationGeneration
+            || isRunObservationRequested
+        else {
+            runState = .transportDisconnected
+            return true
+        }
         runState = .streaming
         runTask = Task { [weak self] in
             await self?.consumeEvents(
@@ -1744,7 +1950,12 @@ final class CompanionSessionHistoryViewModel {
         runID: String,
         modelContext: ModelContext?
     ) async {
-        guard let sessionID = session.sessionId else { return }
+        guard
+            let sessionID = session.sessionId,
+            !isHistoryRequestInFlight
+        else {
+            return
+        }
 
         do {
             let history = try await repository.messageHistory(id: sessionID)

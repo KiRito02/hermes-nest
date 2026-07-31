@@ -26,6 +26,13 @@ SESSION_VIEW = (
     ROOT
     / "HermesMobile/Features/SessionList/CompanionSessionListView.swift"
 ).read_text(encoding="utf-8")
+SESSION_VIEW_MODEL = (
+    ROOT
+    / "HermesMobile/Features/SessionList/CompanionSessionListViewModel.swift"
+).read_text(encoding="utf-8")
+RUN_SERVICE = (
+    ROOT / "HermesMobile/Networking/ConversationRunService.swift"
+).read_text(encoding="utf-8")
 MESSAGE_ACTIONS = (
     ROOT
     / "HermesMobile/Features/SessionList/CompanionPresentationSupport.swift"
@@ -149,8 +156,32 @@ for snippet, description in [
         "explicit-send Companion transcript follow reset",
     ),
     (
-        "isUserInitiated: isExplicitSend",
-        "explicit-send Companion transcript interaction bypass",
+        ".task(id: didCompleteInitialAppearance)",
+        "navigation-complete Companion transcript startup",
+    ),
+    (
+        "scheduleInitialTranscriptFollow(proxy)",
+        "post-navigation Companion transcript bottom correction",
+    ),
+    (
+        "UIResponder.keyboardDidHideNotification",
+        "post-send keyboard-dismissal transcript correction",
+    ),
+    (
+        "viewModel.hasLiveTranscriptContent",
+        "live-event-aware post-send keyboard target",
+    ),
+    (
+        "private func scheduleLatestMessageFollow(",
+        "stable optimistic-message scroll target",
+    ),
+    (
+        "historyViewModelRegistry: historyViewModelRegistry",
+        "navigation-stable Companion run observer ownership",
+    ),
+    (
+        "historyViewModelRegistry?.adopt(",
+        "rendered Companion view-model registry adoption",
     ),
     (
         "dismissComposerKeyboard()",
@@ -200,6 +231,27 @@ for snippet, description in [
     ),
 ]:
     require(SESSION_VIEW, snippet, description)
+require(
+    SESSION_VIEW_MODEL,
+    "final class CompanionSessionHistoryViewModelRegistry",
+    "Companion history view-model registry",
+)
+require(
+    RUN_SERVICE,
+    "static let defaultEventConnectTimeoutNanoseconds: UInt64 =",
+    "event connect timeout longer than the Gateway keepalive interval",
+)
+require(
+    RUN_SERVICE,
+    "45_000_000_000",
+    "45-second event first-byte timeout",
+)
+require(
+    SESSION_VIEW,
+    "if historyViewModelRegistry == nil {\n"
+    "                viewModel.suspendRunObservation()",
+    "standalone-only run observer teardown",
+)
 if ".defaultScrollAnchor(.bottom)" in SESSION_VIEW:
     raise SystemExit(
         "The Companion transcript must not reuse its initial bottom anchor "

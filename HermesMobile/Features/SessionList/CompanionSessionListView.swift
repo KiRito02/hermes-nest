@@ -20,6 +20,8 @@ struct CompanionSessionListView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var sessionPendingDelete: SessionSummary?
     @State private var isCreatingSession = false
+    @State private var historyViewModelRegistry =
+        CompanionSessionHistoryViewModelRegistry()
     @FocusState private var isSearchFocused: Bool
     private let repository: any SessionRepository
 
@@ -233,6 +235,7 @@ struct CompanionSessionListView: View {
         .alert("Forget this Companion?", isPresented: $isConfirmingForget) {
             Button("Cancel", role: .cancel) {}
             Button("Forget and revoke device", role: .destructive) {
+                historyViewModelRegistry.removeAll()
                 Task { await connectionManager.forgetConnection() }
             }
         } message: {
@@ -258,6 +261,9 @@ struct CompanionSessionListView: View {
                        selectedSessionID == session.id {
                         selectedSessionID = nil
                     }
+                    if didDelete {
+                        historyViewModelRegistry.remove(sessionID: session.id)
+                    }
                 }
             }
             Button("Cancel", role: .cancel) {
@@ -278,6 +284,9 @@ struct CompanionSessionListView: View {
             }
         } message: {
             Text(viewModel.mutationErrorMessage ?? "")
+        }
+        .onDisappear {
+            historyViewModelRegistry.suspendObservations()
         }
     }
 
@@ -313,6 +322,7 @@ struct CompanionSessionListView: View {
             supportsUploads: connection.capabilities.supportsUploads,
             supportsServerFileAttachments:
                 connection.capabilities.supportsServerFileAttachments,
+            historyViewModelRegistry: historyViewModelRegistry,
             onUpdated: { session in
                 selectedSessionID = session.id
                 viewModel.updateSessionSnapshot(
@@ -328,6 +338,7 @@ struct CompanionSessionListView: View {
                 }
             },
             onDeleted: { sessionID in
+                historyViewModelRegistry.remove(sessionID: sessionID)
                 selectedSessionID = nil
                 Task {
                     await viewModel.reconcileDeletedSession(
@@ -410,6 +421,8 @@ struct CompanionSessionHistoryView: View {
     let runService: (any ConversationRunServing)?
     let modelService: (any CompanionModelServing)?
     let workspaceService: any CompanionWorkspaceServing
+    let historyViewModelRegistry:
+        CompanionSessionHistoryViewModelRegistry?
     let onUpdated: (SessionSummary) -> Void
     let onForked: () -> Void
     let onDeleted: (String) -> Void
@@ -443,7 +456,9 @@ struct CompanionSessionHistoryView: View {
     @State private var userScrollCooldownUntil: Date?
     @State private var followScrollGeneration = 0
     @State private var pendingExplicitSendFollow = false
+    @State private var pendingPostSendKeyboardFollow = false
     @State private var restoresComposerFocusAfterPresentation = false
+    @State private var didCompleteInitialAppearance = false
     @FocusState private var composerIsFocused: Bool
 
     private let transcriptBottomAnchorID = "companion-transcript-bottom"
@@ -459,6 +474,8 @@ struct CompanionSessionHistoryView: View {
         runService: (any ConversationRunServing)? = nil,
         modelService: (any CompanionModelServing)? = nil,
         workspaceService: (any CompanionWorkspaceServing)? = nil,
+        historyViewModelRegistry:
+            CompanionSessionHistoryViewModelRegistry? = nil,
         onUpdated: @escaping (SessionSummary) -> Void,
         onForked: @escaping () -> Void,
         onDeleted: @escaping (String) -> Void
@@ -474,11 +491,12 @@ struct CompanionSessionHistoryView: View {
         let resolvedWorkspaceService = workspaceService
             ?? CompanionWorkspaceService(companionURL: companionURL)
         self.workspaceService = resolvedWorkspaceService
+        self.historyViewModelRegistry = historyViewModelRegistry
         self.onUpdated = onUpdated
         self.onForked = onForked
         self.onDeleted = onDeleted
-        _viewModel = State(
-            initialValue: CompanionSessionHistoryViewModel(
+        let makeViewModel = {
+            CompanionSessionHistoryViewModel(
                 session: session,
                 repository: repository,
                 companionURL: companionURL,
@@ -489,6 +507,12 @@ struct CompanionSessionHistoryView: View {
                 workspaceService: resolvedWorkspaceService,
                 activeRunStore: CompanionActiveRunStore.shared
             )
+        }
+        _viewModel = State(
+            initialValue: historyViewModelRegistry?.viewModel(
+                for: session,
+                make: makeViewModel
+            ) ?? makeViewModel()
         )
     }
 
@@ -612,15 +636,23 @@ struct CompanionSessionHistoryView: View {
                     return
                 }
                 pendingExplicitSendFollow = false
-                scheduleFollowScroll(
-                    proxy,
-                    animated: true,
-                    isUserInitiated: isExplicitSend
-                )
+                if isExplicitSend {
+                    scheduleLatestMessageFollow(
+                        proxy,
+                        animated: false,
+                        isUserInitiated: true
+                    )
+                } else {
+                    scheduleFollowScroll(proxy, animated: true)
+                }
             }
             .onChange(of: viewModel.streamingFollowTrigger) {
                 guard shouldFollowLatestMessage else { return }
                 scheduleFollowScroll(proxy, animated: true)
+            }
+            .onChange(of: didCompleteInitialAppearance) {
+                guard didCompleteInitialAppearance else { return }
+                scheduleInitialTranscriptFollow(proxy)
             }
             .onReceive(
                 NotificationCenter.default.publisher(
@@ -629,6 +661,31 @@ struct CompanionSessionHistoryView: View {
             ) { _ in
                 guard isScrolledNearBottom else { return }
                 scheduleFollowScroll(proxy, animated: false)
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: UIResponder.keyboardDidHideNotification
+                )
+            ) { _ in
+                guard pendingPostSendKeyboardFollow else { return }
+                pendingPostSendKeyboardFollow = false
+                if ChatScrollPolicy
+                    .shouldUseLatestMessageAnchorAfterKeyboardDismissal(
+                        hasLiveTranscriptContent:
+                            viewModel.hasLiveTranscriptContent
+                    ) {
+                    scheduleLatestMessageFollow(
+                        proxy,
+                        animated: false,
+                        isUserInitiated: true
+                    )
+                } else {
+                    scheduleFollowScroll(
+                        proxy,
+                        animated: false,
+                        isUserInitiated: true
+                    )
+                }
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -678,6 +735,7 @@ struct CompanionSessionHistoryView: View {
                 runService: runService,
                 modelService: modelService,
                 workspaceService: workspaceService,
+                historyViewModelRegistry: historyViewModelRegistry,
                 onUpdated: onUpdated,
                 onForked: onForked,
                 onDeleted: onDeleted
@@ -721,13 +779,33 @@ struct CompanionSessionHistoryView: View {
                 .disabled(viewModel.isRunActive)
             }
         }
-        .task {
-            if viewModel.allMessages.isEmpty {
-                await viewModel.load(modelContext: modelContext)
+        .background {
+            NavigationAppearanceCompletionObserver {
+                didCompleteInitialAppearance = true
             }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+        .onAppear {
+            historyViewModelRegistry?.adopt(
+                viewModel,
+                sessionID: viewModel.session.id
+            )
+        }
+        .task(id: didCompleteInitialAppearance) {
+            viewModel.prepareInitialMessageLoad(modelContext: modelContext)
+            guard ChatInitialAppearancePolicy.shouldBeginAsyncWork(
+                hasCompletedAppearance: didCompleteInitialAppearance
+            ) else {
+                return
+            }
+
             await viewModel.resumeRunObservation(
                 modelContext: modelContext
             )
+            if !viewModel.hasLoadedAuthoritativeHistory {
+                await viewModel.load(modelContext: modelContext)
+            }
             await viewModel.loadModelOptions()
             if supportsUploads {
                 await viewModel.restorePendingUploads()
@@ -911,7 +989,9 @@ struct CompanionSessionHistoryView: View {
         .onDisappear {
             droppedAttachmentTask?.cancel()
             attachmentUploadTask?.cancel()
-            viewModel.suspendRunObservation()
+            if historyViewModelRegistry == nil {
+                viewModel.suspendRunObservation()
+            }
             viewModel.cancelAttachmentRetry()
             Task {
                 await viewModel.discardStagedDroppedAttachments()
@@ -1365,9 +1445,11 @@ struct CompanionSessionHistoryView: View {
                 modelContext: modelContext
             ) {
                 draftMessage = ""
+                pendingPostSendKeyboardFollow = composerIsFocused
                 composerIsFocused = false
             } else {
                 pendingExplicitSendFollow = false
+                pendingPostSendKeyboardFollow = false
             }
         }
     }
@@ -1404,8 +1486,42 @@ struct CompanionSessionHistoryView: View {
         pendingExplicitSendFollow = true
     }
 
+    private func scheduleInitialTranscriptFollow(_ proxy: ScrollViewProxy) {
+        shouldFollowLatestMessage = true
+        isScrolledNearBottom = true
+        userScrollCooldownUntil = nil
+        pendingExplicitSendFollow = false
+        scheduleFollowScroll(
+            proxy,
+            animated: false,
+            isUserInitiated: true
+        )
+    }
+
+    private func scheduleLatestMessageFollow(
+        _ proxy: ScrollViewProxy,
+        animated: Bool,
+        isUserInitiated: Bool
+    ) {
+        guard let messageID = viewModel.visibleMessages.last?.id else {
+            scheduleFollowScroll(
+                proxy,
+                animated: animated,
+                isUserInitiated: isUserInitiated
+            )
+            return
+        }
+        scheduleFollowScroll(
+            proxy,
+            targetID: messageID,
+            animated: animated,
+            isUserInitiated: isUserInitiated
+        )
+    }
+
     private func scheduleFollowScroll(
         _ proxy: ScrollViewProxy,
+        targetID: String? = nil,
         animated: Bool,
         isUserInitiated: Bool = false
     ) {
@@ -1417,6 +1533,7 @@ struct CompanionSessionHistoryView: View {
 
         followScrollGeneration += 1
         let generation = followScrollGeneration
+        let resolvedTargetID = targetID ?? transcriptBottomAnchorID
         Task { @MainActor in
             await Task.yield()
             try? await Task.sleep(nanoseconds: 16_000_000)
@@ -1438,11 +1555,25 @@ struct CompanionSessionHistoryView: View {
                         ? ChatMotion.streamingFollow(reduceMotion: reduceMotion)
                         : ChatMotion.scrollToLatest(reduceMotion: reduceMotion)
                 ) {
-                    proxy.scrollTo(transcriptBottomAnchorID, anchor: .bottom)
+                    proxy.scrollTo(resolvedTargetID, anchor: .bottom)
                 }
             } else {
-                proxy.scrollTo(transcriptBottomAnchorID, anchor: .bottom)
+                proxy.scrollTo(resolvedTargetID, anchor: .bottom)
             }
+
+            try? await Task.sleep(
+                nanoseconds: ChatScrollPolicy
+                    .followLayoutSettlementDelayNanoseconds
+            )
+            guard
+                !Task.isCancelled,
+                generation == followScrollGeneration,
+                shouldFollowLatestMessage,
+                !isAutoFollowScrollPaused
+            else {
+                return
+            }
+            proxy.scrollTo(resolvedTargetID, anchor: .bottom)
         }
     }
 
