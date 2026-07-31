@@ -555,72 +555,8 @@ struct CompanionSessionHistoryView: View {
                         .frame(maxWidth: .infinity)
                     }
 
-                    ForEach(viewModel.visibleMessages) { message in
-                        CompanionMessageRow(
-                            message: message,
-                            reasoningGroups: viewModel.durableReasoning(
-                                anchoredTo: message
-                            ),
-                            toolCallGroups: viewModel.durableToolActivity(
-                                anchoredTo: message
-                            ),
-                            transcriptMediaCacheNamespace:
-                                companionURL.absoluteString,
-                            loadAttachment: {
-                                try? await workspaceService.downloadAttachment(
-                                    path: $0
-                                )
-                            }
-                        )
-                        .equatable()
-                    }
-
-                    if !viewModel.reasoningText.isEmpty {
-                        DisclosureGroup("Reasoning") {
-                            Text(viewModel.reasoningText)
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
-                                .frame(
-                                    maxWidth: .infinity,
-                                    alignment: .leading
-                                )
-                        }
-                        .accessibilityIdentifier("companion.run.reasoning")
-                    }
-
-                    ForEach(viewModel.liveToolCalls) { toolCall in
-                        ToolCallCardView(toolCall: toolCall)
-                    }
-
-                    if let approval = viewModel.pendingApproval {
-                        CompanionRunApprovalCard(
-                            approval: approval,
-                            submissionChoice:
-                                viewModel.approvalSubmissionChoice,
-                            errorMessage:
-                                viewModel.approvalErrorMessage,
-                            canRespond: viewModel.canRespondToApproval
-                        ) { choice in
-                            Task {
-                                await viewModel.respondToApproval(
-                                    choice,
-                                    modelContext: modelContext
-                                )
-                            }
-                        }
-                    } else if viewModel.approvalContextUnavailable {
-                        CompanionRunApprovalUnavailableCard()
-                    }
-
-                    if let streamingMessage = viewModel.streamingMessage {
-                        MessageBubbleView(
-                            message: streamingMessage,
-                            transcriptMediaCacheNamespace: companionURL.absoluteString,
-                            isStreaming: viewModel.isRunActive
-                        )
-                        .accessibilityLabel("Streaming assistant response")
-                    }
+                    visibleTranscriptMessages
+                    liveRunTranscriptContent
 
                     Color.clear
                         .frame(height: 1)
@@ -975,6 +911,78 @@ struct CompanionSessionHistoryView: View {
             Task {
                 await viewModel.discardStagedDroppedAttachments()
             }
+        }
+    }
+
+    private var visibleTranscriptMessages: some View {
+        ForEach(viewModel.visibleMessages) { message in
+            CompanionMessageRow(
+                message: message,
+                reasoningGroups: viewModel.durableReasoning(
+                    anchoredTo: message
+                ),
+                toolCallGroups: viewModel.durableToolActivity(
+                    anchoredTo: message
+                ),
+                transcriptMediaCacheNamespace:
+                    companionURL.absoluteString,
+                loadAttachment: {
+                    try? await workspaceService.downloadAttachment(
+                        path: $0
+                    )
+                }
+            )
+            .equatable()
+        }
+    }
+
+    @ViewBuilder
+    private var liveRunTranscriptContent: some View {
+        if !viewModel.reasoningText.isEmpty {
+            DisclosureGroup("Reasoning") {
+                Text(viewModel.reasoningText)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+            }
+            .accessibilityIdentifier("companion.run.reasoning")
+        }
+
+        ForEach(viewModel.liveToolCalls) { toolCall in
+            ToolCallCardView(toolCall: toolCall)
+        }
+
+        if let approval = viewModel.pendingApproval {
+            CompanionRunApprovalCard(
+                approval: approval,
+                submissionChoice:
+                    viewModel.approvalSubmissionChoice,
+                errorMessage:
+                    viewModel.approvalErrorMessage,
+                canRespond: viewModel.canRespondToApproval
+            ) { choice in
+                Task {
+                    await viewModel.respondToApproval(
+                        choice,
+                        modelContext: modelContext
+                    )
+                }
+            }
+        } else if viewModel.approvalContextUnavailable {
+            CompanionRunApprovalUnavailableCard()
+        }
+
+        if let streamingMessage = viewModel.streamingMessage {
+            MessageBubbleView(
+                message: streamingMessage,
+                transcriptMediaCacheNamespace: companionURL.absoluteString,
+                isStreaming: viewModel.isRunActive
+            )
+            .accessibilityLabel("Streaming assistant response")
         }
     }
 
