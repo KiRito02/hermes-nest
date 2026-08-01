@@ -3137,7 +3137,7 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         let didSend = await viewModel.send("Recover the answer")
         XCTAssertTrue(didSend)
         await waitUntil {
-            !(viewModel.streamingMessage?.content.isEmpty ?? true)
+            !(viewModel.streamingMessage?.content?.isEmpty ?? true)
         }
 
         let firstFrame = try XCTUnwrap(
