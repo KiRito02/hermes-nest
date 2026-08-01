@@ -3151,6 +3151,8 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
 
         await waitUntil(timeoutNanoseconds: 3_000_000_000) {
             viewModel.activeRunID == nil
+                && viewModel.allMessages.last?.content == output
+                && viewModel.streamingMessage == nil
         }
         XCTAssertEqual(output, viewModel.allMessages.last?.content)
         XCTAssertNil(viewModel.streamingMessage)
