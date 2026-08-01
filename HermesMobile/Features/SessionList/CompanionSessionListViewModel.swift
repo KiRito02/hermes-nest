@@ -621,7 +621,7 @@ final class CompanionSessionHistoryViewModel {
 
     private(set) var session: SessionSummary
     private(set) var allMessages: [ChatMessage] = []
-    private(set) var isLoading = true
+    private(set) var isLoading = false
     private(set) var isViewingCachedData = false
     private(set) var errorMessage: String?
     private(set) var mutationErrorMessage: String?
@@ -939,8 +939,7 @@ final class CompanionSessionHistoryViewModel {
         guard isRunActive,
               isWaitingForVisibleRunProgress,
               liveReasoningPresentationText == nil,
-              liveToolActivityGroup == nil,
-              streamingMessage == nil else {
+              liveToolActivityGroup == nil else {
             return false
         }
         switch runState {
@@ -2186,7 +2185,9 @@ final class CompanionSessionHistoryViewModel {
 
     private func scheduleDeltaFlush() {
         deltaFlushTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 60_000_000)
+            try? await Task.sleep(
+                nanoseconds: Self.deltaFlushCadenceNanoseconds
+            )
             guard !Task.isCancelled else { return }
             self?.flushPendingDelta()
         }
@@ -2195,14 +2196,43 @@ final class CompanionSessionHistoryViewModel {
     private func flushPendingDelta() {
         deltaFlushTask?.cancel()
         deltaFlushTask = nil
+        let pendingText = deltaBuffer.pendingText
+        let backlogUnits = StreamingWordDrain.unitCount(in: pendingText)
+        let maximumCharacters: Int
+        if backlogUnits <= 1 {
+            maximumCharacters = max(
+                3,
+                Int(
+                    ceil(
+                        Double(pendingText.count)
+                            * Double(Self.deltaFlushCadenceNanoseconds)
+                            / Double(Self.maximumPresentationLagNanoseconds)
+                    )
+                )
+            )
+        } else {
+            let quota = StreamingWordDrain.drainQuota(
+                backlogUnitCount: backlogUnits,
+                cadenceNanoseconds: Self.deltaFlushCadenceNanoseconds,
+                maxLagNanoseconds: Self.maximumPresentationLagNanoseconds
+            )
+            maximumCharacters = StreamingWordDrain.splitAtUnitBoundary(
+                pendingText,
+                unitCount: quota
+            ).head.count
+        }
         let drained = deltaBuffer.drain(
-            maximumCharacters: 3
+            maximumCharacters: maximumCharacters
         )
         guard !drained.isEmpty else { return }
         streamedAssistantText += drained
         markStreamingTranscriptChanged()
         ensureDeltaFlushScheduled()
     }
+
+    private static let deltaFlushCadenceNanoseconds: UInt64 = 60_000_000
+    private static let maximumPresentationLagNanoseconds: UInt64 =
+        2_000_000_000
 
     private func beginReconciliation(
         runID: String,

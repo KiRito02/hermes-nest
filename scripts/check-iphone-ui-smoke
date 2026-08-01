@@ -359,12 +359,16 @@ for snippet, description in [
         "stable live-to-terminal presentation identity",
     ),
     (
-        "maximumCharacters: 3",
-        "human-readable progressive assistant output",
+        "StreamingWordDrain.drainQuota(",
+        "word-paced progressive assistant output",
     ),
     (
-        "nanoseconds: 60_000_000",
+        "deltaFlushCadenceNanoseconds: UInt64 = 60_000_000",
         "ChatGPT-like progressive output cadence",
+    ),
+    (
+        "maximumPresentationLagNanoseconds: UInt64 =",
+        "bounded catch-up lag for bulk responses",
     ),
     (
         "liveReasoningPresentationText == nil",

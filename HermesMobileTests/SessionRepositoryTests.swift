@@ -612,14 +612,14 @@ final class SessionRepositoryTests: CompanionHTTPTestCase {
         XCTAssertTrue(loaded)
         XCTAssertEqual(4, viewModel.allMessages.count)
         XCTAssertEqual(
-            ["user", "assistant", "assistant"],
+            ["user", "assistant"],
             viewModel.visibleMessages.compactMap(\.role)
         )
         XCTAssertFalse(viewModel.visibleMessages.contains {
             $0.content?.contains("<untrusted_tool_result") == true
         })
         let activity = viewModel.durableToolActivity(
-            anchoredTo: toolRequest
+            anchoredTo: try XCTUnwrap(viewModel.visibleMessages.last)
         )
         let toolCalls = activity.flatMap(\.toolCalls)
         XCTAssertEqual(["web_search"], toolCalls.map(\.name))
