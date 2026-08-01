@@ -682,6 +682,7 @@ final class CompanionSessionHistoryViewModel {
     private var isStopRequestInFlight = false
     private var stopRecoveryState: CompanionStopRecoveryState = .notRequested
     private var terminalOutputFallback: String?
+    private var terminalPresentationRunID: String?
     private var nextToolOrdinal = 0
     private var isTerminalRefreshPending = false
     private var isHistoryRequestInFlight = false
@@ -898,6 +899,7 @@ final class CompanionSessionHistoryViewModel {
             && !isPreparingDroppedAttachments
             && !isViewingCachedData
             && !isTerminalRefreshPending
+            && !needsTerminalHistoryRetry
             && !isApplyingModelSelection
             && errorMessage == nil
     }
@@ -1296,6 +1298,7 @@ final class CompanionSessionHistoryViewModel {
                 id: history.sessionID
             )
             session = resolvedSession
+            let preservedTerminalPresentation: Bool
             if let activeRunID, !runState.isTerminalPresentation {
                 if let mergedMessages = mergeRunningHistory(
                     history.messages
@@ -1305,14 +1308,17 @@ final class CompanionSessionHistoryViewModel {
                 guard self.activeRunID == activeRunID else {
                     return false
                 }
+                preservedTerminalPresentation = false
             } else if shouldPreserveTerminalPresentation(
                 for: history.messages
             ) {
                 // Status/event output can precede authoritative history by a
                 // few polls. Keep the already-presented answer until the
                 // matching turn reaches the history endpoint.
+                preservedTerminalPresentation = true
             } else {
                 apply(history.messages)
+                preservedTerminalPresentation = false
             }
             hasLoadedAuthoritativeHistory = true
             isViewingCachedData = false
@@ -1322,11 +1328,12 @@ final class CompanionSessionHistoryViewModel {
                 in: modelContext
             )
             cacheSession(resolvedSession, in: modelContext)
-            if needsTerminalHistoryRetry {
+            if needsTerminalHistoryRetry,
+               !preservedTerminalPresentation {
                 clearTerminalFallbackPresentation()
                 needsTerminalHistoryRetry = false
             }
-            return true
+            return !preservedTerminalPresentation
         } catch {
             guard !(error is CancellationError) else { return false }
             if allMessages.isEmpty,
@@ -1339,7 +1346,7 @@ final class CompanionSessionHistoryViewModel {
                 visibleStartIndex = 0
                 isViewingCachedData = false
                 errorMessage = error.localizedDescription
-            } else if !isRunActive {
+            } else if !isRunActive && !isTerminalRefreshPending {
                 // A transient refresh failure must never erase a transcript
                 // that is already visible. Keep the last coherent snapshot.
                 errorMessage = error.localizedDescription
@@ -1599,6 +1606,7 @@ final class CompanionSessionHistoryViewModel {
         deltaBuffer.removeAll()
         stopRecoveryState = .notRequested
         terminalOutputFallback = nil
+        terminalPresentationRunID = nil
         latestRunUsage = nil
         nextToolOrdinal = 0
         let observationGeneration = runObservationGeneration
@@ -1766,7 +1774,8 @@ final class CompanionSessionHistoryViewModel {
 
         do {
             let snapshot = try await runService.stop(runID: runID)
-            guard activeRunID == runID else { return }
+            guard canReceiveSnapshotResponse(for: runID) else { return }
+            if absorbSnapshotAfterTerminal(snapshot) { return }
             terminalOutputFallback = snapshot.output
             applyRunSnapshot(snapshot)
             await persistStopStateIfNeeded(snapshot, runID: runID)
@@ -2044,7 +2053,10 @@ final class CompanionSessionHistoryViewModel {
             while !Task.isCancelled, activeRunID == runID {
                 do {
                     let snapshot = try await runService.status(runID: runID)
-                    guard activeRunID == runID else { return }
+                    guard canReceiveSnapshotResponse(for: runID) else {
+                        return
+                    }
+                    if absorbSnapshotAfterTerminal(snapshot) { return }
                     terminalOutputFallback = snapshot.output
                         ?? terminalOutputFallback
                     applyRunSnapshot(snapshot)
@@ -2426,7 +2438,8 @@ final class CompanionSessionHistoryViewModel {
     ) async {
         do {
             let snapshot = try await runService.status(runID: runID)
-            guard activeRunID == runID else { return }
+            guard canReceiveSnapshotResponse(for: runID) else { return }
+            if absorbSnapshotAfterTerminal(snapshot) { return }
             terminalOutputFallback = snapshot.output
                 ?? terminalOutputFallback
             applyRunSnapshot(snapshot)
@@ -2468,6 +2481,10 @@ final class CompanionSessionHistoryViewModel {
         if let usage = snapshot.usage {
             latestRunUsage = usage
         }
+        // A delayed status or stop response must never regress an event-stream
+        // terminal state while the final presentation/history reconciliation
+        // is still finishing.
+        guard !runState.isTerminalPresentation else { return }
         switch snapshot.state {
         case .started, .queued, .running:
             if runState != .stopping {
@@ -2488,6 +2505,35 @@ final class CompanionSessionHistoryViewModel {
         case .unknown:
             runState = .transportDisconnected
         }
+    }
+
+    private func canReceiveSnapshotResponse(for runID: String) -> Bool {
+        activeRunID == runID
+            || (
+                activeRunID == nil
+                    && runState.isTerminalPresentation
+                    && terminalPresentationRunID == runID
+                    && (isTerminalRefreshPending
+                        || needsTerminalHistoryRetry)
+            )
+    }
+
+    private func absorbSnapshotAfterTerminal(
+        _ snapshot: ConversationRunSnapshot
+    ) -> Bool {
+        guard runState.isTerminalPresentation else { return false }
+        guard snapshot.state.isTerminal else { return true }
+
+        if latestRunUsage == nil, let usage = snapshot.usage {
+            latestRunUsage = usage
+        }
+        if terminalOutputFallback?.trimmedNonEmptyValue == nil,
+           let output = snapshot.output,
+           output.trimmedNonEmptyValue != nil {
+            terminalOutputFallback = output
+            enqueueTerminalAssistantOutput(output)
+        }
+        return true
     }
 
     private func terminalState(
@@ -2511,6 +2557,7 @@ final class CompanionSessionHistoryViewModel {
         modelContext: ModelContext?
     ) async {
         guard activeRunID == runID else { return }
+        terminalPresentationRunID = runID
         if let activeRunKey {
             await activeRunStore.clear(
                 runID: runID,
@@ -2520,7 +2567,7 @@ final class CompanionSessionHistoryViewModel {
         }
         if let terminalOutputFallback,
            !terminalOutputFallback.isEmpty {
-            enqueueAuthoritativeAssistantOutput(terminalOutputFallback)
+            enqueueTerminalAssistantOutput(terminalOutputFallback)
         }
         guard await drainPendingPresentation(runID: runID) else {
             return
@@ -2530,6 +2577,10 @@ final class CompanionSessionHistoryViewModel {
             ?? streamedAssistantText.trimmedNonEmptyValue
         let messagesBeforeRefresh = allMessages
         isTerminalRefreshPending = true
+        // Transport ownership ends once every pending presentation frame is
+        // visible. Clearing the run identity here also makes late status/stop
+        // responses harmless while authoritative history catches up.
+        activeRunID = nil
         pendingApproval = nil
         approvalErrorMessage = nil
         approvalSubmissionChoice = nil
@@ -2539,7 +2590,8 @@ final class CompanionSessionHistoryViewModel {
         reconciliationTask = nil
         let loadedAuthoritativeHistory = await refreshHistoryAfterTerminal(
             modelContext: modelContext,
-            expectsAssistantOutput: expectedTerminalOutput != nil
+            expectsAssistantOutput:
+                runState == .completed || expectedTerminalOutput != nil
         )
         if loadedAuthoritativeHistory {
             clearTerminalFallbackPresentation()
@@ -2556,6 +2608,28 @@ final class CompanionSessionHistoryViewModel {
         stopRecoveryState = .notRequested
         terminalOutputFallback = nil
         isTerminalRefreshPending = false
+    }
+
+    private func enqueueTerminalAssistantOutput(_ output: String) {
+        let presentedAndQueued =
+            streamedAssistantText + deltaBuffer.pendingText
+        if output.hasPrefix(presentedAndQueued) {
+            enqueue(String(output.dropFirst(presentedAndQueued.count)))
+            return
+        }
+        if presentedAndQueued.hasPrefix(output) {
+            return
+        }
+
+        // A terminal snapshot is the best available fallback when history is
+        // unavailable. Replace a conflicting partial with one bounded frame,
+        // then keep draining the remainder instead of jumping to a full block.
+        deltaFlushTask?.cancel()
+        deltaFlushTask = nil
+        deltaBuffer.removeAll()
+        streamedAssistantText = ""
+        deltaBuffer.append(output)
+        flushPendingDelta()
     }
 
     private func drainPendingPresentation(runID: String) async -> Bool {
@@ -2608,9 +2682,12 @@ final class CompanionSessionHistoryViewModel {
     private func shouldPreserveTerminalPresentation(
         for messages: [ChatMessage]
     ) -> Bool {
-        runState.isTerminalPresentation
-            && (terminalOutputFallback?.trimmedNonEmptyValue
-                ?? streamedAssistantText.trimmedNonEmptyValue) != nil
+        guard runState.isTerminalPresentation else { return false }
+        if messages.isEmpty, !allMessages.isEmpty {
+            return true
+        }
+        return (terminalOutputFallback?.trimmedNonEmptyValue
+            ?? streamedAssistantText.trimmedNonEmptyValue) != nil
             && !hasVisibleAssistantOutputInCurrentTurn(messages)
     }
 
@@ -2633,6 +2710,10 @@ final class CompanionSessionHistoryViewModel {
     private func clearTerminalFallbackPresentation() {
         thinkingIndicatorTask?.cancel()
         thinkingIndicatorTask = nil
+        deltaFlushTask?.cancel()
+        deltaFlushTask = nil
+        deltaBuffer.removeAll()
+        terminalPresentationRunID = nil
         streamedAssistantText = ""
         reasoningText = ""
         liveToolCalls = []

@@ -2141,6 +2141,7 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
             viewModel.durableReasoningGroups.map(\.text) == [
                 "Reviewing the prior answer."
             ]
+                && viewModel.streamingMessage?.content == "New suffix"
         }
 
         XCTAssertEqual("New suffix", viewModel.streamingMessage?.content)
@@ -2983,7 +2984,9 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         XCTAssertLessThan(viewModel.streamedAssistantText.count, 10_000)
 
         await viewModel.stopRun()
-        await waitUntil { viewModel.activeRunID == nil }
+        await waitUntil(timeoutNanoseconds: 3_000_000_000) {
+            viewModel.activeRunID == nil
+        }
     }
 
     func testProgressiveBufferDrainsLargeRecoverySnapshotsWithABoundedPerTickBudget() {
@@ -3156,6 +3159,10 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
     @MainActor
     func testTerminalOutputSurvivesAuthoritativeHistoryRefreshFailure() async throws {
         let session = try makeSessionSummary()
+        let fallbackOutput = String(
+            repeating: "Fallback final answer. ",
+            count: 500
+        )
         let authoritativeReply = ChatMessage(
             role: "assistant",
             content: "Authoritative final answer",
@@ -3173,7 +3180,7 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
                 event: nil,
                 runID: "run-1",
                 delta: nil,
-                output: "Fallback final answer",
+                output: fallbackOutput,
                 error: nil,
                 timestamp: 4
             )
@@ -3224,11 +3231,21 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
             modelContext: modelContext
         )
         XCTAssertTrue(didSend)
-        await waitUntil { viewModel.needsTerminalHistoryRetry }
+        await waitUntil {
+            !(viewModel.streamingMessage?.content?.isEmpty ?? true)
+        }
+        let firstFrame = try XCTUnwrap(
+            viewModel.streamingMessage?.content
+        )
+        XCTAssertLessThan(firstFrame.count, fallbackOutput.count)
+        XCTAssertTrue(fallbackOutput.hasPrefix(firstFrame))
+        await waitUntil(timeoutNanoseconds: 4_000_000_000) {
+            viewModel.needsTerminalHistoryRetry
+        }
 
         XCTAssertEqual(.completed, viewModel.runState)
         XCTAssertEqual(
-            "Fallback final answer",
+            fallbackOutput,
             viewModel.streamedAssistantText
         )
         XCTAssertEqual("Finish", viewModel.allMessages.last?.content)
@@ -3535,7 +3552,12 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
                 delta: nil,
                 output: "Done",
                 error: nil,
-                timestamp: 2
+                timestamp: 2,
+                usage: ConversationRunUsage(
+                    inputTokens: 1,
+                    outputTokens: 1,
+                    totalTokens: 2
+                )
             )
         )
         let runService = RunServiceStub(
@@ -3546,7 +3568,7 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
                     state: .running,
                     sessionID: "session-1",
                     lastEvent: nil,
-                    output: nil,
+                    output: "Stale partial",
                     errorMessage: nil
                 )
             ],
@@ -3570,6 +3592,77 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         try await Task.sleep(nanoseconds: 120_000_000)
 
         XCTAssertEqual(.completed, viewModel.runState)
+        XCTAssertEqual("Done", viewModel.streamedAssistantText)
+    }
+
+    @MainActor
+    func testLateTerminalStatusSuppliesMissingEventOutputProgressively() async throws {
+        let session = try makeSessionSummary()
+        let repository = RunHistoryRepositoryStub(session: session)
+        let output = "\n  "
+            + String(repeating: "Recovered answer. ", count: 600)
+            + "\n\n"
+        let usage = ConversationRunUsage(
+            inputTokens: 20,
+            outputTokens: 80,
+            totalTokens: 100
+        )
+        let terminal = ConversationRunEvent.data(
+            ConversationRunEventData(
+                transportEvent: nil,
+                event: "run.completed",
+                runID: "run-1",
+                delta: nil,
+                output: nil,
+                error: nil,
+                timestamp: 2
+            )
+        )
+        let terminalSnapshot = ConversationRunSnapshot(
+            runID: "run-1",
+            state: .completed,
+            sessionID: "session-1",
+            lastEvent: "run.completed",
+            output: output,
+            errorMessage: nil,
+            usage: usage
+        )
+        let runService = RunServiceStub(
+            eventResult: .eventsAfterDelay([terminal], 20_000_000),
+            statuses: [terminalSnapshot, terminalSnapshot],
+            statusDelayNanoseconds: 100_000_000
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: runService,
+            reconciliationDelayNanoseconds: 0
+        )
+        await viewModel.load()
+        let didSend = await viewModel.send("Recover")
+        XCTAssertTrue(didSend)
+
+        await viewModel.stopRun()
+        await waitUntil {
+            !(viewModel.streamingMessage?.content?.isEmpty ?? true)
+        }
+        let firstFrame = try XCTUnwrap(
+            viewModel.streamingMessage?.content
+        )
+        XCTAssertLessThan(firstFrame.count, output.count)
+        XCTAssertTrue(output.hasPrefix(firstFrame))
+        XCTAssertEqual("Recover", viewModel.allMessages.last?.content)
+        await waitUntil(timeoutNanoseconds: 4_000_000_000) {
+            viewModel.streamedAssistantText == output
+        }
+
+        XCTAssertEqual(.completed, viewModel.runState)
+        XCTAssertEqual(usage, viewModel.latestRunUsage)
+        XCTAssertTrue(viewModel.needsTerminalHistoryRetry)
+        XCTAssertFalse(viewModel.canSend)
     }
 
     private func makeSession(
