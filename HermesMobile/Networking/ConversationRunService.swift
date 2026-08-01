@@ -544,18 +544,26 @@ enum ConversationRunServiceError: LocalizedError, Equatable {
 
 actor ConversationRunService: ConversationRunServing {
     static let maximumResponseBytes = 2 * 1024 * 1024
+    /// Gateway sends an idle run keepalive every 30 seconds. Foundation can
+    /// wait for the first response byte before completing `bytes(for:)`, so the
+    /// connect guard must leave margin beyond that verified interval.
+    static let defaultEventConnectTimeoutNanoseconds: UInt64 =
+        45_000_000_000
 
     private let companionURL: URL
     private let keychain: any KeychainStoring
     nonisolated let session: URLSession
     nonisolated let eventSession: URLSession
     private let decoder: JSONDecoder
+    private let eventConnectTimeoutNanoseconds: UInt64
 
     init(
         companionURL: URL,
         keychain: any KeychainStoring = KeychainStore(),
         session: URLSession? = nil,
-        eventSession: URLSession? = nil
+        eventSession: URLSession? = nil,
+        eventConnectTimeoutNanoseconds: UInt64 =
+            ConversationRunService.defaultEventConnectTimeoutNanoseconds
     ) {
         self.companionURL = companionURL
         self.keychain = keychain
@@ -565,6 +573,8 @@ actor ConversationRunService: ConversationRunServing {
             eventSession
             ?? session
             ?? CompanionSessionPool.shared.eventSession
+        self.eventConnectTimeoutNanoseconds =
+            eventConnectTimeoutNanoseconds
 
         let decoder = JSONDecoder()
         self.decoder = decoder
@@ -695,6 +705,7 @@ actor ConversationRunService: ConversationRunServing {
         )
         request.httpMethod = "GET"
         request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = .greatestFiniteMagnitude
         request.setValue(
             "text/event-stream",
             forHTTPHeaderField: "Accept"
@@ -710,10 +721,26 @@ actor ConversationRunService: ConversationRunServing {
         )
 
         let session = eventSession
+        let connectTimeoutNanoseconds = eventConnectTimeoutNanoseconds
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let (bytes, response) = try await session.bytes(for: request)
+                    let connectTask = Task {
+                        try await session.bytes(for: request)
+                    }
+                    let timeoutTask = Task {
+                        try? await Task.sleep(
+                            nanoseconds: connectTimeoutNanoseconds
+                        )
+                        guard !Task.isCancelled else { return }
+                        connectTask.cancel()
+                    }
+                    defer { timeoutTask.cancel() }
+                    let (bytes, response) = try await withTaskCancellationHandler {
+                        try await connectTask.value
+                    } onCancel: {
+                        connectTask.cancel()
+                    }
                     guard let httpResponse = response as? HTTPURLResponse else {
                         throw ConversationRunServiceError.unexpectedResponse
                     }

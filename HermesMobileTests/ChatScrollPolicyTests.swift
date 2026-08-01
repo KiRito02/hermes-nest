@@ -19,6 +19,28 @@ final class ChatScrollPolicyTests: XCTestCase {
         XCTAssertTrue(ChatInitialAppearancePolicy.shouldBeginAsyncWork(hasCompletedAppearance: true))
     }
 
+    func testFollowScrollAllowsRichRowsToFinishTheirSecondLayoutPass() {
+        XCTAssertEqual(
+            ChatScrollPolicy.followLayoutSettlementDelayNanoseconds,
+            250_000_000
+        )
+    }
+
+    func testKeyboardDismissalKeepsLiveEventBelowUserMessageVisible() {
+        XCTAssertFalse(
+            ChatScrollPolicy
+                .shouldUseLatestMessageAnchorAfterKeyboardDismissal(
+                    hasLiveTranscriptContent: true
+                )
+        )
+        XCTAssertTrue(
+            ChatScrollPolicy
+                .shouldUseLatestMessageAnchorAfterKeyboardDismissal(
+                    hasLiveTranscriptContent: false
+                )
+        )
+    }
+
     func testBottomThresholdLoosensWhileStreaming() {
         XCTAssertEqual(
             ChatScrollPolicy.bottomThreshold(isStreaming: false),

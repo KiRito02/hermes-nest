@@ -26,6 +26,13 @@ SESSION_VIEW = (
     ROOT
     / "HermesMobile/Features/SessionList/CompanionSessionListView.swift"
 ).read_text(encoding="utf-8")
+SESSION_VIEW_MODEL = (
+    ROOT
+    / "HermesMobile/Features/SessionList/CompanionSessionListViewModel.swift"
+).read_text(encoding="utf-8")
+RUN_SERVICE = (
+    ROOT / "HermesMobile/Networking/ConversationRunService.swift"
+).read_text(encoding="utf-8")
 MESSAGE_ACTIONS = (
     ROOT
     / "HermesMobile/Features/SessionList/CompanionPresentationSupport.swift"
@@ -87,7 +94,7 @@ for forbidden in ["URLSession", "Keychain", "API_SERVER_KEY", "deviceCredential"
         )
 
 attachment_entry = SESSION_VIEW.split(
-    "composerInputLayout {", maxsplit=1
+    "private var companionComposer: some View", maxsplit=1
 )[1].split("TextField(", maxsplit=1)[0]
 for snippet, description in [
     ("showsAttachmentUnavailable = true", "visible attachment explanation action"),
@@ -109,10 +116,84 @@ if "Menu {" in attachment_entry or ".disabled(true)" in attachment_entry:
 for snippet, description in [
     ("ChatActionButtonPalette.resolve", "explicit send-button palette"),
     ("CompanionSendButtonStyle()", "custom high-contrast send style"),
-    ("ViewThatFits(in: .horizontal)", "width-adaptive composer controls"),
     (
-        "CompanionComposerControlLabel",
-        "quiet shared composer control treatment",
+        ".scrollDismissesKeyboard(.interactively)",
+        "interactive transcript keyboard dismissal",
+    ),
+    (
+        ".defaultScrollAnchor(\n"
+        "                ChatScrollPolicy.initialTranscriptAnchor,\n"
+        "                for: .initialOffset\n"
+        "            )",
+        "initial-only transcript bottom anchor",
+    ),
+    (
+        "ChatScrollPolicy.sizeChangeAnchor(\n"
+        "                    shouldFollowLatestMessage: shouldFollowLatestMessage\n"
+        "                ),\n"
+        "                for: .sizeChanges",
+        "conditional Companion transcript size-change anchor",
+    ),
+    ("ScrollViewReader { proxy in", "Companion transcript scroll proxy"),
+    (
+        ".id(transcriptBottomAnchorID)",
+        "Companion transcript bottom target",
+    ),
+    (
+        ".onChange(of: viewModel.visibleMessages.last?.id)",
+        "window-safe new-message Companion transcript follow trigger",
+    ),
+    (
+        ".onChange(of: viewModel.streamingFollowTrigger)",
+        "streaming Companion transcript follow trigger",
+    ),
+    (
+        "UIResponder.keyboardWillShowNotification",
+        "keyboard Companion transcript follow trigger",
+    ),
+    (
+        "prepareTranscriptForExplicitSend()",
+        "explicit-send Companion transcript follow reset",
+    ),
+    (
+        ".task(id: didCompleteInitialAppearance)",
+        "navigation-complete Companion transcript startup",
+    ),
+    (
+        "scheduleInitialTranscriptFollow(proxy)",
+        "post-navigation Companion transcript bottom correction",
+    ),
+    (
+        "UIResponder.keyboardDidHideNotification",
+        "post-send keyboard-dismissal transcript correction",
+    ),
+    (
+        "viewModel.hasLiveTranscriptContent",
+        "live-event-aware post-send keyboard target",
+    ),
+    (
+        "private func scheduleLatestMessageFollow(",
+        "stable optimistic-message scroll target",
+    ),
+    (
+        "historyViewModelRegistry: historyViewModelRegistry",
+        "navigation-stable Companion run observer ownership",
+    ),
+    (
+        "historyViewModelRegistry?.adopt(",
+        "rendered Companion view-model registry adoption",
+    ),
+    (
+        "dismissComposerKeyboard()",
+        "empty-transcript keyboard dismissal",
+    ),
+    (
+        "compactComposerContextMenu",
+        "consolidated model, reasoning, and usage menu",
+    ),
+    (
+        "dynamicTypeSize.isAccessibilitySize",
+        "accessibility-size composer fallback",
     ),
     (
         "Text(option.presentationName)",
@@ -150,6 +231,46 @@ for snippet, description in [
     ),
 ]:
     require(SESSION_VIEW, snippet, description)
+require(
+    SESSION_VIEW_MODEL,
+    "final class CompanionSessionHistoryViewModelRegistry",
+    "Companion history view-model registry",
+)
+require(
+    RUN_SERVICE,
+    "static let defaultEventConnectTimeoutNanoseconds: UInt64 =",
+    "event connect timeout longer than the Gateway keepalive interval",
+)
+require(
+    RUN_SERVICE,
+    "45_000_000_000",
+    "45-second event first-byte timeout",
+)
+require(
+    SESSION_VIEW,
+    "if historyViewModelRegistry == nil {\n"
+    "                viewModel.suspendRunObservation()",
+    "standalone-only run observer teardown",
+)
+if ".defaultScrollAnchor(.bottom)" in SESSION_VIEW:
+    raise SystemExit(
+        "The Companion transcript must not reuse its initial bottom anchor "
+        "for keyboard-driven container size changes."
+    )
+
+composer = SESSION_VIEW.split(
+    "private var companionComposer: some View", maxsplit=1
+)[1].split("private var attachmentStrip: some View", maxsplit=1)[0]
+if ".background(.regularMaterial)" in composer:
+    raise SystemExit(
+        "The chat composer must float above the transcript instead of "
+        "painting a full-width material slab."
+    )
+if "\n            modelControls\n" in composer:
+    raise SystemExit(
+        "Model, reasoning, and usage must not remain as a persistent "
+        "three-control row above the input."
+    )
 for snippet, description in [
     ("actor CompanionAttachmentStager", "isolated attachment stager"),
     (".isRegularFileKey", "regular-file drop validation"),

@@ -5,6 +5,81 @@ import UIKit
 import UniformTypeIdentifiers
 import PhotosUI
 
+private struct CompanionNavigationAppearanceCompletionObserver:
+    UIViewControllerRepresentable
+{
+    let action: @MainActor () -> Void
+
+    func makeUIViewController(
+        context: Context
+    ) -> CompanionNavigationAppearanceObserverViewController {
+        CompanionNavigationAppearanceObserverViewController(action: action)
+    }
+
+    func updateUIViewController(
+        _ uiViewController:
+            CompanionNavigationAppearanceObserverViewController,
+        context: Context
+    ) {
+        uiViewController.action = action
+    }
+}
+
+@MainActor
+private final class CompanionNavigationAppearanceObserverViewController:
+    UIViewController
+{
+    var action: @MainActor () -> Void
+
+    private var isAwaitingTransitionCompletion = false
+    private var didReportAppearance = false
+
+    init(action: @escaping @MainActor () -> Void) {
+        self.action = action
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+        view.accessibilityElementsHidden = true
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        guard !didReportAppearance,
+              let coordinator = transitionCoordinator
+        else {
+            return
+        }
+        isAwaitingTransitionCompletion = true
+        coordinator.animate(alongsideTransition: nil) { [weak self] context in
+            guard let self else { return }
+            isAwaitingTransitionCompletion = false
+            guard !context.isCancelled else { return }
+            reportAppearanceIfNeeded()
+        }
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard !isAwaitingTransitionCompletion else { return }
+        reportAppearanceIfNeeded()
+    }
+
+    private func reportAppearanceIfNeeded() {
+        guard !didReportAppearance else { return }
+        didReportAppearance = true
+        action()
+    }
+}
+
 /// Native Companion-backed session management and paged history presentation.
 @MainActor
 struct CompanionSessionListView: View {
@@ -20,6 +95,8 @@ struct CompanionSessionListView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var sessionPendingDelete: SessionSummary?
     @State private var isCreatingSession = false
+    @State private var historyViewModelRegistry =
+        CompanionSessionHistoryViewModelRegistry()
     @FocusState private var isSearchFocused: Bool
     private let repository: any SessionRepository
 
@@ -233,6 +310,7 @@ struct CompanionSessionListView: View {
         .alert("Forget this Companion?", isPresented: $isConfirmingForget) {
             Button("Cancel", role: .cancel) {}
             Button("Forget and revoke device", role: .destructive) {
+                historyViewModelRegistry.removeAll()
                 Task { await connectionManager.forgetConnection() }
             }
         } message: {
@@ -258,6 +336,9 @@ struct CompanionSessionListView: View {
                        selectedSessionID == session.id {
                         selectedSessionID = nil
                     }
+                    if didDelete {
+                        historyViewModelRegistry.remove(sessionID: session.id)
+                    }
                 }
             }
             Button("Cancel", role: .cancel) {
@@ -278,6 +359,9 @@ struct CompanionSessionListView: View {
             }
         } message: {
             Text(viewModel.mutationErrorMessage ?? "")
+        }
+        .onDisappear {
+            historyViewModelRegistry.suspendObservations()
         }
     }
 
@@ -313,6 +397,7 @@ struct CompanionSessionListView: View {
             supportsUploads: connection.capabilities.supportsUploads,
             supportsServerFileAttachments:
                 connection.capabilities.supportsServerFileAttachments,
+            historyViewModelRegistry: historyViewModelRegistry,
             onUpdated: { session in
                 selectedSessionID = session.id
                 viewModel.updateSessionSnapshot(
@@ -328,6 +413,7 @@ struct CompanionSessionListView: View {
                 }
             },
             onDeleted: { sessionID in
+                historyViewModelRegistry.remove(sessionID: sessionID)
                 selectedSessionID = nil
                 Task {
                     await viewModel.reconcileDeletedSession(
@@ -410,11 +496,14 @@ struct CompanionSessionHistoryView: View {
     let runService: (any ConversationRunServing)?
     let modelService: (any CompanionModelServing)?
     let workspaceService: any CompanionWorkspaceServing
+    let historyViewModelRegistry:
+        CompanionSessionHistoryViewModelRegistry?
     let onUpdated: (SessionSummary) -> Void
     let onForked: () -> Void
     let onDeleted: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel: CompanionSessionHistoryViewModel
@@ -436,9 +525,18 @@ struct CompanionSessionHistoryView: View {
     @State private var droppedAttachmentTask: Task<Void, Never>?
     @State private var isDropTargeted = false
     @State private var draftMessage = ""
+    @State private var shouldFollowLatestMessage = true
+    @State private var isScrolledNearBottom = true
     @State private var isUserInteractingWithScroll = false
+    @State private var userScrollCooldownUntil: Date?
+    @State private var followScrollGeneration = 0
+    @State private var pendingExplicitSendFollow = false
+    @State private var pendingPostSendKeyboardFollow = false
     @State private var restoresComposerFocusAfterPresentation = false
+    @State private var didCompleteInitialAppearance = false
     @FocusState private var composerIsFocused: Bool
+
+    private let transcriptBottomAnchorID = "companion-transcript-bottom"
 
     init(
         session: SessionSummary,
@@ -451,6 +549,8 @@ struct CompanionSessionHistoryView: View {
         runService: (any ConversationRunServing)? = nil,
         modelService: (any CompanionModelServing)? = nil,
         workspaceService: (any CompanionWorkspaceServing)? = nil,
+        historyViewModelRegistry:
+            CompanionSessionHistoryViewModelRegistry? = nil,
         onUpdated: @escaping (SessionSummary) -> Void,
         onForked: @escaping () -> Void,
         onDeleted: @escaping (String) -> Void
@@ -466,11 +566,12 @@ struct CompanionSessionHistoryView: View {
         let resolvedWorkspaceService = workspaceService
             ?? CompanionWorkspaceService(companionURL: companionURL)
         self.workspaceService = resolvedWorkspaceService
+        self.historyViewModelRegistry = historyViewModelRegistry
         self.onUpdated = onUpdated
         self.onForked = onForked
         self.onDeleted = onDeleted
-        _viewModel = State(
-            initialValue: CompanionSessionHistoryViewModel(
+        let makeViewModel = {
+            CompanionSessionHistoryViewModel(
                 session: session,
                 repository: repository,
                 companionURL: companionURL,
@@ -478,167 +579,145 @@ struct CompanionSessionHistoryView: View {
                 supportsRunApprovals: supportsRunApprovals,
                 supportsModelSelection: supportsModelSelection,
                 modelService: modelService,
-                workspaceService: resolvedWorkspaceService
+                workspaceService: resolvedWorkspaceService,
+                activeRunStore: CompanionActiveRunStore.shared
             )
+        }
+        _viewModel = State(
+            initialValue: historyViewModelRegistry?.viewModel(
+                for: session,
+                make: makeViewModel
+            ) ?? makeViewModel()
         )
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(
-                alignment: .leading,
-                spacing: HermesNestDesign.Spacing.medium
-            ) {
-                if viewModel.isViewingCachedData {
-                    CompanionOfflineCacheBanner()
-                }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: HermesNestDesign.Spacing.medium
+                ) {
+                    transcriptStatusContent
 
-                if viewModel.needsTerminalHistoryRetry {
-                    VStack(
-                        alignment: .leading,
-                        spacing: HermesNestDesign.Spacing.small
-                    ) {
-                        Label(
-                            "Final response is shown from the run stream.",
-                            systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
-                        )
-                        .font(HermesNestDesign.Typography.control)
-
-                        Text(viewModel.terminalHistoryRetryMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-
-                        Button("Retry History") {
-                            Task {
-                                await viewModel.retryTerminalHistory(
-                                    modelContext: modelContext
-                                )
-                            }
+                    if viewModel.hasOlderMessages {
+                        Button {
+                            viewModel.loadOlderMessages()
+                        } label: {
+                            Label("Load earlier messages", systemImage: "arrow.up")
                         }
                         .buttonStyle(.bordered)
+                        .frame(maxWidth: .infinity)
                     }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        .orange.opacity(0.12),
-                        in: RoundedRectangle(cornerRadius: 12)
-                    )
-                    .accessibilityIdentifier("companion.run.history-retry")
-                }
 
-                if let mutationErrorMessage = viewModel.mutationErrorMessage {
-                    Label(
-                        mutationErrorMessage,
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                    visibleTranscriptMessages
+                    liveRunTranscriptContent
 
-                if viewModel.hasOlderMessages {
-                    Button {
-                        viewModel.loadOlderMessages()
-                    } label: {
-                        Label("Load earlier messages", systemImage: "arrow.up")
+                    Color.clear
+                        .frame(height: 1)
+                        .id(transcriptBottomAnchorID)
+                        .allowsHitTesting(false)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(
+                    maxWidth: HermesNestDesign.transcriptMaximumWidth,
+                    alignment: .leading
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.interactively)
+            .background {
+                HermesNestDesign.canvas
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        dismissComposerKeyboard()
                     }
-                    .buttonStyle(.bordered)
-                    .frame(maxWidth: .infinity)
-                }
-
-                ForEach(viewModel.visibleMessages) { message in
-                    CompanionMessageRow(
-                        message: message,
-                        reasoningGroups: viewModel.durableReasoning(
-                            anchoredTo: message
-                        ),
-                        toolCallGroups: viewModel.durableToolActivity(
-                            anchoredTo: message
-                        ),
-                        transcriptMediaCacheNamespace:
-                            companionURL.absoluteString,
-                        loadAttachment: {
-                            try? await workspaceService.downloadAttachment(
-                                path: $0
-                            )
-                        }
-                    )
-                    .equatable()
-                }
-
-                if !viewModel.reasoningText.isEmpty {
-                    DisclosureGroup("Reasoning") {
-                        Text(viewModel.reasoningText)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                            .frame(
-                                maxWidth: .infinity,
-                                alignment: .leading
-                            )
-                    }
-                    .accessibilityIdentifier("companion.run.reasoning")
-                }
-
-                ForEach(viewModel.liveToolCalls) { toolCall in
-                    ToolCallCardView(toolCall: toolCall)
-                }
-
-                if let approval = viewModel.pendingApproval {
-                    CompanionRunApprovalCard(
-                        approval: approval,
-                        submissionChoice:
-                            viewModel.approvalSubmissionChoice,
-                        errorMessage:
-                            viewModel.approvalErrorMessage,
-                        canRespond: viewModel.canRespondToApproval
-                    ) { choice in
-                        Task {
-                            await viewModel.respondToApproval(
-                                choice,
-                                modelContext: modelContext
-                            )
-                        }
-                    }
-                } else if viewModel.approvalContextUnavailable {
-                    CompanionRunApprovalUnavailableCard()
-                }
-
-                if let streamingMessage = viewModel.streamingMessage {
-                    MessageBubbleView(
-                        message: streamingMessage,
-                        transcriptMediaCacheNamespace: companionURL.absoluteString,
+            }
+            .background {
+                ZStack {
+                    ChatScrollObserver(
                         isStreaming: viewModel.isRunActive
-                    )
-                    .accessibilityLabel("Streaming assistant response")
+                    ) { metrics in
+                        updateScrollMetrics(metrics)
+                    }
+                    ChatVerticalScrollAxisGuard()
                 }
+                .accessibilityHidden(true)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(
-                maxWidth: HermesNestDesign.transcriptMaximumWidth,
-                alignment: .leading
+            .environment(
+                \.chatIsUserInteractingWithScroll,
+                isUserInteractingWithScroll
             )
-            .frame(maxWidth: .infinity)
-        }
-        .scrollIndicators(.hidden)
-        .background(HermesNestDesign.canvas)
-        .background {
-            ZStack {
-                ChatScrollObserver(
-                    isStreaming: viewModel.isRunActive
-                ) { metrics in
-                    isUserInteractingWithScroll = metrics.isUserInteracting
+            .defaultScrollAnchor(
+                ChatScrollPolicy.initialTranscriptAnchor,
+                for: .initialOffset
+            )
+            .defaultScrollAnchor(
+                ChatScrollPolicy.sizeChangeAnchor(
+                    shouldFollowLatestMessage: shouldFollowLatestMessage
+                ),
+                for: .sizeChanges
+            )
+            .onChange(of: viewModel.visibleMessages.last?.id) {
+                let isExplicitSend = pendingExplicitSendFollow
+                guard shouldFollowLatestMessage || isExplicitSend else {
+                    return
                 }
-                ChatVerticalScrollAxisGuard()
+                pendingExplicitSendFollow = false
+                if isExplicitSend {
+                    scheduleLatestMessageFollow(
+                        proxy,
+                        animated: false,
+                        isUserInitiated: true
+                    )
+                } else {
+                    scheduleFollowScroll(proxy, animated: true)
+                }
             }
-            .accessibilityHidden(true)
+            .onChange(of: viewModel.streamingFollowTrigger) {
+                guard shouldFollowLatestMessage else { return }
+                scheduleFollowScroll(proxy, animated: true)
+            }
+            .onChange(of: didCompleteInitialAppearance) {
+                guard didCompleteInitialAppearance else { return }
+                scheduleInitialTranscriptFollow(proxy)
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: UIResponder.keyboardWillShowNotification
+                )
+            ) { _ in
+                guard isScrolledNearBottom else { return }
+                scheduleFollowScroll(proxy, animated: false)
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: UIResponder.keyboardDidHideNotification
+                )
+            ) { _ in
+                guard pendingPostSendKeyboardFollow else { return }
+                pendingPostSendKeyboardFollow = false
+                if ChatScrollPolicy
+                    .shouldUseLatestMessageAnchorAfterKeyboardDismissal(
+                        hasLiveTranscriptContent:
+                            viewModel.hasLiveTranscriptContent
+                    ) {
+                    scheduleLatestMessageFollow(
+                        proxy,
+                        animated: false,
+                        isUserInitiated: true
+                    )
+                } else {
+                    scheduleFollowScroll(
+                        proxy,
+                        animated: false,
+                        isUserInitiated: true
+                    )
+                }
+            }
         }
-        .environment(
-            \.chatIsUserInteractingWithScroll,
-            isUserInteractingWithScroll
-        )
-        .defaultScrollAnchor(.bottom)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             companionComposer
         }
@@ -686,6 +765,7 @@ struct CompanionSessionHistoryView: View {
                 runService: runService,
                 modelService: modelService,
                 workspaceService: workspaceService,
+                historyViewModelRegistry: historyViewModelRegistry,
                 onUpdated: onUpdated,
                 onForked: onForked,
                 onDeleted: onDeleted
@@ -729,8 +809,31 @@ struct CompanionSessionHistoryView: View {
                 .disabled(viewModel.isRunActive)
             }
         }
-        .task {
-            if viewModel.allMessages.isEmpty {
+        .background {
+            CompanionNavigationAppearanceCompletionObserver {
+                didCompleteInitialAppearance = true
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+        .onAppear {
+            historyViewModelRegistry?.adopt(
+                viewModel,
+                sessionID: viewModel.session.id
+            )
+        }
+        .task(id: didCompleteInitialAppearance) {
+            viewModel.prepareInitialMessageLoad(modelContext: modelContext)
+            guard ChatInitialAppearancePolicy.shouldBeginAsyncWork(
+                hasCompletedAppearance: didCompleteInitialAppearance
+            ) else {
+                return
+            }
+
+            await viewModel.resumeRunObservation(
+                modelContext: modelContext
+            )
+            if !viewModel.hasLoadedAuthoritativeHistory {
                 await viewModel.load(modelContext: modelContext)
             }
             await viewModel.loadModelOptions()
@@ -916,6 +1019,9 @@ struct CompanionSessionHistoryView: View {
         .onDisappear {
             droppedAttachmentTask?.cancel()
             attachmentUploadTask?.cancel()
+            if historyViewModelRegistry == nil {
+                viewModel.suspendRunObservation()
+            }
             viewModel.cancelAttachmentRetry()
             Task {
                 await viewModel.discardStagedDroppedAttachments()
@@ -923,8 +1029,133 @@ struct CompanionSessionHistoryView: View {
         }
     }
 
+    @ViewBuilder
+    private var transcriptStatusContent: some View {
+        if viewModel.isViewingCachedData {
+            CompanionOfflineCacheBanner()
+        }
+
+        if viewModel.needsTerminalHistoryRetry {
+            VStack(
+                alignment: .leading,
+                spacing: HermesNestDesign.Spacing.small
+            ) {
+                Label(
+                    "Final response is shown from the run stream.",
+                    systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
+                )
+                .font(HermesNestDesign.Typography.control)
+
+                Text(viewModel.terminalHistoryRetryMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Button("Retry History") {
+                    Task {
+                        await viewModel.retryTerminalHistory(
+                            modelContext: modelContext
+                        )
+                    }
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                .orange.opacity(0.12),
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+            .accessibilityIdentifier("companion.run.history-retry")
+        }
+
+        if let mutationErrorMessage = viewModel.mutationErrorMessage {
+            Label(
+                mutationErrorMessage,
+                systemImage: "exclamationmark.triangle"
+            )
+            .font(.footnote)
+            .foregroundStyle(.red)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var visibleTranscriptMessages: some View {
+        ForEach(viewModel.visibleMessages) { message in
+            CompanionMessageRow(
+                message: message,
+                reasoningGroups: viewModel.durableReasoning(
+                    anchoredTo: message
+                ),
+                toolCallGroups: viewModel.durableToolActivity(
+                    anchoredTo: message
+                ),
+                transcriptMediaCacheNamespace:
+                    companionURL.absoluteString,
+                loadAttachment: {
+                    try? await workspaceService.downloadAttachment(
+                        path: $0
+                    )
+                }
+            )
+            .equatable()
+        }
+    }
+
+    @ViewBuilder
+    private var liveRunTranscriptContent: some View {
+        if !viewModel.reasoningText.isEmpty {
+            DisclosureGroup("Reasoning") {
+                Text(viewModel.reasoningText)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+            }
+            .accessibilityIdentifier("companion.run.reasoning")
+        }
+
+        ForEach(viewModel.liveToolCalls) { toolCall in
+            ToolCallCardView(toolCall: toolCall)
+        }
+
+        if let approval = viewModel.pendingApproval {
+            CompanionRunApprovalCard(
+                approval: approval,
+                submissionChoice:
+                    viewModel.approvalSubmissionChoice,
+                errorMessage:
+                    viewModel.approvalErrorMessage,
+                canRespond: viewModel.canRespondToApproval
+            ) { choice in
+                Task {
+                    await viewModel.respondToApproval(
+                        choice,
+                        modelContext: modelContext
+                    )
+                }
+            }
+        } else if viewModel.approvalContextUnavailable {
+            CompanionRunApprovalUnavailableCard()
+        }
+
+        if let streamingMessage = viewModel.streamingMessage {
+            MessageBubbleView(
+                message: streamingMessage,
+                transcriptMediaCacheNamespace: companionURL.absoluteString,
+                isStreaming: viewModel.isRunActive
+            )
+            .accessibilityLabel("Streaming assistant response")
+        }
+    }
+
     private var companionComposer: some View {
-        VStack(spacing: HermesNestDesign.Spacing.small) {
+        VStack(
+            alignment: .leading,
+            spacing: HermesNestDesign.Spacing.small
+        ) {
             if let status = viewModel.runStatusText {
                 Text(status)
                     .font(HermesNestDesign.Typography.metadata)
@@ -943,7 +1174,24 @@ struct CompanionSessionHistoryView: View {
                 attachmentStrip
             }
 
-            modelControls
+            if let error = viewModel.modelSelectionErrorMessage {
+                HStack(spacing: 8) {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .lineLimit(2)
+                    Spacer(minLength: 8)
+                    if viewModel.modelGroups.isEmpty {
+                        Button("Retry") {
+                            Task {
+                                await viewModel.loadModelOptions(refresh: true)
+                            }
+                        }
+                        .font(HermesNestDesign.Typography.control)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             composerInputLayout {
                 Button {
@@ -1038,34 +1286,35 @@ struct CompanionSessionHistoryView: View {
                     .accessibilityIdentifier("companion.run.send")
                 }
             }
-            .padding(.horizontal, HermesNestDesign.Spacing.large)
-            .padding(.vertical, HermesNestDesign.Spacing.medium)
-            .background(
-                HermesNestDesign.sidebar,
-                in: RoundedRectangle(
-                    cornerRadius: HermesNestDesign.composerCornerRadius,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: HermesNestDesign.composerCornerRadius,
-                    style: .continuous
-                )
-                .stroke(HermesNestDesign.subtleBorder, lineWidth: 0.5)
-            }
-            .shadow(
-                color: .black.opacity(0.08),
-                radius: 14,
-                y: 4
-            )
+
+            compactComposerContextMenu
         }
+        .padding(.horizontal, HermesNestDesign.Spacing.medium)
+        .padding(.vertical, 10)
+        .background(
+            HermesNestDesign.sidebar,
+            in: RoundedRectangle(
+                cornerRadius: HermesNestDesign.composerCornerRadius,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: HermesNestDesign.composerCornerRadius,
+                style: .continuous
+            )
+            .stroke(HermesNestDesign.subtleBorder, lineWidth: 0.5)
+        }
+        .shadow(
+            color: .black.opacity(0.08),
+            radius: 14,
+            y: 4
+        )
         .padding(.horizontal, HermesNestDesign.Spacing.large)
         .padding(.top, HermesNestDesign.Spacing.small)
         .padding(.bottom, HermesNestDesign.Spacing.xSmall)
         .frame(maxWidth: HermesNestDesign.transcriptMaximumWidth)
         .frame(maxWidth: .infinity)
-        .background(.regularMaterial)
         .overlay {
             if isDropTargeted {
                 RoundedRectangle(
@@ -1152,80 +1401,25 @@ struct CompanionSessionHistoryView: View {
         }
     }
 
-    @ViewBuilder
-    private var modelControls: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let error = viewModel.modelSelectionErrorMessage {
-                HStack(spacing: 8) {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .lineLimit(2)
-                    Spacer(minLength: 8)
-                    if viewModel.modelGroups.isEmpty {
-                        Button("Retry") {
-                            Task {
-                                await viewModel.loadModelOptions(refresh: true)
-                            }
-                        }
-                        .font(HermesNestDesign.Typography.control)
-                    }
+    private var compactComposerContextMenu: some View {
+        Menu {
+            if !viewModel.modelGroups.isEmpty
+                || viewModel.isLoadingModelOptions {
+                Button {
+                    preserveComposerFocus()
+                    showsModelPicker = true
+                } label: {
+                    Label("Choose model", systemImage: "cpu")
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            adaptiveModelControls
-        }
-    }
-
-    @ViewBuilder
-    private var adaptiveModelControls: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            VStack(alignment: .leading, spacing: 6) {
-                modelControlItems
-            }
-        } else {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 6) {
-                    modelControlItems
-                    Spacer(minLength: 0)
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    modelControlItems
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var modelControlItems: some View {
-        if !viewModel.modelGroups.isEmpty
-            || viewModel.isLoadingModelOptions {
-            Button {
-                preserveComposerFocus()
-                showsModelPicker = true
-            } label: {
-                CompanionComposerControlLabel(
-                    title: viewModel.selectedModelDisplayName,
-                    systemImage: "cpu",
-                    showsDisclosure: true,
-                    isLoading: viewModel.isLoadingModelOptions
+                .disabled(
+                    !viewModel.canChangeModel
+                        || viewModel.modelGroups.isEmpty
                 )
+                .accessibilityIdentifier("companion.model.picker")
             }
-            .buttonStyle(.chatTactile(.compactControl))
-            .hoverEffect(.highlight)
-            .help("Choose model")
-            .disabled(
-                !viewModel.canChangeModel
-                    || viewModel.modelGroups.isEmpty
-            )
-            .accessibilityLabel("Choose model")
-            .accessibilityValue(viewModel.selectedModelDisplayName)
-            .accessibilityIdentifier("companion.model.picker")
 
             if viewModel.selectedModelSupportsReasoning {
-                Menu {
+                Section("Reasoning") {
                     ForEach(
                         CompanionReasoningEffort.allCases,
                         id: \.self
@@ -1247,40 +1441,59 @@ struct CompanionSessionHistoryView: View {
                                 Text(effort.displayName)
                             }
                         }
+                        .disabled(!viewModel.canChangeModel)
                     }
-                } label: {
-                    CompanionComposerControlLabel(
-                        title: viewModel.selectedReasoningDisplayName,
-                        systemImage: "brain",
-                        showsDisclosure: true
-                    )
                 }
-                .buttonStyle(.chatTactile(.compactControl))
-                .hoverEffect(.highlight)
-                .help("Choose reasoning effort")
-                .disabled(!viewModel.canChangeModel)
-                .accessibilityLabel("Choose reasoning effort")
-                .accessibilityIdentifier("companion.reasoning.picker")
             }
-        }
 
-        Button {
-            preserveComposerFocus()
-            showsUsage = true
+            Divider()
+
+            Button {
+                preserveComposerFocus()
+                showsUsage = true
+            } label: {
+                Label(usageControlLabel, systemImage: "chart.bar.xaxis")
+            }
+            .accessibilityIdentifier("companion.usage")
         } label: {
-            CompanionComposerControlLabel(
-                title: usageControlLabel,
-                systemImage: "chart.bar.xaxis"
-            )
+            HStack(spacing: 5) {
+                if viewModel.isLoadingModelOptions {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "brain")
+                }
+
+                Text(composerContextLabel)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+            }
+            .font(HermesNestDesign.Typography.control)
+            .foregroundStyle(.secondary)
+            .frame(minHeight: 24)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.chatTactile(.compactControl))
+        .buttonStyle(.plain)
         .hoverEffect(.highlight)
         .help("Model and token usage")
         .accessibilityLabel("Model and token usage")
+        .accessibilityValue(composerContextLabel)
         .accessibilityHint(
-            "Shows exact run and session usage. Context occupancy is shown only when Hermes reports it."
+            "Choose the model or reasoning effort, or view exact token usage."
         )
-        .accessibilityIdentifier("companion.usage")
+    }
+
+    private var composerContextLabel: String {
+        guard viewModel.selectedModelSupportsReasoning else {
+            return viewModel.selectedModelDisplayName
+        }
+        return [
+            viewModel.selectedModelDisplayName,
+            viewModel.selectedReasoningDisplayName
+        ].joined(separator: " · ")
     }
 
     private var usageControlLabel: String {
@@ -1296,22 +1509,156 @@ struct CompanionSessionHistoryView: View {
 
     private var composerInputLayout: AnyLayout {
         if dynamicTypeSize.isAccessibilitySize {
-            return AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+            return AnyLayout(
+                VStackLayout(alignment: .leading, spacing: 10)
+            )
         }
         return AnyLayout(HStackLayout(alignment: .bottom, spacing: 10))
     }
 
     private func sendDraft() {
         let draft = draftMessage
+        prepareTranscriptForExplicitSend()
         Task {
             if await viewModel.send(
                 draft,
                 modelContext: modelContext
             ) {
                 draftMessage = ""
+                pendingPostSendKeyboardFollow = composerIsFocused
                 composerIsFocused = false
+            } else {
+                pendingExplicitSendFollow = false
+                pendingPostSendKeyboardFollow = false
             }
         }
+    }
+
+    private func updateScrollMetrics(_ metrics: ChatScrollMetrics) {
+        let isNearBottom = ChatScrollPolicy.isNearBottom(
+            distanceFromBottom: metrics.distanceFromBottom,
+            isStreaming: viewModel.isRunActive
+        )
+        isScrolledNearBottom = isNearBottom
+        isUserInteractingWithScroll = metrics.isUserInteracting
+
+        if metrics.isUserInteracting {
+            userScrollCooldownUntil = ChatScrollPolicy.cooldownDeadline()
+        }
+
+        if isNearBottom {
+            shouldFollowLatestMessage = true
+        } else if metrics.isUserInteracting {
+            shouldFollowLatestMessage = false
+        }
+    }
+
+    private var isAutoFollowScrollPaused: Bool {
+        ChatScrollPolicy.isAutoScrollPaused(
+            isUserInteracting: isUserInteractingWithScroll,
+            cooldownUntil: userScrollCooldownUntil
+        )
+    }
+
+    private func prepareTranscriptForExplicitSend() {
+        shouldFollowLatestMessage = true
+        userScrollCooldownUntil = nil
+        pendingExplicitSendFollow = true
+    }
+
+    private func scheduleInitialTranscriptFollow(_ proxy: ScrollViewProxy) {
+        shouldFollowLatestMessage = true
+        isScrolledNearBottom = true
+        userScrollCooldownUntil = nil
+        pendingExplicitSendFollow = false
+        scheduleFollowScroll(
+            proxy,
+            animated: false,
+            isUserInitiated: true
+        )
+    }
+
+    private func scheduleLatestMessageFollow(
+        _ proxy: ScrollViewProxy,
+        animated: Bool,
+        isUserInitiated: Bool
+    ) {
+        guard let messageID = viewModel.visibleMessages.last?.id else {
+            scheduleFollowScroll(
+                proxy,
+                animated: animated,
+                isUserInitiated: isUserInitiated
+            )
+            return
+        }
+        scheduleFollowScroll(
+            proxy,
+            targetID: messageID,
+            animated: animated,
+            isUserInitiated: isUserInitiated
+        )
+    }
+
+    private func scheduleFollowScroll(
+        _ proxy: ScrollViewProxy,
+        targetID: String? = nil,
+        animated: Bool,
+        isUserInitiated: Bool = false
+    ) {
+        guard isUserInitiated || !isAutoFollowScrollPaused else { return }
+
+        if isUserInitiated {
+            userScrollCooldownUntil = nil
+        }
+
+        followScrollGeneration += 1
+        let generation = followScrollGeneration
+        let resolvedTargetID = targetID ?? transcriptBottomAnchorID
+        Task { @MainActor in
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 16_000_000)
+            guard
+                !Task.isCancelled,
+                generation == followScrollGeneration,
+                isUserInitiated || !isAutoFollowScrollPaused
+            else {
+                return
+            }
+
+            if isUserInitiated {
+                shouldFollowLatestMessage = true
+            }
+
+            if animated {
+                withAnimation(
+                    viewModel.isRunActive
+                        ? ChatMotion.streamingFollow(reduceMotion: reduceMotion)
+                        : ChatMotion.scrollToLatest(reduceMotion: reduceMotion)
+                ) {
+                    proxy.scrollTo(resolvedTargetID, anchor: .bottom)
+                }
+            } else {
+                proxy.scrollTo(resolvedTargetID, anchor: .bottom)
+            }
+
+            try? await Task.sleep(
+                nanoseconds: ChatScrollPolicy
+                    .followLayoutSettlementDelayNanoseconds
+            )
+            guard
+                !Task.isCancelled,
+                generation == followScrollGeneration,
+                shouldFollowLatestMessage,
+                !isAutoFollowScrollPaused
+            else {
+                return
+            }
+            proxy.scrollTo(resolvedTargetID, anchor: .bottom)
+        }
+    }
+
+    private func dismissComposerKeyboard() {
+        composerIsFocused = false
     }
 
     private func preserveComposerFocus() {
@@ -1667,51 +2014,6 @@ struct CompanionMessageRow: View, Equatable {
             in: .whitespacesAndNewlines
         )
         return trimmed.isEmpty ? nil : content
-    }
-}
-
-private struct CompanionComposerControlLabel: View {
-    let title: String
-    let systemImage: String
-    var showsDisclosure = false
-    var isLoading = false
-
-    var body: some View {
-        HStack(spacing: 5) {
-            if isLoading {
-                ProgressView()
-                    .controlSize(.small)
-            } else {
-                Image(systemName: systemImage)
-            }
-
-            Text(title)
-                .lineLimit(1)
-                .truncationMode(.middle)
-
-            if showsDisclosure {
-                Image(systemName: "chevron.down")
-                    .font(.caption2.weight(.semibold))
-            }
-        }
-        .font(HermesNestDesign.Typography.control)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 9)
-        .frame(minHeight: 32)
-        .background(
-            HermesNestDesign.raisedSurface,
-            in: Capsule()
-        )
-        .overlay {
-            Capsule()
-                .stroke(HermesNestDesign.subtleBorder, lineWidth: 0.5)
-        }
-        .contentShape(Capsule())
-        .chatMinimumHitTarget(
-            horizontalPadding: 4,
-            verticalPadding: 6,
-            in: Capsule()
-        )
     }
 }
 

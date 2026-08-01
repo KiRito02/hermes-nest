@@ -51,6 +51,16 @@
         }
       }
     },
+    "Choose the model or reasoning effort, or view exact token usage.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择模型或推理强度，或查看精确令牌用量。"
+          }
+        }
+      }
+    },
     "Choose a chat from the sidebar or start a new conversation with your Hermes Agent.": {
       "localizations": {
         "zh-Hans": {

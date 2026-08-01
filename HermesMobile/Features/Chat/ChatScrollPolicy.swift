@@ -41,6 +41,21 @@ enum ChatScrollPolicy {
     /// SwiftUI state on every content-size/offset callback.
     static let metricDeliveryInterval: TimeInterval = 1.0 / 30.0
 
+    /// Rich transcript rows can finish a second layout pass after the initial
+    /// scroll target resolves. A settled snap prevents that late size change
+    /// from leaving the viewport beyond the rendered content.
+    static let followLayoutSettlementDelayNanoseconds: UInt64 = 250_000_000
+
+    /// The optimistic user row is the most stable target while the keyboard is
+    /// collapsing, but it stops being the latest content as soon as a live run
+    /// event renders below it. Never let the keyboard completion callback pull
+    /// reasoning, tools, or streamed output back below the viewport.
+    static func shouldUseLatestMessageAnchorAfterKeyboardDismissal(
+        hasLiveTranscriptContent: Bool
+    ) -> Bool {
+        !hasLiveTranscriptContent
+    }
+
     static func bottomThreshold(isStreaming: Bool) -> CGFloat {
         isStreaming ? streamingBottomDetectionThreshold : bottomDetectionThreshold
     }
