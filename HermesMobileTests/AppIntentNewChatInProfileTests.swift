@@ -3,8 +3,8 @@ import AppIntents
 @testable import HermesMobile
 
 /// Covers the "New Chat in <Profile>" App Intent plumbing (issue #339): the profile-carrying
-/// deep link, its non-aliasing with the other new-chat links, the `NewChatRequest` threading,
-/// the intent itself, and the shared `ProfileEntity` mapping + cache.
+/// deep link, its non-aliasing with the other new-chat links, the intent itself,
+/// and the shared `ProfileEntity` mapping + cache.
 final class AppIntentNewChatInProfileTests: XCTestCase {
 
     override func setUp() async throws {
@@ -74,22 +74,6 @@ final class AppIntentNewChatInProfileTests: XCTestCase {
         XCTAssertFalse(HermesDeepLink.isNewChatInProfileURL(voice))
         XCTAssertFalse(HermesDeepLink.isNewChatInProfileURL(session))
         XCTAssertNil(HermesDeepLink.profileName(fromNewChatInProfile: plain))
-    }
-
-    // MARK: - NewChatRequest threading
-
-    func testNewChatRequestDefaultsToNoProfile() {
-        XCTAssertNil(NewChatRequest().profileName)
-    }
-
-    func testNewChatRequestCarriesProfileName() {
-        XCTAssertEqual(NewChatRequest(profileName: "dev").profileName, "dev")
-    }
-
-    func testNewChatRequestVoiceAndProfileAreIndependent() {
-        let request = NewChatRequest(autoStartsVoiceInput: false, profileName: "dev")
-        XCTAssertFalse(request.autoStartsVoiceInput)
-        XCTAssertEqual(request.profileName, "dev")
     }
 
     // MARK: - Intent

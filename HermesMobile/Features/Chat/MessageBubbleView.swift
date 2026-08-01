@@ -596,9 +596,8 @@ private struct GridAttachmentCell: View {
 
 // MARK: - Remote image loading with cookie-aware session
 
-/// Loads attachment images through the authenticated `APIClient` instead of
-/// `AsyncImage`, which uses `URLSession.shared` and may not carry our auth
-/// cookie. Deduplicates concurrent requests and caches in memory.
+/// Loads attachment images through the injected authenticated loader instead
+/// of `AsyncImage`. Deduplicates concurrent requests and caches in memory.
 private struct RemoteAttachmentImage: View {
     let path: String
     let loadAttachmentImage: (String) async -> Data?

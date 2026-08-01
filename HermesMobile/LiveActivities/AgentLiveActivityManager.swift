@@ -579,7 +579,7 @@ enum LiveActivityReconciler {
         guard !orphans.isEmpty else { return }
         liveActivityReconcilerLogger.notice("Checking \(orphans.count, privacy: .public) persisted Live Activity(ies) against server status")
 
-        let client = APIClient(baseURL: server)
+        let client = PreservedWebUIReadService(baseURL: server)
         await reconcileOrphanedActivities(
             orphans: orphans,
             now: now,

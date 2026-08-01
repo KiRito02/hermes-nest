@@ -2,7 +2,7 @@ import Foundation
 
 /// Pure, testable audio-attachment detection shared by the chat bubble and the
 /// full-screen attachment preview. Mirrors the image-detection rules used by
-/// `GridAttachmentCell.inferredIsImage` / `ChatAttachmentPreviewItem.inferredIsImage`.
+/// the retained transcript attachment renderer.
 enum AttachmentAudioDetection {
     /// File extensions we treat as audio. `AVAudioPlayer` natively decodes the
     /// first group (m4a/mp3/wav/aac/caf); ogg/oga/opus/flac are still detected

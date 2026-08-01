@@ -9,8 +9,8 @@ import Foundation
 /// uses for #212 pacing, so `prefix(of:unitCount:)` can never alter content —
 /// the final prefix is exactly the fixture.
 enum StreamingLabReplay {
-    /// Matches the production word-reveal cadence in `ChatViewModel`
-    /// (one unit per 48ms tick), so the default lab speed feels like a real
+    /// Matches the production word-reveal cadence (one unit per 48ms tick), so
+    /// the default lab speed feels like a real
     /// reply and higher speeds reveal several words per tick — the chunky
     /// #212 backlog-catch-up arrival pattern.
     static let tickInterval: TimeInterval = 0.048
