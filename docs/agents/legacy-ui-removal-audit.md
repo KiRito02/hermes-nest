@@ -16,9 +16,12 @@ HermesMobileApp
         └── CompanionDiscoveryView
 ```
 
-The App target's `PBXSourcesBuildPhase` contains 75 unique Swift files. That
-set exactly matches the 75-entry `Config/PersonalSideloadSources.txt` release
-allowlist: there are no files present in one set but absent from the other.
+Before deletion, the App target's `PBXSourcesBuildPhase` contained 75 unique
+Swift files and the XCTest phase contained 21. The App set exactly matched the
+75-entry `Config/PersonalSideloadSources.txt` release allowlist: there were no
+files present in one set but absent from the other. The branch keeps that App
+set unchanged and expands the XCTest phase to 25 entries solely to compile the
+preserved read-only WebUI boundary and its focused contract/security tests.
 Consequently, a legacy candidate is removable only when all of the following
 hold:
 
@@ -28,8 +31,8 @@ hold:
 4. any tests, project references, and localizations removed with it are
    exclusive to that candidate graph.
 
-The old files are PBX group references only. They are not members of either
-Sources build phase. Removing them therefore does not change a Companion
+The removed files were PBX group references only. They were not members of
+either Sources build phase. Removing them therefore does not change a Companion
 endpoint, model shape, credential path, or release-root navigation route.
 
 ## Preserve boundary
@@ -54,7 +57,14 @@ The following code stays:
   features are isolated in `PreservedWebUIReadService`; it keeps the existing
   `/api/profiles` and `/api/chat/stream/status?stream_id=...` contracts,
   owner-configured headers, cookie behavior, and cross-origin redirect guard
-  without retaining the general WebUI `APIClient` graph;
+  without retaining the general WebUI `APIClient` graph. The service and
+  `CustomHeader` and credential reader compile in the XCTest target together
+  with focused route, decoding, header-precedence, cookie, redirect, and scoped
+  credential-selection tests; they remain excluded from the personal-v1 App
+  target alongside their out-of-process consumers;
+- `PreservedWebUICredentialReader` keeps the existing scoped-Keychain-first,
+  legacy-global-fallback custom-header lookup shared by the profile picker and
+  Live Activity reconciler, without restoring the old mutable account graph;
 - `CustomHeader.swift` and `KeychainStore.swift`, which supply that narrow
   preserved service without entering the Companion release source graph;
 - historical documentation. It is labeled historical and is not a product
@@ -93,7 +103,9 @@ English/Simplified-Chinese completeness checks remain.
 
 ## Validation required after deletion
 
-- project references resolve and the App/test source sets remain unchanged;
+- project references resolve, the 75-file App source set remains unchanged,
+  and the 25-file XCTest set contains only the previous tests plus the preserved
+  service, its header/credential dependencies, and its focused test suite;
 - personal-sideload release readiness, promotion, UI smoke, localization JSON,
   and project-balance checks pass;
 - full XCTest passes on macOS;

@@ -1,5 +1,4 @@
 import Foundation
-import os
 
 /// A single user-supplied HTTP request header attached to every outgoing request.
 ///
@@ -124,28 +123,5 @@ extension Array where Element == CustomHeader {
             return []
         }
         return headers
-    }
-}
-
-/// Process-wide, thread-safe snapshot of the user's custom headers.
-///
-/// The personal-v1 Companion client does not consume these headers. This small
-/// process-wide store remains only for the preserved out-of-process profile
-/// picker and Live Activity status reconciliation requests.
-final class CustomHeaderStore: Sendable {
-    static let shared = CustomHeaderStore()
-
-    private let storage: OSAllocatedUnfairLock<[CustomHeader]>
-
-    init(headers: [CustomHeader] = []) {
-        storage = OSAllocatedUnfairLock(initialState: headers)
-    }
-
-    func snapshot() -> [CustomHeader] {
-        storage.withLock { $0 }
-    }
-
-    func replace(with headers: [CustomHeader]) {
-        storage.withLock { $0 = headers }
     }
 }

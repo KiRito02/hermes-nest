@@ -12,38 +12,39 @@ actor PreservedWebUIReadService {
 
     init(
         baseURL: URL,
-        session: URLSession? = nil,
-        customHeaderProvider: @escaping @Sendable () -> [CustomHeader] = {
-            CustomHeaderStore.shared.snapshot()
-        }
+        sessionConfiguration: URLSessionConfiguration = .default,
+        customHeaderProvider: @escaping @Sendable () -> [CustomHeader]
     ) {
         self.baseURL = baseURL
         self.customHeaderProvider = customHeaderProvider
 
-        if let session {
-            self.session = session
-            ownedSession = nil
-        } else {
-            let configuration = URLSessionConfiguration.default
-            configuration.httpCookieStorage = .shared
-            configuration.httpCookieAcceptPolicy = .always
-            configuration.httpShouldSetCookies = true
-            let delegate = PreservedWebUIRedirectGuard(
-                baseURL: baseURL,
-                customHeaderProvider: customHeaderProvider
-            )
-            let created = URLSession(
-                configuration: configuration,
-                delegate: delegate,
-                delegateQueue: nil
-            )
-            self.session = created
-            ownedSession = created
-        }
+        let configuration = Self.configuredSessionConfiguration(
+            from: sessionConfiguration
+        )
+        let delegate = PreservedWebUIRedirectGuard(
+            baseURL: baseURL,
+            customHeaderProvider: customHeaderProvider
+        )
+        let created = URLSession(
+            configuration: configuration,
+            delegate: delegate,
+            delegateQueue: nil
+        )
+        self.session = created
+        ownedSession = created
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         self.decoder = decoder
+    }
+
+    static func configuredSessionConfiguration(
+        from configuration: URLSessionConfiguration
+    ) -> URLSessionConfiguration {
+        configuration.httpCookieStorage = .shared
+        configuration.httpCookieAcceptPolicy = .always
+        configuration.httpShouldSetCookies = true
+        return configuration
     }
 
     deinit {
@@ -110,7 +111,7 @@ private enum PreservedWebUIReadError: Error {
 
 /// Prevents the two preserved requests from forwarding owner-configured
 /// headers when a same-origin server redirects to another origin.
-private final class PreservedWebUIRedirectGuard:
+final class PreservedWebUIRedirectGuard:
     NSObject,
     URLSessionTaskDelegate,
     @unchecked Sendable
@@ -133,10 +134,13 @@ private final class PreservedWebUIRedirectGuard:
         newRequest request: URLRequest,
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
+        completionHandler(sanitizedRedirectRequest(request))
+    }
+
+    func sanitizedRedirectRequest(_ request: URLRequest) -> URLRequest {
         guard let destination = request.url,
               !Self.isSameOrigin(destination, as: baseURL) else {
-            completionHandler(request)
-            return
+            return request
         }
 
         let namesToStrip = Set(
@@ -146,15 +150,14 @@ private final class PreservedWebUIRedirectGuard:
         )
         guard !namesToStrip.isEmpty,
               let fields = request.allHTTPHeaderFields else {
-            completionHandler(request)
-            return
+            return request
         }
 
         var stripped = request
         for name in fields.keys where namesToStrip.contains(name.lowercased()) {
             stripped.setValue(nil, forHTTPHeaderField: name)
         }
-        completionHandler(stripped)
+        return stripped
     }
 
     private static func isSameOrigin(_ url: URL, as baseURL: URL) -> Bool {

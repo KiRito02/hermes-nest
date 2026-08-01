@@ -579,7 +579,20 @@ enum LiveActivityReconciler {
         guard !orphans.isEmpty else { return }
         liveActivityReconcilerLogger.notice("Checking \(orphans.count, privacy: .public) persisted Live Activity(ies) against server status")
 
-        let client = PreservedWebUIReadService(baseURL: server)
+        let keychain = KeychainStore()
+        let headers = PreservedWebUICredentialReader.customHeaders(
+            for: server,
+            loadScoped: { scope in
+                try keychain.load(.customHeaders, scope: scope)
+            },
+            loadGlobal: {
+                try keychain.load(.customHeaders)
+            }
+        )
+        let client = PreservedWebUIReadService(
+            baseURL: server,
+            customHeaderProvider: { headers }
+        )
         await reconcileOrphanedActivities(
             orphans: orphans,
             now: now,

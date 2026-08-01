@@ -112,6 +112,10 @@
 		C23400000000000000000003 /* StreamingLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23400000000000000000004 /* StreamingLabView.swift */; };
 		C72600000000000000000001 /* CoreChatLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C72600000000000000000002 /* CoreChatLabView.swift */; };
 		C23400000000000000000005 /* StreamingLabReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23400000000000000000006 /* StreamingLabReplayTests.swift */; };
+		F03400000000000000000001 /* PreservedWebUIReadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F03400000000000000000011 /* PreservedWebUIReadService.swift */; };
+		F03400000000000000000002 /* CustomHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FF000000000000000000A2 /* CustomHeader.swift */; };
+		F03400000000000000000003 /* PreservedWebUIReadServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F03400000000000000000012 /* PreservedWebUIReadServiceTests.swift */; };
+		F03400000000000000000004 /* PreservedWebUICredentialReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F03400000000000000000013 /* PreservedWebUICredentialReader.swift */; };
 		C21300000000000000000007 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = C21300000000000000000008 /* MarkdownUI */; };
 /* End PBXBuildFile section */
 
@@ -187,6 +191,8 @@
 		C02700000000000000000002 /* ActiveStreamRecoveryState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveStreamRecoveryState.swift; sourceTree = "<group>"; };
 		C0FF000000000000000000A2 /* CustomHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomHeader.swift; sourceTree = "<group>"; };
 		F03400000000000000000011 /* PreservedWebUIReadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreservedWebUIReadService.swift; sourceTree = "<group>"; };
+		F03400000000000000000012 /* PreservedWebUIReadServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreservedWebUIReadServiceTests.swift; sourceTree = "<group>"; };
+		F03400000000000000000013 /* PreservedWebUICredentialReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreservedWebUICredentialReader.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000D9 /* MessageBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBubbleView.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000DB /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
 		C14300000000000000000002 /* StreamingMarkdownSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingMarkdownSupport.swift; sourceTree = "<group>"; };
@@ -355,6 +361,7 @@
 				031031031031031031031004 /* MarkdownMathRendererTests.swift */,
 				C0DE34000000000000000004 /* TranscriptMediaParserTests.swift */,
 				C0DE12000000000000000004 /* TranscriptLinkPreviewTests.swift */,
+				F03400000000000000000012 /* PreservedWebUIReadServiceTests.swift */,
 				A04500000000000000000018 /* LiveActivityTests.swift */,
 				1A2B3C4D5E6F700000000340 /* AppIntentNewChatTests.swift */,
 				1A2B3C4D5E6F700000000344 /* AppIntentNewChatInProfileTests.swift */,
@@ -383,6 +390,7 @@
 				F02400000000000000000011 /* CompanionWorkspaceModels.swift */,
 				F02100000000000000000011 /* CompanionWorkspaceService.swift */,
 				F03400000000000000000011 /* PreservedWebUIReadService.swift */,
+				F03400000000000000000013 /* PreservedWebUICredentialReader.swift */,
 				C0FF000000000000000000A2 /* CustomHeader.swift */,
 			);
 			path = Networking;
@@ -770,6 +778,10 @@
 				031031031031031031031003 /* MarkdownMathRendererTests.swift in Sources */,
 				C0DE34000000000000000003 /* TranscriptMediaParserTests.swift in Sources */,
 				C0DE12000000000000000003 /* TranscriptLinkPreviewTests.swift in Sources */,
+				F03400000000000000000001 /* PreservedWebUIReadService.swift in Sources */,
+				F03400000000000000000002 /* CustomHeader.swift in Sources */,
+				F03400000000000000000004 /* PreservedWebUICredentialReader.swift in Sources */,
+				F03400000000000000000003 /* PreservedWebUIReadServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
