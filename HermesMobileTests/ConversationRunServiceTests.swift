@@ -3252,20 +3252,68 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         )
         XCTAssertEqual("Finish", viewModel.allMessages.last?.content)
         XCTAssertFalse(viewModel.canSend)
+        XCTAssertTrue(viewModel.canEditDraft)
         XCTAssertTrue(viewModel.needsTerminalHistoryRetry)
         XCTAssertNil(viewModel.errorMessage)
         XCTAssertFalse(viewModel.terminalHistoryRetryMessage.isEmpty)
 
-        let didRetry = await viewModel.retryTerminalHistory(
+        await viewModel.refreshHistoryOnAppearance(
             modelContext: modelContext
         )
-        XCTAssertTrue(didRetry)
         XCTAssertEqual(
             "Authoritative final answer",
             viewModel.allMessages.last?.content
         )
         XCTAssertEqual("", viewModel.streamedAssistantText)
         XCTAssertFalse(viewModel.needsTerminalHistoryRetry)
+        XCTAssertTrue(viewModel.canSend)
+    }
+
+    @MainActor
+    func testReenteringLoadedSessionRetriesTransientRefreshWithoutBlockingDraft() async throws {
+        let session = try makeSessionSummary()
+        let history = [
+            ChatMessage(
+                role: "user",
+                content: "Existing question",
+                timestamp: 1,
+                messageId: "user-1"
+            ),
+            ChatMessage(
+                role: "assistant",
+                content: "Existing answer",
+                timestamp: 2,
+                messageId: "assistant-1"
+            ),
+        ]
+        let repository = RunHistoryRepositoryStub(
+            session: session,
+            failHistoryCalls: [2],
+            historyMessagesByCall: [1: history, 3: history]
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            )
+        )
+
+        let initialLoad = await viewModel.load()
+        let transientRefresh = await viewModel.load()
+        XCTAssertTrue(initialLoad)
+        XCTAssertFalse(transientRefresh)
+        XCTAssertTrue(viewModel.hasLoadedAuthoritativeHistory)
+        XCTAssertTrue(viewModel.shouldRefreshHistoryOnAppearance)
+        XCTAssertTrue(viewModel.canEditDraft)
+        XCTAssertTrue(viewModel.canSend)
+
+        await viewModel.refreshHistoryOnAppearance()
+
+        let historyCallCount = await repository.historyCallCount
+        XCTAssertEqual(3, historyCallCount)
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertFalse(viewModel.shouldRefreshHistoryOnAppearance)
         XCTAssertTrue(viewModel.canSend)
     }
 

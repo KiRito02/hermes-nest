@@ -169,6 +169,19 @@ if "Menu {" in attachment_entry or ".disabled(true)" in attachment_entry:
         "The attachment entry must stay visible; an all-disabled Menu is hidden on iOS."
     )
 
+composer_text_field = SESSION_VIEW.split(
+    'TextField(\n                    "Message Hermes..."', maxsplit=1
+)[1].split("if viewModel.isRunActive", maxsplit=1)[0]
+require(
+    composer_text_field,
+    ".disabled(!viewModel.canEditDraft)",
+    "draft-editing state independent from Send availability",
+)
+if "!viewModel.canSend" in composer_text_field:
+    raise SystemExit(
+        "History or Run synchronization must not make the draft field inert."
+    )
+
 for snippet, description in [
     (
         "preferredCompactColumn: $preferredCompactColumn",
@@ -224,6 +237,10 @@ for snippet, description in [
         "navigation-complete Companion transcript startup",
     ),
     (
+        "await viewModel.refreshHistoryOnAppearance(",
+        "retained-session transient history retry",
+    ),
+    (
         "scheduleInitialTranscriptFollow(proxy)",
         "post-navigation Companion transcript bottom correction",
     ),
@@ -246,6 +263,10 @@ for snippet, description in [
     (
         "historyViewModelRegistry?.adopt(",
         "rendered Companion view-model registry adoption",
+    ),
+    (
+        "sessionID: registrySessionID",
+        "lineage-stable Companion registry identity",
     ),
     (
         "dismissComposerKeyboard()",

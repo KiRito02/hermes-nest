@@ -295,9 +295,23 @@ struct SessionSummary: Decodable, Equatable, Hashable, Identifiable, Sendable {
     /// Mirrors all stored fields so local title patches preserve session-list metadata.
     /// Update this when `SessionSummary` gains a new stored property.
     func replacingTitle(with title: String) -> SessionSummary {
+        replacing(title: title)
+    }
+
+    /// Rebinds a list/root row to the message-bearing compression tip while
+    /// preserving the metadata already available to the client. A failed
+    /// best-effort detail refresh must not discard successfully loaded history.
+    func replacingSessionID(with sessionID: String) -> SessionSummary {
+        replacing(sessionID: sessionID)
+    }
+
+    private func replacing(
+        sessionID: String? = nil,
+        title: String? = nil
+    ) -> SessionSummary {
         SessionSummary(
-            sessionId: sessionId,
-            title: title,
+            sessionId: sessionID ?? sessionId,
+            title: title ?? self.title,
             workspace: workspace,
             model: model,
             modelProvider: modelProvider,

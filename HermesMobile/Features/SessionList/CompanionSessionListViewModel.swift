@@ -1024,7 +1024,24 @@ final class CompanionSessionHistoryViewModel {
             && !isTerminalRefreshPending
             && !needsTerminalHistoryRetry
             && !isApplyingModelSelection
-            && errorMessage == nil
+            && (errorMessage == nil || hasLoadedAuthoritativeHistory)
+    }
+
+    /// Drafting is local UI state. A history refresh or transient transport
+    /// failure may delay Send, but must never make the text field inert.
+    var canEditDraft: Bool {
+        !isPreparingDroppedAttachments
+    }
+
+    /// Retained view models keep live runs and drafts across compact
+    /// navigation. They must not also retain a transient refresh failure
+    /// forever merely because one earlier authoritative load succeeded.
+    var shouldRefreshHistoryOnAppearance: Bool {
+        !isRunActive
+            && (!hasLoadedAuthoritativeHistory
+                || isViewingCachedData
+                || errorMessage != nil
+                || needsTerminalHistoryRetry)
     }
 
     func prepareDroppedAttachments(
@@ -1417,9 +1434,14 @@ final class CompanionSessionHistoryViewModel {
 
         do {
             let history = try await repository.messageHistory(id: sessionID)
-            let resolvedSession = try await repository.session(
-                id: history.sessionID
-            )
+            let resolvedSession: SessionSummary
+            if history.sessionID == sessionID {
+                resolvedSession = session
+            } else {
+                resolvedSession = (try? await repository.session(
+                    id: history.sessionID
+                )) ?? session.replacingSessionID(with: history.sessionID)
+            }
             session = resolvedSession
             let preservedTerminalPresentation: Bool
             if let activeRunID, !runState.isTerminalPresentation {
@@ -1450,6 +1472,16 @@ final class CompanionSessionHistoryViewModel {
                 sessionID: history.sessionID,
                 in: modelContext
             )
+            if history.sessionID != sessionID {
+                // The sidebar continues to address the lineage root. Keep a
+                // root-keyed snapshot too so the next launch can paint before
+                // Gateway resolves the compression tip again.
+                cache(
+                    history.messages,
+                    sessionID: sessionID,
+                    in: modelContext
+                )
+            }
             cacheSession(resolvedSession, in: modelContext)
             if needsTerminalHistoryRetry,
                !preservedTerminalPresentation {
@@ -1476,6 +1508,13 @@ final class CompanionSessionHistoryViewModel {
             }
             return false
         }
+    }
+
+    func refreshHistoryOnAppearance(
+        modelContext: ModelContext? = nil
+    ) async {
+        guard shouldRefreshHistoryOnAppearance else { return }
+        _ = await load(modelContext: modelContext)
     }
 
     func resumeRunObservation(

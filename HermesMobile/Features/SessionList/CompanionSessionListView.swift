@@ -638,6 +638,7 @@ struct CompanionSessionHistoryView: View {
     let onUpdated: (SessionSummary) -> Void
     let onForked: () -> Void
     let onDeleted: (String) -> Void
+    private let registrySessionID: String
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -707,6 +708,7 @@ struct CompanionSessionHistoryView: View {
         self.onUpdated = onUpdated
         self.onForked = onForked
         self.onDeleted = onDeleted
+        registrySessionID = session.id
         let makeViewModel = {
             CompanionSessionHistoryViewModel(
                 session: session,
@@ -961,7 +963,7 @@ struct CompanionSessionHistoryView: View {
         .onAppear {
             historyViewModelRegistry?.adopt(
                 viewModel,
-                sessionID: viewModel.session.id
+                sessionID: registrySessionID
             )
         }
         .task(id: didCompleteInitialAppearance) {
@@ -975,9 +977,9 @@ struct CompanionSessionHistoryView: View {
             await viewModel.resumeRunObservation(
                 modelContext: modelContext
             )
-            if !viewModel.hasLoadedAuthoritativeHistory {
-                await viewModel.load(modelContext: modelContext)
-            }
+            await viewModel.refreshHistoryOnAppearance(
+                modelContext: modelContext
+            )
             await viewModel.loadModelOptions()
             if supportsUploads {
                 await viewModel.restorePendingUploads()
@@ -1376,13 +1378,12 @@ struct CompanionSessionHistoryView: View {
                 .focused($composerIsFocused)
                 .lineLimit(1...6)
                 .textFieldStyle(.plain)
-                .disabled(
-                    !viewModel.canSend
-                        || viewModel.isPreparingDroppedAttachments
-                )
+                .disabled(!viewModel.canEditDraft)
                 .submitLabel(.send)
                 .onSubmit {
-                    sendDraft()
+                    if viewModel.canSend {
+                        sendDraft()
+                    }
                 }
 
                 if viewModel.isRunActive {
