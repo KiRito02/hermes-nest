@@ -34,14 +34,22 @@ struct ReasoningBlockView: View {
                     header(summary: summary)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(String(localized: "Thinking, \(summary)"))
+                .accessibilityLabel("\(stateTitle), \(summary)")
                 .accessibilityHint(isExpanded ? "Double tap to collapse details." : "Double tap to expand details.")
 
                 if isExpanded {
-                    Text(trimmedText)
-                        .font(AppFont.caption())
-                        .foregroundStyle(.primary)
-                        .textSelection(.enabled)
+                    ScrollView(.vertical) {
+                        MarkdownRenderer(content: trimmedText)
+                            .font(AppFont.caption())
+                            .foregroundStyle(.primary)
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
+                    }
+                    .frame(maxHeight: 280)
+                    .scrollIndicators(.visible)
+                    .scrollBounceBehavior(.basedOnSize)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.leading, 14)
                         .overlay(alignment: .leading) {
@@ -93,8 +101,13 @@ struct ReasoningBlockView: View {
 
     private var titleText: some View {
         HStack(spacing: 5) {
-            Text("Thinking")
+            Text(stateTitle)
                 .lineLimit(1)
+                .contentTransition(.opacity)
+                .animation(
+                    reduceMotion ? nil : .easeInOut(duration: 0.18),
+                    value: stateTitle
+                )
 
             if isActive {
                 TimelineView(
@@ -130,6 +143,17 @@ struct ReasoningBlockView: View {
             .font(AppFont.caption())
             .foregroundStyle(.secondary)
             .lineLimit(lineLimit)
+            .contentTransition(.opacity)
+            .animation(
+                reduceMotion ? nil : .easeInOut(duration: 0.18),
+                value: value
+            )
+    }
+
+    private var stateTitle: String {
+        isActive
+            ? String(localized: "Thinking")
+            : String(localized: "Thought process")
     }
 
     private var trimmedText: String? {
@@ -149,7 +173,7 @@ struct ReasoningBlockView: View {
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 return cleaned.isEmpty ? nil : cleaned
             }
-            .first ?? String(localized: "Thinking")
+            .first ?? stateTitle
 
         if latestLine.count <= 80 {
             return latestLine

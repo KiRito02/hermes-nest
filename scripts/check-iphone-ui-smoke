@@ -35,6 +35,9 @@ SESSION_VIEW_MODEL = (
     ROOT
     / "HermesMobile/Features/SessionList/CompanionSessionListViewModel.swift"
 ).read_text(encoding="utf-8")
+REASONING_BLOCK = (
+    ROOT / "HermesMobile/Features/Chat/ReasoningBlockView.swift"
+).read_text(encoding="utf-8")
 RUN_SERVICE = (
     ROOT / "HermesMobile/Networking/ConversationRunService.swift"
 ).read_text(encoding="utf-8")
@@ -335,8 +338,12 @@ for snippet, description in [
         "stable live-to-terminal presentation identity",
     ),
     (
-        "maximumCharacters: 4",
+        "maximumCharacters: 3",
         "human-readable progressive assistant output",
+    ),
+    (
+        "nanoseconds: 60_000_000",
+        "ChatGPT-like progressive output cadence",
     ),
     (
         "liveReasoningPresentationText == nil",
@@ -348,6 +355,17 @@ for snippet, description in [
     ),
 ]:
     require(SESSION_VIEW_MODEL, snippet, description)
+
+for snippet, description in [
+    ('String(localized: "Thought process")', "completed reasoning title"),
+    (
+        "MarkdownRenderer(content: trimmedText)",
+        "formatted expanded reasoning content",
+    ),
+    (".frame(maxHeight: 280)", "bounded expanded reasoning height"),
+    (".contentTransition(.opacity)", "reasoning-summary crossfade"),
+]:
+    require(REASONING_BLOCK, snippet, description)
 
 shell_source = SESSION_VIEW.split(
     "struct CompanionSessionHistoryView: View", maxsplit=1

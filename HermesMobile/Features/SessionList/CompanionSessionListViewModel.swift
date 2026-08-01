@@ -2147,7 +2147,7 @@ final class CompanionSessionHistoryViewModel {
 
     private func scheduleDeltaFlush() {
         deltaFlushTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 50_000_000)
+            try? await Task.sleep(nanoseconds: 60_000_000)
             guard !Task.isCancelled else { return }
             self?.flushPendingDelta()
         }
@@ -2157,7 +2157,7 @@ final class CompanionSessionHistoryViewModel {
         deltaFlushTask?.cancel()
         deltaFlushTask = nil
         let drained = deltaBuffer.drain(
-            maximumCharacters: 4
+            maximumCharacters: 3
         )
         guard !drained.isEmpty else { return }
         streamedAssistantText += drained

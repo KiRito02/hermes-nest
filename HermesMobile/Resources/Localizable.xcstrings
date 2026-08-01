@@ -4219,6 +4219,16 @@
         }
       }
     },
+    "Thought process": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "思考过程"
+          }
+        }
+      }
+    },
     "This device is offline. Connect to the internet, then try again.": {
       "localizations": {
         "zh-Hans": {
