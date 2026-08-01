@@ -5956,6 +5956,46 @@
         }
       }
     },
+    "Companion": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Companion"
+          }
+        }
+      }
+    },
+    "Forget Companion": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "忘记 Companion"
+          }
+        }
+      }
+    },
+    "Loading sessions...": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在加载会话…"
+          }
+        }
+      }
+    },
+    "Sessions unavailable": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法加载会话"
+          }
+        }
+      }
+    },
     "No matching chats": {
       "localizations": {
         "zh-Hans": {

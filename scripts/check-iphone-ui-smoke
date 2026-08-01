@@ -102,6 +102,39 @@ require(
     "CompanionSessionListView(",
     "real production App shell in the fixture",
 )
+for snippet, description in [
+    (
+        "workspaceService = CoreChatLabWorkspaceService()",
+        "local App-shell workspace fixture",
+    ),
+    (
+        "discoveryService = CoreChatLabDiscoveryService()",
+        "local App-shell discovery fixture",
+    ),
+    (
+        "service: CoreChatLabConnectionService(",
+        "local App-shell connection fixture",
+    ),
+    (
+        "workspaceService: workspaceService",
+        "injected server-free workspace service",
+    ),
+    (
+        "discoveryService: discoveryService",
+        "injected server-free discovery service",
+    ),
+]:
+    require(FIXTURE, snippet, description)
+if "CompanionConnectionManager()" in FIXTURE:
+    raise SystemExit(
+        "The server-free App-shell fixture must inject its connection service"
+    )
+for destination in ["case files", "case memory", "case skillsAndToolsets"]:
+    require(
+        SHELL_COMPONENTS,
+        destination,
+        f"reachable App-shell destination {destination}",
+    )
 require(
     FIXTURE,
     "requestGeometryUpdate",
@@ -406,10 +439,14 @@ if unexpected_languages:
         + ", ".join(sorted(unexpected_languages))
     )
 for key in [
+    "Companion",
     "Connection",
+    "Forget Companion",
     "Gateway status",
+    "Loading sessions...",
     "No matching chats",
     "Opens this destination",
+    "Sessions unavailable",
     "Shows Companion connection details",
     "Skills and Toolsets",
     "Unavailable with this Gateway or Companion",

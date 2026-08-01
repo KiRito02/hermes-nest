@@ -105,6 +105,7 @@ struct CompanionSessionListView: View {
     private let runService: (any ConversationRunServing)?
     private let modelService: (any CompanionModelServing)?
     private let workspaceService: (any CompanionWorkspaceServing)?
+    private let discoveryService: (any CompanionDiscoveryServing)?
 
     init(
         connectionManager: CompanionConnectionManager,
@@ -113,7 +114,8 @@ struct CompanionSessionListView: View {
         initialSelectedSessionID: String? = nil,
         runService: (any ConversationRunServing)? = nil,
         modelService: (any CompanionModelServing)? = nil,
-        workspaceService: (any CompanionWorkspaceServing)? = nil
+        workspaceService: (any CompanionWorkspaceServing)? = nil,
+        discoveryService: (any CompanionDiscoveryServing)? = nil
     ) {
         self.connectionManager = connectionManager
         self.connection = connection
@@ -124,6 +126,7 @@ struct CompanionSessionListView: View {
         self.runService = runService
         self.modelService = modelService
         self.workspaceService = workspaceService
+        self.discoveryService = discoveryService
         _viewModel = State(
             initialValue: CompanionSessionListViewModel(
                 repository: resolvedRepository,
@@ -453,13 +456,20 @@ struct CompanionSessionListView: View {
     ) -> some View {
         switch destination {
         case .files:
-            CompanionWorkspaceView(companionURL: connection.companionURL)
+            CompanionWorkspaceView(
+                companionURL: connection.companionURL,
+                service: workspaceService
+            )
         case .memory:
-            CompanionMemoryView(companionURL: connection.companionURL)
+            CompanionMemoryView(
+                companionURL: connection.companionURL,
+                service: workspaceService
+            )
         case .skillsAndToolsets:
             CompanionDiscoveryView(
                 companionURL: connection.companionURL,
-                capabilities: connection.capabilities
+                capabilities: connection.capabilities,
+                service: discoveryService
             )
         }
     }

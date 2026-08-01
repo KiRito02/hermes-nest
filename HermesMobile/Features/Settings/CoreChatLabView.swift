@@ -52,13 +52,15 @@ struct CoreChatLabView: View {
 /// the real session list, sidebar destinations, and detail navigation while
 /// keeping every repository response local to the process.
 struct CompanionShellLabView: View {
-    @State private var connectionManager = CompanionConnectionManager()
+    @State private var connectionManager: CompanionConnectionManager
 
     private let session: SessionSummary
     private let repository: any SessionRepository
     private let connection: CompanionConnection
     private let runService: any ConversationRunServing
     private let modelService: any CompanionModelServing
+    private let workspaceService: any CompanionWorkspaceServing
+    private let discoveryService: any CompanionDiscoveryServing
 
     init() {
         let usesSimplifiedChinese =
@@ -74,11 +76,21 @@ struct CompanionShellLabView: View {
                 usesSimplifiedChinese: usesSimplifiedChinese
             )
         )
-        connection = CoreChatLabFixture.connection()
+        let connection = CoreChatLabFixture.connection()
+        self.connection = connection
+        _connectionManager = State(
+            initialValue: CompanionConnectionManager(
+                service: CoreChatLabConnectionService(
+                    connection: connection
+                )
+            )
+        )
         runService = CoreChatLabRunService(
             usesSimplifiedChinese: usesSimplifiedChinese
         )
         modelService = CoreChatLabModelService()
+        workspaceService = CoreChatLabWorkspaceService()
+        discoveryService = CoreChatLabDiscoveryService()
     }
 
     var body: some View {
@@ -88,7 +100,9 @@ struct CompanionShellLabView: View {
             repository: repository,
             initialSelectedSessionID: session.id,
             runService: runService,
-            modelService: modelService
+            modelService: modelService,
+            workspaceService: workspaceService,
+            discoveryService: discoveryService
         )
     }
 }
@@ -536,5 +550,155 @@ private actor CoreChatLabModelService: CompanionModelServing {
             )
         )
     }
+}
+
+private actor CoreChatLabWorkspaceService: CompanionWorkspaceServing {
+    func roots() async throws -> [CompanionWorkspaceRoot] {
+        [
+            CompanionWorkspaceRoot(
+                id: "workspace",
+                name: "Hermes Workspace",
+                writable: true,
+                attachable: true
+            )
+        ]
+    }
+
+    func entries(
+        rootID: String,
+        path: String,
+        cursor: String?
+    ) async throws -> CompanionWorkspacePage {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func preview(
+        rootID: String,
+        path: String
+    ) async throws -> CompanionWorkspacePreview {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func download(rootID: String, path: String) async throws -> Data {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func downloadAttachment(path: String) async throws -> Data {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func upload(
+        sessionID: String,
+        destination: CompanionUploadDestination,
+        filename: String,
+        contentType: String,
+        fileURL: URL,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws -> CompanionUpload {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func stageServerFile(
+        sessionID: String,
+        sourceRootID: String,
+        sourcePath: String,
+        destination: CompanionUploadDestination
+    ) async throws -> CompanionUpload {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func uploads(sessionID: String) async throws -> [CompanionUpload] {
+        []
+    }
+
+    func deleteUpload(id: String) async throws {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func memory(target: String) async throws -> CompanionMemorySnapshot {
+        CompanionMemorySnapshot(
+            target: target,
+            entries: ["Prefer concise, evidence-backed answers."],
+            revision: "ui-smoke",
+            charCount: 39,
+            charLimit: 12_000
+        )
+    }
+
+    func mutateMemory(
+        target: String,
+        revision: String,
+        operations: [CompanionMemoryOperation]
+    ) async throws -> CompanionMemorySnapshot {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func resetMemory(
+        target: String,
+        revision: String,
+        confirmation: String
+    ) async throws -> CompanionMemorySnapshot {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+}
+
+private actor CoreChatLabDiscoveryService: CompanionDiscoveryServing {
+    func fetch() async throws -> CompanionDiscoveryCatalog {
+        CompanionDiscoveryCatalog(
+            skills: [
+                CompanionSkill(
+                    name: "ui-review",
+                    description: "Local UI acceptance fixture",
+                    category: "System"
+                )
+            ],
+            toolsets: [
+                CompanionToolset(
+                    name: "workspace",
+                    label: "Workspace",
+                    description: "Local UI acceptance fixture",
+                    enabled: true,
+                    configured: true,
+                    tools: ["read_file"]
+                )
+            ]
+        )
+    }
+}
+
+private actor CoreChatLabConnectionService: CompanionConnectionServing {
+    private let connection: CompanionConnection
+
+    init(connection: CompanionConnection) {
+        self.connection = connection
+    }
+
+    func checkLiveness(
+        companionURLString: String
+    ) async throws -> CompanionHealth {
+        throw CompanionConnectionError.invalidRequest
+    }
+
+    func pair(
+        companionURLString: String,
+        secret: String,
+        deviceName: String
+    ) async throws -> CompanionConnection {
+        throw CompanionConnectionError.invalidRequest
+    }
+
+    func savedCompanionURL() async -> URL? {
+        connection.companionURL
+    }
+
+    func hasStoredDeviceCredential() async -> Bool {
+        false
+    }
+
+    func resume() async throws -> CompanionConnection? {
+        connection
+    }
+
+    func forget() async {}
 }
 #endif
