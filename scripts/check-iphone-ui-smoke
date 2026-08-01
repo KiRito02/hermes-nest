@@ -335,8 +335,16 @@ for snippet, description in [
         "stable live-to-terminal presentation identity",
     ),
     (
-        "maximumCharacters: 48",
-        "visible progressive assistant output",
+        "maximumCharacters: 4",
+        "human-readable progressive assistant output",
+    ),
+    (
+        "liveReasoningPresentationText == nil",
+        "duplicate thinking-indicator suppression",
+    ),
+    (
+        "durablePresentationAnchorIDsByAnchorID",
+        "one durable reasoning presentation per assistant turn",
     ),
 ]:
     require(SESSION_VIEW_MODEL, snippet, description)

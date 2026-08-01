@@ -43,15 +43,17 @@ struct ReasoningBlockView: View {
                         .foregroundStyle(.primary)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 14)
+                        .overlay(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.secondary.opacity(0.28))
+                                .frame(width: 2)
+                        }
                         .transition(ChatMotion.disclosureTransition(reduceMotion: reduceMotion))
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
-            .chatTimelineAccessorySurface(
-                fallbackMaterial: .thinMaterial,
-                cornerRadius: 10
-            )
+            .padding(.horizontal, 4)
+            .padding(.vertical, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }

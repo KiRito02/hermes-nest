@@ -858,7 +858,10 @@ struct CompanionSessionHistoryView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            companionComposer
+            VStack(spacing: 0) {
+                companionComposer
+            }
+            .background(HermesNestDesign.canvas.ignoresSafeArea())
         }
         .overlay {
             if viewModel.isLoading && viewModel.allMessages.isEmpty {

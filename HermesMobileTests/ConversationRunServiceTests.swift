@@ -3832,6 +3832,13 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
             ),
             ChatMessage(
                 role: "assistant",
+                content: nil,
+                timestamp: 3.5,
+                messageId: "assistant-reasoning",
+                reasoning: "I should summarize the verified result."
+            ),
+            ChatMessage(
+                role: "assistant",
                 content: "The file contains project documentation.",
                 timestamp: 4,
                 messageId: "assistant-answer"
@@ -3856,7 +3863,10 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         XCTAssertTrue(didLoad)
 
         XCTAssertEqual(
-            ["I should inspect the requested file first."],
+            [
+                "I should inspect the requested file first.",
+                "I should summarize the verified result."
+            ],
             viewModel.durableReasoningGroups.map(\.text)
         )
         XCTAssertEqual(1, viewModel.durableToolCallGroups.count)
@@ -3867,6 +3877,25 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         XCTAssertEqual(
             "Project documentation",
             viewModel.durableToolCallGroups.first?.toolCalls.first?.preview
+        )
+        XCTAssertEqual(
+            ["user-1", "assistant-answer"],
+            viewModel.visibleMessages.map(\.id)
+        )
+        XCTAssertEqual(
+            [
+                "I should inspect the requested file first.\n\n"
+                    + "I should summarize the verified result."
+            ],
+            viewModel.durableReasoning(
+                anchoredTo: messages[4]
+            ).map(\.text)
+        )
+        XCTAssertEqual(
+            ["read_file"],
+            viewModel.durableToolActivity(
+                anchoredTo: messages[4]
+            ).flatMap(\.toolCalls).compactMap(\.name)
         )
     }
 

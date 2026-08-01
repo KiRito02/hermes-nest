@@ -734,14 +734,23 @@ final class CompanionSessionHistoryViewModel {
         return allMessages[visibleStartIndex...].filter { message in
             message.role != "tool"
                 && !TranscriptTurnClassifier.isToolResultOnlyMessage(message)
-                && !isLivePlaceholderMessage(message)
+                && !isHiddenAssistantPlaceholder(message)
         }
     }
 
-    private func isLivePlaceholderMessage(_ message: ChatMessage) -> Bool {
-        message.role == "assistant"
-            && message.content?.trimmedNonEmptyValue == nil
-            && isLiveRunAnchor(message.id)
+    private func isHiddenAssistantPlaceholder(
+        _ message: ChatMessage
+    ) -> Bool {
+        guard message.role == "assistant",
+              message.content?.trimmedNonEmptyValue == nil,
+              message.attachments?.isEmpty != false,
+              let anchorID = transcriptAnchorID(for: message) else {
+            return false
+        }
+        if isLiveRunAnchor(anchorID) {
+            return true
+        }
+        return durablePresentationAnchorIDsByAnchorID[anchorID] != anchorID
     }
 
     /// Primes cache-backed rows before a navigation transition completes. The
@@ -775,19 +784,51 @@ final class CompanionSessionHistoryViewModel {
     func durableReasoning(
         anchoredTo message: ChatMessage
     ) -> [ReasoningGroup] {
-        durableReasoningGroups.filter {
-            $0.anchorMessageID == message.id
-                && !isLiveRunAnchor($0.anchorMessageID)
+        guard let messageAnchorID = transcriptAnchorID(for: message) else {
+            return []
         }
+        let groups = durableReasoningGroups.filter { group in
+            guard let anchorID = group.anchorMessageID else { return false }
+            return !isLiveRunAnchor(anchorID)
+                && durablePresentationAnchorIDsByAnchorID[anchorID]
+                    == messageAnchorID
+        }
+        guard let text = consolidatedReasoningText(from: groups) else {
+            return []
+        }
+        return [
+            ReasoningGroup(
+                id: "turn-reasoning-\(messageAnchorID)",
+                anchorMessageID: messageAnchorID,
+                text: text
+            )
+        ]
     }
 
     func durableToolActivity(
         anchoredTo message: ChatMessage
     ) -> [ToolCallGroup] {
-        durableToolCallGroups.filter {
-            $0.anchorMessageID == message.id
-                && !isLiveRunAnchor($0.anchorMessageID)
+        guard let messageAnchorID = transcriptAnchorID(for: message) else {
+            return []
         }
+        let groups = durableToolCallGroups.filter { group in
+            guard let anchorID = group.anchorMessageID else { return false }
+            return !isLiveRunAnchor(anchorID)
+                && durablePresentationAnchorIDsByAnchorID[anchorID]
+                    == messageAnchorID
+        }
+        guard !groups.isEmpty else { return [] }
+        let toolCalls = ToolCallGroup.coalescingByAssistantTurn(
+            groups,
+            messages: allMessages
+        ).flatMap(\.toolCalls)
+        return [
+            ToolCallGroup(
+                id: "turn-tools-\(messageAnchorID)",
+                anchorMessageID: messageAnchorID,
+                toolCalls: toolCalls
+            )
+        ]
     }
 
     var liveReasoningGroups: [ReasoningGroup] {
@@ -822,8 +863,14 @@ final class CompanionSessionHistoryViewModel {
     /// Presents the current turn as one continuously updating thinking block,
     /// even when Hermes persists several reasoning checkpoints.
     var liveReasoningPresentationText: String? {
+        consolidatedReasoningText(from: liveReasoningGroups)
+    }
+
+    private func consolidatedReasoningText(
+        from groups: [ReasoningGroup]
+    ) -> String? {
         var checkpoints: [String] = []
-        for group in liveReasoningGroups {
+        for group in groups {
             guard let text = group.text.trimmedNonEmptyValue else { continue }
             if let last = checkpoints.last,
                text.hasPrefix(last) || last.hasPrefix(text) {
@@ -889,7 +936,11 @@ final class CompanionSessionHistoryViewModel {
     }
 
     var showsThinkingIndicator: Bool {
-        guard isRunActive, isWaitingForVisibleRunProgress else {
+        guard isRunActive,
+              isWaitingForVisibleRunProgress,
+              liveReasoningPresentationText == nil,
+              liveToolActivityGroup == nil,
+              streamingMessage == nil else {
             return false
         }
         switch runState {
@@ -909,6 +960,50 @@ final class CompanionSessionHistoryViewModel {
 
     private var presentationRunID: String? {
         activeRunID ?? terminalPresentationRunID
+    }
+
+    private var durablePresentationAnchorIDsByAnchorID: [String: String] {
+        let turnKeys = TranscriptTurnClassifier
+            .assistantTurnKeysByAnchorID(allMessages)
+        var anchorsByTurnKey: [String: [String]] = [:]
+        var visibleAnchorByTurnKey: [String: String] = [:]
+
+        for (index, message) in allMessages.enumerated()
+        where message.role == "assistant" {
+            let anchorID = TranscriptTurnClassifier.anchorID(
+                for: message,
+                at: index
+            )
+            let turnKey = turnKeys[anchorID] ?? "message:\(anchorID)"
+            anchorsByTurnKey[turnKey, default: []].append(anchorID)
+            if message.content?.trimmedNonEmptyValue != nil
+                || message.attachments?.isEmpty == false {
+                visibleAnchorByTurnKey[turnKey] = anchorID
+            }
+        }
+
+        return anchorsByTurnKey.reduce(into: [:]) { result, entry in
+            guard let fallbackAnchor = entry.value.last else { return }
+            let presentationAnchor =
+                visibleAnchorByTurnKey[entry.key] ?? fallbackAnchor
+            for anchorID in entry.value {
+                result[anchorID] = presentationAnchor
+            }
+        }
+    }
+
+    private func transcriptAnchorID(
+        for message: ChatMessage
+    ) -> String? {
+        guard let index = allMessages.firstIndex(where: {
+            $0.id == message.id
+        }) else {
+            return message.messageId
+        }
+        return TranscriptTurnClassifier.anchorID(
+            for: message,
+            at: index
+        )
     }
 
     private var activeRunKey: CompanionActiveRunKey? {
@@ -2062,7 +2157,7 @@ final class CompanionSessionHistoryViewModel {
         deltaFlushTask?.cancel()
         deltaFlushTask = nil
         let drained = deltaBuffer.drain(
-            maximumCharacters: 48
+            maximumCharacters: 4
         )
         guard !drained.isEmpty else { return }
         streamedAssistantText += drained

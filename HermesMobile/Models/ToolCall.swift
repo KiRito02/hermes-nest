@@ -35,7 +35,16 @@ struct ToolCall: Identifiable, Equatable {
         guard let trimmedName, !trimmedName.isEmpty else {
             return String(localized: "Tool")
         }
-        return trimmedName
+        let words = trimmedName
+            .split(whereSeparator: { character in
+                character == "_" || character == "-"
+                    || character.isWhitespace
+            })
+        guard !words.isEmpty else { return trimmedName }
+        return words.map { word in
+            word.prefix(1).uppercased() + String(word.dropFirst())
+        }
+        .joined(separator: " ")
     }
 }
 
