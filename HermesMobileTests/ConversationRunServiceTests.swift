@@ -825,6 +825,202 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
             "web_search",
             viewModel.durableToolCallGroups.first?.toolCalls.first?.name
         )
+        XCTAssertEqual(.streaming, viewModel.runState)
+        XCTAssertNil(viewModel.runStatusText)
+        viewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testRecoveredCurrentTurnProgressKeepsOneStableLivePresentation() async throws {
+        let session = try makeSessionSummary()
+        let runningHistory = [
+            ChatMessage(
+                role: "user",
+                content: "Inspect the repository",
+                timestamp: 1,
+                messageId: "user-1"
+            ),
+            ChatMessage(
+                role: "assistant",
+                content: nil,
+                timestamp: 2,
+                messageId: "assistant-1",
+                toolCalls: [
+                    .object([
+                        "id": .string("tool-1"),
+                        "function": .object([
+                            "name": .string("read_file")
+                        ]),
+                    ])
+                ],
+                reasoning: "Checking the repository structure."
+            ),
+        ]
+        let repository = RunHistoryRepositoryStub(
+            session: session,
+            historyMessagesByCall: [2: runningHistory]
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: RunServiceStub(
+                eventResult: .disconnect,
+                statuses: [
+                    ConversationRunSnapshot(
+                        runID: "run-1",
+                        state: .running,
+                        sessionID: "session-1",
+                        lastEvent: "tool.started",
+                        output: nil,
+                        errorMessage: nil
+                    )
+                ]
+            ),
+            reconciliationDelayNanoseconds: 100_000_000
+        )
+        await viewModel.load()
+
+        let didSend = await viewModel.send("Inspect the repository")
+        XCTAssertTrue(didSend)
+        await waitUntil {
+            viewModel.liveReasoningGroups.map(\.text) == [
+                "Checking the repository structure."
+            ]
+        }
+
+        let assistant = try XCTUnwrap(
+            viewModel.allMessages.first { $0.messageId == "assistant-1" }
+        )
+        XCTAssertTrue(viewModel.durableReasoning(anchoredTo: assistant).isEmpty)
+        XCTAssertEqual(
+            "read_file",
+            viewModel.liveToolActivityGroup?.toolCalls.first?.name
+        )
+        XCTAssertTrue(viewModel.durableToolActivity(anchoredTo: assistant).isEmpty)
+        XCTAssertTrue(viewModel.hasLiveTranscriptContent)
+        viewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testActiveRunWithoutEventsStillPresentsThinkingFeedback() async throws {
+        let session = try makeSessionSummary()
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: RunHistoryRepositoryStub(session: session),
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: RunServiceStub(
+                eventResult: .holdOpen,
+                statuses: []
+            )
+        )
+        await viewModel.load()
+
+        let didSend = await viewModel.send("Think carefully")
+
+        XCTAssertTrue(didSend)
+        XCTAssertTrue(viewModel.showsThinkingIndicator)
+        XCTAssertTrue(viewModel.hasLiveTranscriptContent)
+        viewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testThinkingFeedbackReturnsWhenVisibleStreamingPauses() async throws {
+        let session = try makeSessionSummary()
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: RunHistoryRepositoryStub(session: session),
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: RunServiceStub(
+                eventResult: .deltasThenWait(
+                    ["Partial answer"],
+                    5_000_000_000
+                ),
+                statuses: []
+            )
+        )
+        await viewModel.load()
+
+        let didSend = await viewModel.send("Think, then continue")
+        XCTAssertTrue(didSend)
+        await waitUntil {
+            viewModel.streamingMessage?.content == "Partial answer"
+        }
+        XCTAssertFalse(viewModel.showsThinkingIndicator)
+
+        await waitUntil(timeoutNanoseconds: 2_000_000_000) {
+            viewModel.showsThinkingIndicator
+        }
+        XCTAssertEqual(
+            "Partial answer",
+            viewModel.streamingMessage?.content
+        )
+        viewModel.suspendRunObservation()
+    }
+
+    @MainActor
+    func testSuccessfulBlankRunningHistoryKeepsNonemptyTranscript() async throws {
+        let session = try makeSessionSummary()
+        let initialHistory = [
+            ChatMessage(
+                role: "user",
+                content: "Earlier question",
+                timestamp: 1,
+                messageId: "user-old"
+            ),
+            ChatMessage(
+                role: "assistant",
+                content: "Earlier answer",
+                timestamp: 2,
+                messageId: "assistant-old"
+            ),
+        ]
+        let repository = RunHistoryRepositoryStub(
+            session: session,
+            historyMessagesByCall: [1: initialHistory, 2: []]
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: RunServiceStub(
+                eventResult: .disconnect,
+                statuses: [
+                    ConversationRunSnapshot(
+                        runID: "run-1",
+                        state: .running,
+                        sessionID: "session-1",
+                        lastEvent: nil,
+                        output: nil,
+                        errorMessage: nil
+                    )
+                ]
+            ),
+            reconciliationDelayNanoseconds: 100_000_000
+        )
+        await viewModel.load()
+
+        let didSend = await viewModel.send("Continue")
+        XCTAssertTrue(didSend)
+        let expectedMessages = viewModel.allMessages
+        let historyDeadline = ContinuousClock.now + .seconds(1)
+        while (await repository.historyCallCount) < 2,
+              ContinuousClock.now < historyDeadline {
+            await Task.yield()
+        }
+
+        let historyCallCount = await repository.historyCallCount
+        XCTAssertGreaterThanOrEqual(historyCallCount, 2)
+        XCTAssertEqual(expectedMessages, viewModel.allMessages)
+        XCTAssertFalse(viewModel.visibleMessages.isEmpty)
         viewModel.suspendRunObservation()
     }
 
@@ -896,7 +1092,7 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         await restoredViewModel.resumeRunObservation()
         await waitUntil {
             restoredViewModel.activeRunID == "run-1"
-                && restoredViewModel.runState == .transportDisconnected
+                && restoredViewModel.runState == .streaming
         }
 
         let statusWaitStart = ContinuousClock.now
@@ -1712,7 +1908,7 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
     }
 
     @MainActor
-    func testPersistedAssistantTextReplacesDisconnectedStreamCopy() async throws {
+    func testPersistedAssistantTextStaysInStableLiveRowDuringRun() async throws {
         let session = try makeSessionSummary()
         let repository = RunHistoryRepositoryStub(
             session: session,
@@ -1759,15 +1955,15 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         let didSend = await viewModel.send("Answer slowly")
         XCTAssertTrue(didSend)
         await waitUntil {
-            viewModel.allMessages.last?.content == "Partial answer"
+            viewModel.streamingMessage?.content == "Partial answer"
         }
 
-        XCTAssertNil(viewModel.streamingMessage)
+        XCTAssertNil(viewModel.allMessages.last?.content)
         viewModel.suspendRunObservation()
     }
 
     @MainActor
-    func testPartialPersistedAssistantTextKeepsNewerStreamSuffix() async throws {
+    func testPartialPersistedAssistantTextKeepsCompleteLiveStream() async throws {
         let session = try makeSessionSummary()
         let repository = RunHistoryRepositoryStub(
             session: session,
@@ -1814,15 +2010,15 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         let didSend = await viewModel.send("Answer slowly")
         XCTAssertTrue(didSend)
         await waitUntil {
-            viewModel.allMessages.last?.content == "Hello"
+            viewModel.streamingMessage?.content == "Hello world"
         }
 
-        XCTAssertEqual(" world", viewModel.streamingMessage?.content)
+        XCTAssertNil(viewModel.allMessages.last?.content)
         viewModel.suspendRunObservation()
     }
 
     @MainActor
-    func testConflictingPersistedAssistantTextDropsStreamCopy() async throws {
+    func testConflictingPersistedAssistantTextDoesNotBlankLiveStream() async throws {
         let session = try makeSessionSummary()
         let repository = RunHistoryRepositoryStub(
             session: session,
@@ -1869,10 +2065,10 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         let didSend = await viewModel.send("Answer slowly")
         XCTAssertTrue(didSend)
         await waitUntil {
-            viewModel.allMessages.last?.content == "Saved answer"
+            viewModel.streamingMessage?.content == "Stream answer"
         }
 
-        XCTAssertNil(viewModel.streamingMessage)
+        XCTAssertNil(viewModel.allMessages.last?.content)
         viewModel.suspendRunObservation()
     }
 
@@ -2790,15 +2986,11 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         await waitUntil { viewModel.activeRunID == nil }
     }
 
-    func testProgressiveBufferDrainsWithABoundedPerTickBudget() {
+    func testProgressiveBufferDrainsLargeRecoverySnapshotsWithABoundedPerTickBudget() {
         var buffer = ConversationRunDeltaBuffer()
         let expected = String(repeating: "x", count: 10_000)
-        var reconstructed = buffer.append(expected)
-
-        XCTAssertLessThanOrEqual(
-            buffer.pendingText.count,
-            ConversationRunDeltaBuffer.maximumPendingCharacters
-        )
+        buffer.append(expected)
+        var reconstructed = ""
 
         while !buffer.isEmpty {
             let frame = buffer.drain(maximumCharacters: 192)
@@ -2900,6 +3092,68 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
     }
 
     @MainActor
+    func testBulkTerminalRecoveryOutputIsPresentedProgressively() async throws {
+        let session = try makeSessionSummary()
+        let output = Array(repeating: "progressive", count: 300)
+            .joined(separator: " ")
+        let repository = RunHistoryRepositoryStub(
+            session: session,
+            historyMessagesByCall: [
+                2: [
+                    ChatMessage(
+                        role: "assistant",
+                        content: output,
+                        timestamp: 2,
+                        messageId: "assistant-1"
+                    )
+                ]
+            ]
+        )
+        let terminal = ConversationRunEvent.data(
+            ConversationRunEventData(
+                transportEvent: "run.completed",
+                event: nil,
+                runID: "run-1",
+                delta: nil,
+                output: output,
+                error: nil,
+                timestamp: 2
+            )
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            ),
+            runService: RunServiceStub(
+                eventResult: .eventsAfterDelay([terminal], 20_000_000),
+                statuses: []
+            ),
+            reconciliationDelayNanoseconds: 0
+        )
+        await viewModel.load()
+
+        let didSend = await viewModel.send("Recover the answer")
+        XCTAssertTrue(didSend)
+        await waitUntil {
+            !(viewModel.streamingMessage?.content.isEmpty ?? true)
+        }
+
+        let firstFrame = try XCTUnwrap(
+            viewModel.streamingMessage?.content
+        )
+        XCTAssertLessThan(firstFrame.count, output.count)
+        XCTAssertEqual("run-1", viewModel.activeRunID)
+
+        await waitUntil(timeoutNanoseconds: 3_000_000_000) {
+            viewModel.activeRunID == nil
+        }
+        XCTAssertEqual(output, viewModel.allMessages.last?.content)
+        XCTAssertNil(viewModel.streamingMessage)
+    }
+
+    @MainActor
     func testTerminalOutputSurvivesAuthoritativeHistoryRefreshFailure() async throws {
         let session = try makeSessionSummary()
         let authoritativeReply = ChatMessage(
@@ -2910,8 +3164,8 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         )
         let repository = RunHistoryRepositoryStub(
             session: session,
-            failHistoryCalls: [2],
-            historyMessagesByCall: [3: [authoritativeReply]]
+            failHistoryCalls: [2, 3, 4],
+            historyMessagesByCall: [5: [authoritativeReply]]
         )
         let terminal = ConversationRunEvent.data(
             ConversationRunEventData(

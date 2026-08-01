@@ -387,48 +387,66 @@ final class CompanionSessionListViewModel {
 }
 
 struct ConversationRunDeltaBuffer: Equatable {
-    static let maximumPendingCharacters = 4_096
+    /// Keep individual allocations bounded while retaining the complete
+    /// presentation backlog. Dropping the oldest prefix or publishing it in
+    /// one jump makes recovery snapshots look non-streaming.
+    private static let maximumSegmentCharacters = 4_096
+    private var segments: [String] = []
 
-    private(set) var pendingText = ""
-
-    var isEmpty: Bool {
-        pendingText.isEmpty
+    var pendingText: String {
+        segments.joined()
     }
 
-    @discardableResult
-    mutating func append(_ text: String) -> String {
-        pendingText += text
-        let overflowCount =
-            pendingText.count - Self.maximumPendingCharacters
-        guard overflowCount > 0 else { return "" }
-        let overflowEnd = pendingText.index(
-            pendingText.startIndex,
-            offsetBy: overflowCount
-        )
-        let fastForwarded = String(pendingText[..<overflowEnd])
-        pendingText.removeSubrange(..<overflowEnd)
-        return fastForwarded
+    var isEmpty: Bool {
+        segments.isEmpty
+    }
+
+    mutating func append(_ text: String) {
+        guard !text.isEmpty else { return }
+        var remainder = text[...]
+        while !remainder.isEmpty {
+            let end = remainder.index(
+                remainder.startIndex,
+                offsetBy: Self.maximumSegmentCharacters,
+                limitedBy: remainder.endIndex
+            ) ?? remainder.endIndex
+            segments.append(String(remainder[..<end]))
+            remainder = remainder[end...]
+        }
     }
 
     mutating func drain(maximumCharacters: Int?) -> String {
-        guard !pendingText.isEmpty else { return "" }
+        guard !segments.isEmpty else { return "" }
         guard let maximumCharacters else {
-            defer { pendingText = "" }
-            return pendingText
+            let output = segments.joined()
+            segments.removeAll(keepingCapacity: true)
+            return output
         }
-        let count = max(1, maximumCharacters)
-        let end = pendingText.index(
-            pendingText.startIndex,
-            offsetBy: count,
-            limitedBy: pendingText.endIndex
-        ) ?? pendingText.endIndex
-        let result = String(pendingText[..<end])
-        pendingText.removeSubrange(..<end)
-        return result
+        var remainingBudget = max(1, maximumCharacters)
+        var output = ""
+        while remainingBudget > 0, let first = segments.first {
+            let end = first.index(
+                first.startIndex,
+                offsetBy: remainingBudget,
+                limitedBy: first.endIndex
+            ) ?? first.endIndex
+            output += String(first[..<end])
+            let drainedCount = first.distance(
+                from: first.startIndex,
+                to: end
+            )
+            remainingBudget -= drainedCount
+            if end == first.endIndex {
+                segments.removeFirst()
+            } else {
+                segments[0] = String(first[end...])
+            }
+        }
+        return output
     }
 
     mutating func removeAll() {
-        pendingText = ""
+        segments.removeAll(keepingCapacity: true)
     }
 }
 
@@ -589,6 +607,16 @@ final class CompanionSessionHistoryViewModel {
         case completed
         case failed(String?)
         case cancelled
+
+        var isTerminalPresentation: Bool {
+            switch self {
+            case .completed, .failed, .cancelled:
+                return true
+            case .idle, .starting, .streaming, .waitingForApproval,
+                 .transportDisconnected, .stopping:
+                return false
+            }
+        }
     }
 
     private(set) var session: SessionSummary
@@ -602,6 +630,7 @@ final class CompanionSessionHistoryViewModel {
     private(set) var streamedAssistantText = ""
     private(set) var reasoningText = ""
     private(set) var liveToolCalls: [ToolCall] = []
+    private(set) var isWaitingForVisibleRunProgress = false
     private(set) var streamingFollowTrigger = 0
     private(set) var durableReasoningGroups: [ReasoningGroup] = []
     private(set) var durableToolCallGroups: [ToolCallGroup] = []
@@ -643,12 +672,13 @@ final class CompanionSessionHistoryViewModel {
     private var terminalUsageRefreshTask: Task<Void, Never>?
     private var terminalUsageRefreshRunID: String?
     private var deltaFlushTask: Task<Void, Never>?
+    private var thinkingIndicatorTask: Task<Void, Never>?
     private var runObservationGeneration: UInt64 = 0
     private var isRunObservationRequested = true
     private var runStartAdmission: (() -> Bool)?
     @ObservationIgnored private var deltaBuffer =
         ConversationRunDeltaBuffer()
-    @ObservationIgnored private var fastForwardedDelta = ""
+    private var liveRunAnchorMessageIDs: Set<String> = []
     private var isStopRequestInFlight = false
     private var stopRecoveryState: CompanionStopRecoveryState = .notRequested
     private var terminalOutputFallback: String?
@@ -703,7 +733,14 @@ final class CompanionSessionHistoryViewModel {
         return allMessages[visibleStartIndex...].filter { message in
             message.role != "tool"
                 && !TranscriptTurnClassifier.isToolResultOnlyMessage(message)
+                && !isLivePlaceholderMessage(message)
         }
+    }
+
+    private func isLivePlaceholderMessage(_ message: ChatMessage) -> Bool {
+        message.role == "assistant"
+            && message.content?.trimmedNonEmptyValue == nil
+            && isLiveRunAnchor(message.id)
     }
 
     /// Primes cache-backed rows before a navigation transition completes. The
@@ -739,6 +776,7 @@ final class CompanionSessionHistoryViewModel {
     ) -> [ReasoningGroup] {
         durableReasoningGroups.filter {
             $0.anchorMessageID == message.id
+                && !isLiveRunAnchor($0.anchorMessageID)
         }
     }
 
@@ -747,7 +785,66 @@ final class CompanionSessionHistoryViewModel {
     ) -> [ToolCallGroup] {
         durableToolCallGroups.filter {
             $0.anchorMessageID == message.id
+                && !isLiveRunAnchor($0.anchorMessageID)
         }
+    }
+
+    var liveReasoningGroups: [ReasoningGroup] {
+        var groups = durableReasoningGroups.filter {
+            isLiveRunAnchor($0.anchorMessageID)
+        }
+        guard let liveText = reasoningText.trimmedNonEmptyValue else {
+            return groups
+        }
+        if let compatibleIndex = groups.firstIndex(where: {
+            $0.text.hasPrefix(liveText) || liveText.hasPrefix($0.text)
+        }) {
+            if liveText.count > groups[compatibleIndex].text.count {
+                groups[compatibleIndex] = ReasoningGroup(
+                    id: groups[compatibleIndex].id,
+                    anchorMessageID: groups[compatibleIndex].anchorMessageID,
+                    text: liveText
+                )
+            }
+            return groups
+        }
+        groups.append(
+            ReasoningGroup(
+                id: "live-reasoning-\(activeRunID ?? "pending")",
+                anchorMessageID: nil,
+                text: liveText
+            )
+        )
+        return groups
+    }
+
+    var liveToolActivityGroup: ToolCallGroup? {
+        let persistedGroups = durableToolCallGroups.filter {
+            isLiveRunAnchor($0.anchorMessageID)
+        }
+        guard !persistedGroups.isEmpty || !liveToolCalls.isEmpty else {
+            return nil
+        }
+        let anchorMessageID = persistedGroups.first?.anchorMessageID
+        let persisted = ToolCallGroup(
+            id: "live-tools-\(activeRunID ?? "pending")",
+            anchorMessageID: anchorMessageID,
+            toolCalls: persistedGroups.flatMap(\.toolCalls)
+        )
+        let merged = ToolCallGroup.merging(
+            primaryGroups: persistedGroups.isEmpty ? [] : [persisted],
+            fallbackGroups: [
+                ToolCallGroup.live(
+                    anchorMessageID: anchorMessageID,
+                    toolCalls: liveToolCalls
+                )
+            ]
+        )
+        return ToolCallGroup(
+            id: "live-tools-\(activeRunID ?? "pending")",
+            anchorMessageID: anchorMessageID,
+            toolCalls: merged.flatMap(\.toolCalls)
+        )
     }
 
     var hasOlderMessages: Bool {
@@ -759,11 +856,30 @@ final class CompanionSessionHistoryViewModel {
     }
 
     var hasLiveTranscriptContent: Bool {
-        !reasoningText.isEmpty
-            || !liveToolCalls.isEmpty
+        !liveReasoningGroups.isEmpty
+            || liveToolActivityGroup != nil
             || pendingApproval != nil
             || approvalContextUnavailable
             || streamingMessage != nil
+            || showsThinkingIndicator
+    }
+
+    var showsThinkingIndicator: Bool {
+        guard isRunActive, isWaitingForVisibleRunProgress else {
+            return false
+        }
+        switch runState {
+        case .starting, .streaming, .transportDisconnected:
+            return true
+        case .idle, .waitingForApproval, .stopping, .completed, .failed,
+             .cancelled:
+            return false
+        }
+    }
+
+    private func isLiveRunAnchor(_ anchorMessageID: String?) -> Bool {
+        guard isRunActive, let anchorMessageID else { return false }
+        return liveRunAnchorMessageIDs.contains(anchorMessageID)
     }
 
     private var activeRunKey: CompanionActiveRunKey? {
@@ -1130,7 +1246,7 @@ final class CompanionSessionHistoryViewModel {
         case .waitingForApproval:
             return String(localized: "Hermes is waiting for your approval")
         case .transportDisconnected:
-            return String(localized: "Live response disconnected · checking run")
+            return String(localized: "Reconnecting to live updates…")
         case .stopping:
             return nil
         case .completed:
@@ -1180,7 +1296,24 @@ final class CompanionSessionHistoryViewModel {
                 id: history.sessionID
             )
             session = resolvedSession
-            apply(history.messages)
+            if let activeRunID, !runState.isTerminalPresentation {
+                if let mergedMessages = mergeRunningHistory(
+                    history.messages
+                ) {
+                    applyRunningHistory(mergedMessages)
+                }
+                guard self.activeRunID == activeRunID else {
+                    return false
+                }
+            } else if shouldPreserveTerminalPresentation(
+                for: history.messages
+            ) {
+                // Status/event output can precede authoritative history by a
+                // few polls. Keep the already-presented answer until the
+                // matching turn reaches the history endpoint.
+            } else {
+                apply(history.messages)
+            }
             hasLoadedAuthoritativeHistory = true
             isViewingCachedData = false
             cache(
@@ -1196,13 +1329,19 @@ final class CompanionSessionHistoryViewModel {
             return true
         } catch {
             guard !(error is CancellationError) else { return false }
-            if shouldUseCache(for: error), !cached.isEmpty {
+            if allMessages.isEmpty,
+               shouldUseCache(for: error),
+               !cached.isEmpty {
                 apply(cached)
                 isViewingCachedData = true
-            } else {
+            } else if allMessages.isEmpty {
                 allMessages = []
                 visibleStartIndex = 0
                 isViewingCachedData = false
+                errorMessage = error.localizedDescription
+            } else if !isRunActive {
+                // A transient refresh failure must never erase a transcript
+                // that is already visible. Keep the last coherent snapshot.
                 errorMessage = error.localizedDescription
             }
             return false
@@ -1215,9 +1354,13 @@ final class CompanionSessionHistoryViewModel {
         guard !Task.isCancelled else { return }
         isRunObservationRequested = true
         guard runTask == nil, reconciliationTask == nil else { return }
+        ensureDeltaFlushScheduled()
 
         if let activeRunID {
-            runState = .transportDisconnected
+            isWaitingForVisibleRunProgress = true
+            if runState != .stopping {
+                runState = .streaming
+            }
             beginReconciliation(
                 runID: activeRunID,
                 modelContext: modelContext
@@ -1230,10 +1373,11 @@ final class CompanionSessionHistoryViewModel {
         guard !Task.isCancelled, let storedRun else { return }
 
         activeRunID = storedRun.runID
+        isWaitingForVisibleRunProgress = true
         stopRecoveryState = storedRun.stopState
         runState = storedRun.stopState == .confirmedStopping
             ? .stopping
-            : .transportDisconnected
+            : .streaming
         beginReconciliation(
             runID: storedRun.runID,
             modelContext: modelContext
@@ -1244,7 +1388,7 @@ final class CompanionSessionHistoryViewModel {
         isRunObservationRequested = false
         runObservationGeneration &+= 1
         if activeRunID != nil {
-            flushPendingDelta(forceAll: true)
+            flushPendingDelta()
         }
         cancelRunTasks()
     }
@@ -1448,17 +1592,18 @@ final class CompanionSessionHistoryViewModel {
         streamedAssistantText = ""
         reasoningText = ""
         liveToolCalls = []
+        liveRunAnchorMessageIDs = []
         pendingApproval = nil
         approvalErrorMessage = nil
         approvalSubmissionChoice = nil
         deltaBuffer.removeAll()
-        fastForwardedDelta = ""
         stopRecoveryState = .notRequested
         terminalOutputFallback = nil
         latestRunUsage = nil
         nextToolOrdinal = 0
         let observationGeneration = runObservationGeneration
         runState = .starting
+        isWaitingForVisibleRunProgress = true
         errorMessage = nil
 
         let started: ConversationRunSnapshot
@@ -1825,7 +1970,7 @@ final class CompanionSessionHistoryViewModel {
 
         guard !observedTerminal, activeRunID == runID else { return }
         runTask = nil
-        flushPendingDelta(forceAll: true)
+        ensureDeltaFlushScheduled()
         pendingApproval = nil
         approvalSubmissionChoice = nil
         approvalErrorMessage = String(
@@ -1859,8 +2004,12 @@ final class CompanionSessionHistoryViewModel {
     }
 
     private func enqueue(_ delta: String) {
-        fastForwardedDelta += deltaBuffer.append(delta)
-        guard deltaFlushTask == nil else { return }
+        deltaBuffer.append(delta)
+        ensureDeltaFlushScheduled()
+    }
+
+    private func ensureDeltaFlushScheduled() {
+        guard !deltaBuffer.isEmpty, deltaFlushTask == nil else { return }
         scheduleDeltaFlush()
     }
 
@@ -1872,20 +2021,16 @@ final class CompanionSessionHistoryViewModel {
         }
     }
 
-    private func flushPendingDelta(forceAll: Bool = false) {
+    private func flushPendingDelta() {
         deltaFlushTask?.cancel()
         deltaFlushTask = nil
         let drained = deltaBuffer.drain(
-            maximumCharacters: forceAll ? nil : 192
+            maximumCharacters: 192
         )
-        let published = fastForwardedDelta + drained
-        fastForwardedDelta = ""
-        guard !published.isEmpty else { return }
-        streamedAssistantText += published
+        guard !drained.isEmpty else { return }
+        streamedAssistantText += drained
         markStreamingTranscriptChanged()
-        if !deltaBuffer.isEmpty {
-            scheduleDeltaFlush()
-        }
+        ensureDeltaFlushScheduled()
     }
 
     private func beginReconciliation(
@@ -1966,24 +2111,11 @@ final class CompanionSessionHistoryViewModel {
                 return
             }
 
-            let previousMessages = allMessages
-            let previousReasoning = durableReasoningGroups
-            let previousToolActivity = durableToolCallGroups
-            apply(mergedMessages)
+            applyRunningHistory(mergedMessages)
             cache(
                 mergedMessages,
                 sessionID: history.sessionID,
                 in: modelContext
-            )
-            if durableReasoningGroups != previousReasoning {
-                reasoningText = ""
-            }
-            if durableToolCallGroups != previousToolActivity {
-                liveToolCalls = []
-            }
-            reconcileStreamedAssistantText(
-                previousMessages,
-                mergedMessages
             )
             markStreamingTranscriptChanged()
         } catch is CancellationError {
@@ -2198,47 +2330,94 @@ final class CompanionSessionHistoryViewModel {
         return collection(candidate, hasPrefix: current) ? candidate : current
     }
 
-    private func reconcileStreamedAssistantText(
-        _ previous: [ChatMessage],
-        _ current: [ChatMessage]
-    ) {
-        for (index, message) in current.enumerated() {
+    private func stageRunningAssistantOutput(
+        previousMessages: [ChatMessage],
+        authoritativeMessages: [ChatMessage]
+    ) -> [ChatMessage] {
+        let currentTurnAnchorIDs = Set(
+            TranscriptTurnClassifier.currentTurnAssistantAnchorIDs(
+                in: authoritativeMessages
+            )
+        )
+        return authoritativeMessages.enumerated().map { index, message in
+            let anchorID = TranscriptTurnClassifier.anchorID(
+                for: message,
+                at: index
+            )
             guard
                 message.role == "assistant",
-                let content = message.content,
-                content.trimmedNonEmptyValue != nil
+                currentTurnAnchorIDs.contains(anchorID)
             else {
-                continue
+                return message
             }
-            let previousContent: String
-            if index < previous.count,
-               previous[index].role == "assistant" {
-                previousContent = previous[index].content ?? ""
-            } else {
-                previousContent = ""
-            }
-            guard content != previousContent else { continue }
 
-            let persistedDelta = content.hasPrefix(previousContent)
-                ? String(content.dropFirst(previousContent.count))
-                : content
-            consumePersistedAssistantPrefix(persistedDelta)
+            if let content = message.content,
+               content.trimmedNonEmptyValue != nil {
+                enqueueAuthoritativeAssistantOutput(content)
+            }
+
+            let previousContent: String?
+            if previousMessages.indices.contains(index),
+               previousMessages[index].role == "assistant",
+               identitiesMatch(
+                   previousMessages[index].messageId,
+                   message.messageId
+               ) {
+                previousContent = previousMessages[index].content
+            } else {
+                previousContent = nil
+            }
+
+            return ChatMessage(
+                role: message.role,
+                content: previousContent,
+                timestamp: message.timestamp,
+                messageId: message.messageId,
+                name: message.name,
+                toolCallId: message.toolCallId,
+                toolUseId: message.toolUseId,
+                toolCalls: message.toolCalls,
+                contentParts: message.contentParts,
+                reasoning: message.reasoning,
+                attachments: message.attachments
+            )
         }
     }
 
-    private func consumePersistedAssistantPrefix(_ persisted: String) {
-        guard !persisted.isEmpty, !streamedAssistantText.isEmpty else {
+    private func applyRunningHistory(_ messages: [ChatMessage]) {
+        let previousMessages = allMessages
+        liveRunAnchorMessageIDs = Set(
+            TranscriptTurnClassifier.currentTurnAssistantAnchorIDs(
+                in: messages
+            )
+        )
+        apply(
+            stageRunningAssistantOutput(
+                previousMessages: previousMessages,
+                authoritativeMessages: messages
+            ),
+            preservesVisibleWindow: true
+        )
+    }
+
+    private func enqueueAuthoritativeAssistantOutput(_ output: String) {
+        let presentedAndQueued =
+            streamedAssistantText + deltaBuffer.pendingText
+        if output.hasPrefix(presentedAndQueued) {
+            let suffix = output.dropFirst(presentedAndQueued.count)
+            enqueue(String(suffix))
             return
         }
-        if streamedAssistantText.hasPrefix(persisted) {
-            streamedAssistantText.removeFirst(persisted.count)
-        } else if persisted.hasPrefix(streamedAssistantText) {
-            streamedAssistantText = ""
-        } else {
-            // The persisted transcript is authoritative when it conflicts
-            // with the disconnected stream copy.
-            streamedAssistantText = ""
+        // A shorter snapshot is stale relative to the presentation already
+        // received from SSE. Preserve the newer prefix until the next poll.
+        if presentedAndQueued.hasPrefix(output) {
+            return
         }
+        // Conflicting recovery text must not blank or replace content already
+        // visible on screen. Only seed an empty presentation; terminal history
+        // remains authoritative for a non-prefix conflict.
+        guard presentedAndQueued.isEmpty else { return }
+        enqueue(output)
     }
 
     private func reconcileApproval(
@@ -2291,8 +2470,7 @@ final class CompanionSessionHistoryViewModel {
         }
         switch snapshot.state {
         case .started, .queued, .running:
-            if runState != .transportDisconnected,
-               runState != .stopping {
+            if runState != .stopping {
                 runState = .streaming
             }
         case .waitingForApproval:
@@ -2340,15 +2518,18 @@ final class CompanionSessionHistoryViewModel {
             )
             guard activeRunID == runID else { return }
         }
-        flushPendingDelta(forceAll: true)
         if let terminalOutputFallback,
            !terminalOutputFallback.isEmpty {
-            streamedAssistantText = terminalOutputFallback
-            markStreamingTranscriptChanged()
+            enqueueAuthoritativeAssistantOutput(terminalOutputFallback)
         }
+        guard await drainPendingPresentation(runID: runID) else {
+            return
+        }
+        let expectedTerminalOutput =
+            terminalOutputFallback?.trimmedNonEmptyValue
+            ?? streamedAssistantText.trimmedNonEmptyValue
         let messagesBeforeRefresh = allMessages
         isTerminalRefreshPending = true
-        activeRunID = nil
         pendingApproval = nil
         approvalErrorMessage = nil
         approvalSubmissionChoice = nil
@@ -2357,7 +2538,8 @@ final class CompanionSessionHistoryViewModel {
         reconciliationTask?.cancel()
         reconciliationTask = nil
         let loadedAuthoritativeHistory = await refreshHistoryAfterTerminal(
-            modelContext: modelContext
+            modelContext: modelContext,
+            expectsAssistantOutput: expectedTerminalOutput != nil
         )
         if loadedAuthoritativeHistory {
             clearTerminalFallbackPresentation()
@@ -2366,13 +2548,38 @@ final class CompanionSessionHistoryViewModel {
             apply(messagesBeforeRefresh)
             needsTerminalHistoryRetry = true
         }
+        thinkingIndicatorTask?.cancel()
+        thinkingIndicatorTask = nil
+        isWaitingForVisibleRunProgress = false
+        activeRunID = nil
+        liveRunAnchorMessageIDs = []
         stopRecoveryState = .notRequested
         terminalOutputFallback = nil
         isTerminalRefreshPending = false
     }
 
+    private func drainPendingPresentation(runID: String) async -> Bool {
+        ensureDeltaFlushScheduled()
+        while !deltaBuffer.isEmpty {
+            guard
+                activeRunID == runID,
+                !Task.isCancelled
+            else {
+                return false
+            }
+            do {
+                try await Task.sleep(nanoseconds: 10_000_000)
+            } catch {
+                return false
+            }
+            ensureDeltaFlushScheduled()
+        }
+        return true
+    }
+
     private func refreshHistoryAfterTerminal(
-        modelContext: ModelContext?
+        modelContext: ModelContext?,
+        expectsAssistantOutput: Bool
     ) async -> Bool {
         while isLoading {
             do {
@@ -2381,19 +2588,61 @@ final class CompanionSessionHistoryViewModel {
                 return false
             }
         }
-        return await load(modelContext: modelContext)
+        for attempt in 0..<3 {
+            let loaded = await load(modelContext: modelContext)
+            if loaded,
+               (!expectsAssistantOutput
+                || hasVisibleAssistantOutputInCurrentTurn(allMessages)) {
+                return true
+            }
+            guard attempt < 2 else { break }
+            do {
+                try await Task.sleep(nanoseconds: 200_000_000)
+            } catch {
+                return false
+            }
+        }
+        return false
+    }
+
+    private func shouldPreserveTerminalPresentation(
+        for messages: [ChatMessage]
+    ) -> Bool {
+        runState.isTerminalPresentation
+            && (terminalOutputFallback?.trimmedNonEmptyValue
+                ?? streamedAssistantText.trimmedNonEmptyValue) != nil
+            && !hasVisibleAssistantOutputInCurrentTurn(messages)
+    }
+
+    private func hasVisibleAssistantOutputInCurrentTurn(
+        _ messages: [ChatMessage]
+    ) -> Bool {
+        let latestUserIndex = messages.lastIndex {
+            TranscriptTurnClassifier.isUserTurnBoundary($0)
+        }
+        let startIndex = latestUserIndex.map {
+            messages.index(after: $0)
+        } ?? messages.startIndex
+        guard startIndex < messages.endIndex else { return false }
+        return messages[startIndex...].contains { message in
+            message.role == "assistant"
+                && message.content?.trimmedNonEmptyValue != nil
+        }
     }
 
     private func clearTerminalFallbackPresentation() {
+        thinkingIndicatorTask?.cancel()
+        thinkingIndicatorTask = nil
         streamedAssistantText = ""
         reasoningText = ""
         liveToolCalls = []
+        liveRunAnchorMessageIDs = []
+        isWaitingForVisibleRunProgress = false
     }
 
     private func clearRecoveredRunPresentation() {
         clearTerminalFallbackPresentation()
         deltaBuffer.removeAll()
-        fastForwardedDelta = ""
         pendingApproval = nil
         approvalErrorMessage = nil
         approvalSubmissionChoice = nil
@@ -2412,6 +2661,8 @@ final class CompanionSessionHistoryViewModel {
         terminalUsageRefreshRunID = nil
         deltaFlushTask?.cancel()
         deltaFlushTask = nil
+        thinkingIndicatorTask?.cancel()
+        thinkingIndicatorTask = nil
     }
 
     private func applyToolStarted(
@@ -2486,11 +2737,41 @@ final class CompanionSessionHistoryViewModel {
 
     private func markStreamingTranscriptChanged() {
         streamingFollowTrigger &+= 1
+        thinkingIndicatorTask?.cancel()
+        thinkingIndicatorTask = nil
+        guard isRunActive, !runState.isTerminalPresentation else {
+            isWaitingForVisibleRunProgress = false
+            return
+        }
+        isWaitingForVisibleRunProgress = false
+        thinkingIndicatorTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 600_000_000)
+            } catch {
+                return
+            }
+            guard let self,
+                  !Task.isCancelled,
+                  isRunActive,
+                  !runState.isTerminalPresentation else {
+                return
+            }
+            isWaitingForVisibleRunProgress = true
+            streamingFollowTrigger &+= 1
+            thinkingIndicatorTask = nil
+        }
     }
 
-    private func apply(_ messages: [ChatMessage]) {
+    private func apply(
+        _ messages: [ChatMessage],
+        preservesVisibleWindow: Bool = false
+    ) {
         allMessages = messages
-        visibleStartIndex = max(0, messages.count - pageSize)
+        if preservesVisibleWindow {
+            visibleStartIndex = min(visibleStartIndex, messages.count)
+        } else {
+            visibleStartIndex = max(0, messages.count - pageSize)
+        }
         durableReasoningGroups = CompanionReasoningPresentation.groups(
             messages: messages
         )

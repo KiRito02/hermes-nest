@@ -656,7 +656,9 @@ struct CompanionSessionHistoryView: View {
             )
             .defaultScrollAnchor(
                 ChatScrollPolicy.sizeChangeAnchor(
-                    shouldFollowLatestMessage: shouldFollowLatestMessage
+                    shouldFollowLatestMessage:
+                        shouldFollowLatestMessage
+                        && !viewModel.isRunActive
                 ),
                 for: .sizeChanges
             )
@@ -1103,51 +1105,62 @@ struct CompanionSessionHistoryView: View {
 
     @ViewBuilder
     private var liveRunTranscriptContent: some View {
-        if !viewModel.reasoningText.isEmpty {
-            DisclosureGroup("Reasoning") {
-                Text(viewModel.reasoningText)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                    .frame(
-                        maxWidth: .infinity,
-                        alignment: .leading
-                    )
-            }
-            .accessibilityIdentifier("companion.run.reasoning")
-        }
+        if viewModel.hasLiveTranscriptContent {
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                ForEach(viewModel.liveReasoningGroups) { group in
+                    ReasoningBlockView(text: group.text)
+                        .accessibilityIdentifier(
+                            "companion.run.reasoning"
+                        )
+                }
 
-        ForEach(viewModel.liveToolCalls) { toolCall in
-            ToolCallCardView(toolCall: toolCall)
-        }
+                if let toolGroup = viewModel.liveToolActivityGroup {
+                    ToolActivityGroupView(group: toolGroup)
+                }
 
-        if let approval = viewModel.pendingApproval {
-            CompanionRunApprovalCard(
-                approval: approval,
-                submissionChoice:
-                    viewModel.approvalSubmissionChoice,
-                errorMessage:
-                    viewModel.approvalErrorMessage,
-                canRespond: viewModel.canRespondToApproval
-            ) { choice in
-                Task {
-                    await viewModel.respondToApproval(
-                        choice,
-                        modelContext: modelContext
+                if let approval = viewModel.pendingApproval {
+                    CompanionRunApprovalCard(
+                        approval: approval,
+                        submissionChoice:
+                            viewModel.approvalSubmissionChoice,
+                        errorMessage:
+                            viewModel.approvalErrorMessage,
+                        canRespond: viewModel.canRespondToApproval
+                    ) { choice in
+                        Task {
+                            await viewModel.respondToApproval(
+                                choice,
+                                modelContext: modelContext
+                            )
+                        }
+                    }
+                    .padding(.top, 6)
+                } else if viewModel.approvalContextUnavailable {
+                    CompanionRunApprovalUnavailableCard()
+                        .padding(.top, 6)
+                }
+
+                if viewModel.showsThinkingIndicator {
+                    CompanionRunThinkingIndicator()
+                        .padding(.top, 6)
+                }
+
+                if let streamingMessage = viewModel.streamingMessage {
+                    MessageBubbleView(
+                        message: streamingMessage,
+                        transcriptMediaCacheNamespace:
+                            companionURL.absoluteString,
+                        isStreaming: viewModel.isRunActive
                     )
+                    .accessibilityLabel("Streaming assistant response")
+                    .padding(.top, 6)
                 }
             }
-        } else if viewModel.approvalContextUnavailable {
-            CompanionRunApprovalUnavailableCard()
-        }
-
-        if let streamingMessage = viewModel.streamingMessage {
-            MessageBubbleView(
-                message: streamingMessage,
-                transcriptMediaCacheNamespace: companionURL.absoluteString,
-                isStreaming: viewModel.isRunActive
-            )
-            .accessibilityLabel("Streaming assistant response")
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("companion.run.live-progress")
         }
     }
 
@@ -1159,11 +1172,7 @@ struct CompanionSessionHistoryView: View {
             if let status = viewModel.runStatusText {
                 Text(status)
                     .font(HermesNestDesign.Typography.metadata)
-                    .foregroundStyle(
-                        viewModel.runState == .transportDisconnected
-                            ? Color.orange
-                            : Color.secondary
-                    )
+                    .foregroundStyle(Color.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("companion.run.status")
             }
@@ -2531,6 +2540,60 @@ private struct CompanionRunApprovalUnavailableCard: View {
         .accessibilityIdentifier(
             "companion.run.approval-context-unavailable"
         )
+    }
+}
+
+@MainActor
+private struct CompanionRunThinkingIndicator: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image("LucideBrain")
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(.secondary)
+                .frame(width: 18, height: 18)
+                .accessibilityHidden(true)
+
+            Text("Thinking")
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            TimelineView(
+                .animation(
+                    minimumInterval: 0.18,
+                    paused: reduceMotion
+                )
+            ) { context in
+                HStack(spacing: 3) {
+                    ForEach(0..<3, id: \.self) { index in
+                        Circle()
+                            .fill(Color.secondary)
+                            .frame(width: 4, height: 4)
+                            .opacity(
+                                dotOpacity(
+                                    index: index,
+                                    date: context.date
+                                )
+                            )
+                    }
+                }
+            }
+            .frame(width: 18, height: 8)
+            .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Hermes is thinking")
+        .accessibilityIdentifier("companion.run.thinking")
+    }
+
+    private func dotOpacity(index: Int, date: Date) -> Double {
+        guard !reduceMotion else { return 0.65 }
+        let step = Int(date.timeIntervalSinceReferenceDate / 0.18) % 3
+        return step == index ? 1 : 0.28
     }
 }
 

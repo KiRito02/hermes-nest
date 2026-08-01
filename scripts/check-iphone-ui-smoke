@@ -129,7 +129,9 @@ for snippet, description in [
     ),
     (
         "ChatScrollPolicy.sizeChangeAnchor(\n"
-        "                    shouldFollowLatestMessage: shouldFollowLatestMessage\n"
+        "                    shouldFollowLatestMessage:\n"
+        "                        shouldFollowLatestMessage\n"
+        "                        && !viewModel.isRunActive\n"
         "                ),\n"
         "                for: .sizeChanges",
         "conditional Companion transcript size-change anchor",
