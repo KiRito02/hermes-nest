@@ -83,32 +83,29 @@ enum ProfileEntityProvider {
     /// Best-effort live fetch against the saved server. Returns `[]` (not an error) when no
     /// server is configured; a network/auth failure throws so the caller falls back to cache.
     ///
-    /// Runs out-of-process (App Intents), where `CustomHeaderStore.shared` — which
-    /// `AuthManager` hydrates only on a foreground launch — is empty. So we read the server's
-    /// custom headers straight from the Keychain (reachable cross-process) and pass them
+    /// Runs out-of-process (App Intents), so we read the server's custom headers
+    /// straight from the Keychain (reachable cross-process) and pass them
     /// explicitly; otherwise a reverse proxy that authenticates on a header rejects this fetch
     /// and the picker can never refresh live. (The session cookie is also absent out-of-process,
     /// so a cookie-auth server still falls back to the cache — this just stops the ad-hoc client
     /// from silently dropping the headers every other client in the app carries.)
     private static func fetchLiveProfiles() async throws -> [ProfileSummary] {
         guard let server = savedServerURL() else { return [] }
-        let headers = customHeaders(for: server)
-        let response = try await APIClient(baseURL: server, customHeaderProvider: { headers }).profiles()
-        return response.profiles ?? []
-    }
-
-    /// Loads the server's stored custom headers (scoped key first, then the pre-#16 global
-    /// blob) without mutating the Keychain — mirrors `AuthManager.hydrateCustomHeaders`, but
-    /// read-only since this runs in the App Intents process.
-    private static func customHeaders(for server: URL) -> [CustomHeader] {
         let keychain = KeychainStore()
-        let stored: String?
-        if let scoped = try? keychain.load(.customHeaders, scope: server.absoluteString) {
-            stored = scoped
-        } else {
-            stored = try? keychain.load(.customHeaders)
-        }
-        return [CustomHeader].decodeFromStorage(stored)
+        let headers = PreservedWebUICredentialReader.customHeaders(
+            for: server,
+            loadScoped: { scope in
+                try keychain.load(.customHeaders, scope: scope)
+            },
+            loadGlobal: {
+                try keychain.load(.customHeaders)
+            }
+        )
+        let response = try await PreservedWebUIReadService(
+            baseURL: server,
+            customHeaderProvider: { headers }
+        ).profiles()
+        return response.profiles ?? []
     }
 
     private static func savedServerURL() -> URL? {

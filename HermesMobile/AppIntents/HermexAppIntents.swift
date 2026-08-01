@@ -68,7 +68,7 @@ struct NewChatVoiceIntent: AppIntent {
 /// the user picks when configuring the Shortcut/Siri phrase (issue #339). The chosen
 /// `ProfileEntity` is carried through the same `AppIntentRouter`/deep-link plumbing as the
 /// other New Chat intents, on its own host (`new-chat-profile`) with the profile name as a
-/// query item, so `PendingNewChatView` can create the session pinned to it.
+/// query item for the preserved profile-aware routing contract.
 struct NewChatInProfileIntent: AppIntent {
     static var title: LocalizedStringResource = "New Chat in Profile"
     static var description = IntentDescription("Open Hermes Nest on a new chat pinned to a specific profile.")

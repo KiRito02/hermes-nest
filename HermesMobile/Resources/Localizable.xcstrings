@@ -291,112 +291,12 @@
         }
       }
     },
-    "The Board is refreshing.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "看板正在刷新。"
-          }
-        }
-      }
-    },
-    "The selection is no longer available. Refresh the Board and select the Cards again.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "所选内容已不可用。请刷新看板并重新选择卡片。"
-          }
-        }
-      }
-    },
-    "The selected Cards will be moved to the archive.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "所选卡片将移至归档。"
-          }
-        }
-      }
-    },
-    "Archive Cards": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "归档卡片"
-          }
-        }
-      }
-    },
-    "Assign Profile": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "分配配置文件"
-          }
-        }
-      }
-    },
-    "Bulk Actions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "批量操作"
-          }
-        }
-      }
-    },
-    "Change Status": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "更改状态"
-          }
-        }
-      }
-    },
-    "Retry Failed": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重试失败项"
-          }
-        }
-      }
-    },
     "Select Cards": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "选择卡片"
-          }
-        }
-      }
-    },
-    "Set Priority": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "设置优先级"
-          }
-        }
-      }
-    },
-    "Unknown Status": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "未知状态"
           }
         }
       }
@@ -561,26 +461,6 @@
         }
       }
     },
-    "Offline—showing previously loaded data": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "离线——正在显示之前加载的数据"
-          }
-        }
-      }
-    },
-    "Live updates delayed": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "实时更新延迟"
-          }
-        }
-      }
-    },
     "Kanban": {
       "localizations": {
         "zh-Hans": {
@@ -651,62 +531,12 @@
         }
       }
     },
-    "Tenant": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "租户"
-          }
-        }
-      }
-    },
-    "Clear Filters": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "清除筛选条件"
-          }
-        }
-      }
-    },
-    "Only Mine": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "仅我的"
-          }
-        }
-      }
-    },
-    "1 file changed": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "1 个文件已更改"
-          }
-        }
-      }
-    },
     "Authentication error: %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "身份验证错误：%@"
-          }
-        }
-      }
-    },
-    "Binary file changed": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "二进制文件已更改"
           }
         }
       }
@@ -721,132 +551,12 @@
         }
       }
     },
-    "Changes unavailable": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法更改"
-          }
-        }
-      }
-    },
-    "Could not load providers": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载提供商"
-          }
-        }
-      }
-    },
-    "Couldn't refresh. Showing previously loaded providers.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法刷新。正在显示之前加载的提供商。"
-          }
-        }
-      }
-    },
-    "Diff too large to show.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "差异太大而无法显示。"
-          }
-        }
-      }
-    },
     "Dismiss": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "解雇"
-          }
-        }
-      }
-    },
-    "Git actions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Git 操作"
-          }
-        }
-      }
-    },
-    "Git actions are unavailable for this workspace.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Git 操作对此工作区不可用。"
-          }
-        }
-      }
-    },
-    "Key configured": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "已配置密钥"
-          }
-        }
-      }
-    },
-    "Loading providers…": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载提供商…"
-          }
-        }
-      }
-    },
-    "Local and remote branches diverged": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "本地和远程分支存在分歧"
-          }
-        }
-      }
-    },
-    "Local branch ahead of remote": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "本地分支领先于远程分支"
-          }
-        }
-      }
-    },
-    "Local changes exist and remote branch moved ahead": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "存在本地更改，远程分支继续前进"
-          }
-        }
-      }
-    },
-    "Local repository has uncommitted changes": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "本地存储库有未提交的更改"
           }
         }
       }
@@ -861,92 +571,12 @@
         }
       }
     },
-    "No changes": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "没有变化"
-          }
-        }
-      }
-    },
-    "No key": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无密钥"
-          }
-        }
-      }
-    },
-    "No providers reported by this server.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此服务器未报告任何提供商。"
-          }
-        }
-      }
-    },
-    "Opens the provider status screen.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "打开提供商状态界面。"
-          }
-        }
-      }
-    },
-    "Provider keys are managed on the server. This screen is read-only.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "提供商密钥在服务器上管理。此界面为只读。"
-          }
-        }
-      }
-    },
     "Providers": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "提供商"
-          }
-        }
-      }
-    },
-    "Remote branch ahead of local branch": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "远程分支领先于本地分支"
-          }
-        }
-      }
-    },
-    "Repository status unavailable": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "存储库状态不可用"
-          }
-        }
-      }
-    },
-    "Repository up to date": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "存储库是最新的"
           }
         }
       }
@@ -961,162 +591,12 @@
         }
       }
     },
-    "Showing first 500 changed files.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "显示前 500 个已更改的文件。"
-          }
-        }
-      }
-    },
-    "Shows this provider's model list.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "显示此提供商的模型列表。"
-          }
-        }
-      }
-    },
-    "Unknown provider": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "未知提供商"
-          }
-        }
-      }
-    },
-    "That approval request already expired, so the agent has moved on.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "该审批请求已过期，智能体已继续执行。"
-          }
-        }
-      }
-    },
-    "That clarification prompt already expired, so the agent has moved on.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "该澄清提示已过期，智能体已继续执行。"
-          }
-        }
-      }
-    },
-    "This session is still responding, so it can't be moved yet. Try again when it finishes.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "该会话仍在回复中，暂时无法移动。请等它完成后再试。"
-          }
-        }
-      }
-    },
     "Write": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "写"
-          }
-        }
-      }
-    },
-    "Your working tree is clean.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "你的工作树是干净的。"
-          }
-        }
-      }
-    },
-    "Always use the monochrome light icon": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "始终使用浅色单色图标"
-          }
-        }
-      }
-    },
-    "Always use the monochrome dark icon": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "始终使用深色单色图标"
-          }
-        }
-      }
-    },
-    "Always use the gradient light icon": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "始终使用浅色渐变图标"
-          }
-        }
-      }
-    },
-    "Always use the gradient dark icon": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "始终使用深色渐变图标"
-          }
-        }
-      }
-    },
-    "Monochrome Light": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "浅色单色"
-          }
-        }
-      }
-    },
-    "Monochrome Dark": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "深色单色"
-          }
-        }
-      }
-    },
-    "Gradient Light": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "浅色渐变"
-          }
-        }
-      }
-    },
-    "Gradient Dark": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "深色渐变"
           }
         }
       }
@@ -1427,38 +907,8 @@
         }
       }
     },
-    ", switching in progress": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "，正在切换"
-          }
-        }
-      }
-    },
     "/%@": {
       "shouldTranslate": false
-    },
-    "/background is available for WebUI sessions only.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "/background 仅适用于 WebUI 会话。"
-          }
-        }
-      }
-    },
-    "/btw is available for WebUI sessions only.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "/btw 仅适用于 WebUI 会话。"
-          }
-        }
-      }
     },
     "1 of %lld pending": {
       "localizations": {
@@ -1496,36 +946,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "已激活"
-          }
-        }
-      }
-    },
-    "Active Profile": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "当前配置文件"
-          }
-        }
-      }
-    },
-    "Active Server": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "当前服务器"
-          }
-        }
-      }
-    },
-    "Active profile": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "当前配置文件"
           }
         }
       }
@@ -1594,16 +1014,6 @@
         }
       }
     },
-    "Add Header": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "添加请求头"
-          }
-        }
-      }
-    },
     "Add Server": {
       "localizations": {
         "zh-Hans": {
@@ -1620,86 +1030,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "添加服务器…"
-          }
-        }
-      }
-    },
-    "Add custom model to favorites": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "将自定模型加入收藏"
-          }
-        }
-      }
-    },
-    "Add header": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "添加请求头"
-          }
-        }
-      }
-    },
-    "Add project": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "添加项目"
-          }
-        }
-      }
-    },
-    "Adds a small marker and the time above each response so back-to-back replies are easier to tell apart.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "在每条回复上方添加小标记和时间，便于区分连续的回复。"
-          }
-        }
-      }
-    },
-    "Adds another Hermes server.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "添加另一台 Hermes 服务器。"
-          }
-        }
-      }
-    },
-    "Advanced": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "高级"
-          }
-        }
-      }
-    },
-    "Agent Soul": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "智能体灵魂"
-          }
-        }
-      }
-    },
-    "Agent command": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "智能体命令"
           }
         }
       }
@@ -1734,26 +1064,6 @@
         }
       }
     },
-    "All Models...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "所有模型…"
-          }
-        }
-      }
-    },
-    "All Time": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "全部时间"
-          }
-        }
-      }
-    },
     "Allow Photos access to save images from Hermes Nest.": {
       "localizations": {
         "zh-Hans": {
@@ -1774,36 +1084,6 @@
         }
       }
     },
-    "Always use the dark icon": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "始终使用深色图标"
-          }
-        }
-      }
-    },
-    "Always use the disco icon": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "始终使用迪斯科图标"
-          }
-        }
-      }
-    },
-    "Always use the light icon": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "始终使用浅色图标"
-          }
-        }
-      }
-    },
     "App": {
       "localizations": {
         "zh-Hans": {
@@ -1814,42 +1094,12 @@
         }
       }
     },
-    "App Icon": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "应用图标"
-          }
-        }
-      }
-    },
     "Appearance": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "外观"
-          }
-        }
-      }
-    },
-    "Apply your header color to these primary buttons.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "将你的标题颜色应用到这些主要按钮。"
-          }
-        }
-      }
-    },
-    "Approval bypass active": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "已开启免审批"
           }
         }
       }
@@ -1884,42 +1134,12 @@
         }
       }
     },
-    "Archived Sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "已归档会话"
-          }
-        }
-      }
-    },
     "Arguments": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "参数"
-          }
-        }
-      }
-    },
-    "Ask a side question": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "提一个附带问题"
-          }
-        }
-      }
-    },
-    "Ask anything... /commands": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "随便问点什么…… /commands"
           }
         }
       }
@@ -1954,26 +1174,6 @@
         }
       }
     },
-    "Attach File": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "附加文件"
-          }
-        }
-      }
-    },
-    "Attempts to reconnect to the server and reload sessions.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "尝试重新连接服务器并重新加载会话。"
-          }
-        }
-      }
-    },
     "Available mobile commands:\n\n`/help` - Show this command list.\n`/clear` - Clear the local transcript.\n`/stop` - Stop the current response.\n`/new` - Open a fresh session.\n`/model <id>` - Switch this session's model.\n`/workspace <path>` - Switch this session's workspace.\n`/reasoning <level>` - Set reasoning display or effort.\n`/title <text>` - Rename this session.\n`/personality <name>` - Set or clear this session's personality.\n`/skills [query]` - Search available skills.\n`/queue <message>` - Queue a message for the next turn.\n`/steer <message>` - Steer the active response.\n`/interrupt <message>` - Stop the active response and send a new message.\n`/status` - Show session status.\n`/btw <question>` - Ask a side question without changing this chat.\n`/background <prompt>` - Run a parallel task and post the result here.\n`/bg <prompt>` - Alias for `/background`.\n`/branch [name]` - Fork this conversation.\n`/fork [name]` - Alias for `/branch`.\n`/compress [focus]` - Compress this session's context.\n`/compact [focus]` - Alias for `/compress`.\n`/undo` - Undo the last exchange.\n`/retry` - Retry the last turn.": {
       "localizations": {
         "zh-Hans": {
@@ -1990,26 +1190,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "可用的个性：\n\n%@\n\n使用 `/personality <name>` 或 `/personality none`。"
-          }
-        }
-      }
-    },
-    "Available skills:": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "可用技能："
-          }
-        }
-      }
-    },
-    "Background task started. I'll add the result here when it completes.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "后台任务已开始。完成后我会把结果添加到这里。"
           }
         }
       }
@@ -2044,52 +1224,12 @@
         }
       }
     },
-    "Claude Code Sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Claude Code 会话"
-          }
-        }
-      }
-    },
-    "CLI Sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "CLI 会话"
-          }
-        }
-      }
-    },
-    "Session visibility is synced with this server, so the WebUI follows it too.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "会话显示设置会与此服务器同步，因此 WebUI 也会遵循此设置。"
-          }
-        }
-      }
-    },
     "Cached": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "已缓存"
-          }
-        }
-      }
-    },
-    "Cached sessions and messages are kept for offline viewing. Clearing removes this server's cache only — other servers and the Hermes server are not affected.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "已缓存的会话和消息会保留以供离线查看。清除仅会移除此服务器的缓存——不会影响其他服务器和 Hermes 服务器。"
           }
         }
       }
@@ -2114,16 +1254,6 @@
         }
       }
     },
-    "Cannot reach server": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法连接服务器"
-          }
-        }
-      }
-    },
     "Chat": {
       "localizations": {
         "zh-Hans": {
@@ -2144,27 +1274,7 @@
         }
       }
     },
-    "Check that your Mac is awake and cloudflared is running.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请检查你的 Mac 是否已唤醒，且 cloudflared 正在运行。"
-          }
-        }
-      }
-    },
     "Checking server...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在检查服务器…"
-          }
-        }
-      }
-    },
-    "Checking server…": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -2194,76 +1304,6 @@
         }
       }
     },
-    "Choose Workspace": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "选择工作区"
-          }
-        }
-      }
-    },
-    "Choose a slash command or continue typing.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "选择一个斜杠命令或继续输入。"
-          }
-        }
-      }
-    },
-    "Choose profile": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "选择配置文件"
-          }
-        }
-      }
-    },
-    "Choose provider ID": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "选择提供商 ID"
-          }
-        }
-      }
-    },
-    "Choose workspace path": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "选择工作区路径"
-          }
-        }
-      }
-    },
-    "Clarification Required": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "需要澄清"
-          }
-        }
-      }
-    },
-    "Clarification expiration": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "澄清过期时间"
-          }
-        }
-      }
-    },
     "Clarify": {
       "localizations": {
         "zh-Hans": {
@@ -2284,16 +1324,6 @@
         }
       }
     },
-    "Clear Cache": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "清除缓存"
-          }
-        }
-      }
-    },
     "Clear Offline Cache": {
       "localizations": {
         "zh-Hans": {
@@ -2304,112 +1334,12 @@
         }
       }
     },
-    "Clear file search": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "清除文件搜索"
-          }
-        }
-      }
-    },
-    "Clear model search": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "清除模型搜索"
-          }
-        }
-      }
-    },
-    "Clear profile search": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "清除配置文件搜索"
-          }
-        }
-      }
-    },
-    "Clear search": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "清除搜索"
-          }
-        }
-      }
-    },
-    "Clear the current conversation": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "清除当前对话"
-          }
-        }
-      }
-    },
-    "Clear this server's cache?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "清除此服务器的缓存？"
-          }
-        }
-      }
-    },
-    "Clears the selected project filter.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "清除所选的项目筛选条件。"
-          }
-        }
-      }
-    },
-    "Clears this project filter.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "清除此项目筛选条件。"
-          }
-        }
-      }
-    },
     "Close": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "关闭"
-          }
-        }
-      }
-    },
-    "Close search": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "关闭搜索"
-          }
-        }
-      }
-    },
-    "Closes search and clears the current query.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "关闭搜索并清除当前查询。"
           }
         }
       }
@@ -2430,26 +1360,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "代码"
-          }
-        }
-      }
-    },
-    "Collapse active profile picker": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "收起当前配置文件选择器"
-          }
-        }
-      }
-    },
-    "Collapse projects": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "收起项目"
           }
         }
       }
@@ -2494,46 +1404,6 @@
         }
       }
     },
-    "Composer Option": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "编写器选项"
-          }
-        }
-      }
-    },
-    "Composer options": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "编写器选项"
-          }
-        }
-      }
-    },
-    "Compress session context": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "压缩会话上下文"
-          }
-        }
-      }
-    },
-    "Compressing context...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在压缩上下文…"
-          }
-        }
-      }
-    },
     "Configuration": {
       "localizations": {
         "zh-Hans": {
@@ -2574,16 +1444,6 @@
         }
       }
     },
-    "Connection Headers": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "连接请求头"
-          }
-        }
-      }
-    },
     "Connection ok. Password not required.": {
       "localizations": {
         "zh-Hans": {
@@ -2600,26 +1460,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "连接正常。需要密码。"
-          }
-        }
-      }
-    },
-    "Context compaction": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "上下文压实"
-          }
-        }
-      }
-    },
-    "Context compressed.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "上下文已压缩。"
           }
         }
       }
@@ -2704,26 +1544,6 @@
         }
       }
     },
-    "Copy Deeplink": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "复制深度链接"
-          }
-        }
-      }
-    },
-    "Copy Full Title": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "拷贝完整标题"
-          }
-        }
-      }
-    },
     "Copy Web UI repository link": {
       "localizations": {
         "zh-Hans": {
@@ -2794,152 +1614,12 @@
         }
       }
     },
-    "Could Not Load Analytics": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载分析数据"
-          }
-        }
-      }
-    },
-    "Could Not Load Attachment": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载附件"
-          }
-        }
-      }
-    },
-    "Could Not Load File": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载文件"
-          }
-        }
-      }
-    },
-    "Could Not Load Files": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载文件"
-          }
-        }
-      }
-    },
-    "Could Not Load Media": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载媒体"
-          }
-        }
-      }
-    },
-    "Could Not Load Memory": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载记忆"
-          }
-        }
-      }
-    },
     "Could Not Load Messages": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "无法加载消息"
-          }
-        }
-      }
-    },
-    "Could Not Load Models": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载模型"
-          }
-        }
-      }
-    },
-    "Could Not Load Output": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载输出"
-          }
-        }
-      }
-    },
-    "Could Not Load Profiles": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载配置文件"
-          }
-        }
-      }
-    },
-    "Could Not Load Skill": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载技能"
-          }
-        }
-      }
-    },
-    "Could Not Load Skills": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载技能"
-          }
-        }
-      }
-    },
-    "Could Not Load Tasks": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载任务"
-          }
-        }
-      }
-    },
-    "Could Not Preview Image": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法预览图片"
-          }
-        }
-      }
-    },
-    "Could not clear offline cache.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法清除离线缓存。"
           }
         }
       }
@@ -2954,36 +1634,6 @@
         }
       }
     },
-    "Could not create task.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法创建任务。"
-          }
-        }
-      }
-    },
-    "Could not decode this image.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法解码此图片。"
-          }
-        }
-      }
-    },
-    "Could not delete task.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法删除任务。"
-          }
-        }
-      }
-    },
     "Could not find that server. Check the URL and Cloudflare DNS hostname.": {
       "localizations": {
         "zh-Hans": {
@@ -2994,62 +1644,12 @@
         }
       }
     },
-    "Could not load archived sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载已归档会话"
-          }
-        }
-      }
-    },
     "Could not load file: %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "无法加载文件：%@"
-          }
-        }
-      }
-    },
-    "Could not load profiles": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载配置文件"
-          }
-        }
-      }
-    },
-    "Could not load sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载会话"
-          }
-        }
-      }
-    },
-    "Could not preview this image.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法预览此图片。"
-          }
-        }
-      }
-    },
-    "Could not reach the server to start the update.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法连接服务器以开始更新。"
           }
         }
       }
@@ -3074,136 +1674,6 @@
         }
       }
     },
-    "Could not read the pasted file.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法读取粘贴的文件。"
-          }
-        }
-      }
-    },
-    "Could not read the pasted image.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法读取粘贴的图片。"
-          }
-        }
-      }
-    },
-    "Could not read the selected photo.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法读取所选的照片。"
-          }
-        }
-      }
-    },
-    "Could not save memory.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法保存记忆。"
-          }
-        }
-      }
-    },
-    "Could not save to the server. The toggle was reverted.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法保存到服务器。开关已恢复。"
-          }
-        }
-      }
-    },
-    "Could not send the interrupt message.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法发送中断消息。"
-          }
-        }
-      }
-    },
-    "Could not send the queued message.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法发送排队的消息。"
-          }
-        }
-      }
-    },
-    "Could not send the skill message.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法发送技能消息。"
-          }
-        }
-      }
-    },
-    "Could not send the steering message.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法发送引导消息。"
-          }
-        }
-      }
-    },
-    "Could not start a new chat.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法开始新的聊天。"
-          }
-        }
-      }
-    },
-    "Could not stop the current response yet, so the interrupt message was queued for the next turn.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "暂时无法停止当前回复，因此中断消息已排入下一轮。"
-          }
-        }
-      }
-    },
-    "Could not submit the goal command.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法提交目标命令。"
-          }
-        }
-      }
-    },
-    "Could not update task.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法更新任务。"
-          }
-        }
-      }
-    },
     "Create": {
       "localizations": {
         "zh-Hans": {
@@ -3214,52 +1684,12 @@
         }
       }
     },
-    "Creates a new empty project.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "创建一个新的空项目。"
-          }
-        }
-      }
-    },
-    "Cron Sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Cron 会话"
-          }
-        }
-      }
-    },
     "Current": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "当前"
-          }
-        }
-      }
-    },
-    "Current Custom": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "当前自定项"
-          }
-        }
-      }
-    },
-    "Current Workspace": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "当前工作区"
           }
         }
       }
@@ -3284,36 +1714,6 @@
         }
       }
     },
-    "Custom Model": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "自定模型"
-          }
-        }
-      }
-    },
-    "Custom model ID": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "自定模型 ID"
-          }
-        }
-      }
-    },
-    "Cyan": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "青色"
-          }
-        }
-      }
-    },
     "Dark": {
       "localizations": {
         "zh-Hans": {
@@ -3334,82 +1734,12 @@
         }
       }
     },
-    "Default Model": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "默认模型"
-          }
-        }
-      }
-    },
-    "Default Profile": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "默认配置文件"
-          }
-        }
-      }
-    },
-    "Default model unavailable": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "默认模型不可用"
-          }
-        }
-      }
-    },
     "Delete": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "删除"
-          }
-        }
-      }
-    },
-    "Delete Project": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "删除项目"
-          }
-        }
-      }
-    },
-    "Delete Project?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "删除项目？"
-          }
-        }
-      }
-    },
-    "Delete Session?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "删除会话？"
-          }
-        }
-      }
-    },
-    "Delete Task?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "删除任务？"
           }
         }
       }
@@ -3454,62 +1784,12 @@
         }
       }
     },
-    "Discard & Edit": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "放弃并编辑"
-          }
-        }
-      }
-    },
-    "Discard & Regenerate": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "放弃并重新生成"
-          }
-        }
-      }
-    },
-    "Discard Later Messages?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "放弃之后的消息？"
-          }
-        }
-      }
-    },
     "Disco": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "迪斯科"
-          }
-        }
-      }
-    },
-    "Dismiss attachment error": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "忽略附件错误"
-          }
-        }
-      }
-    },
-    "Display Name": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "显示名称"
           }
         }
       }
@@ -3594,26 +1874,6 @@
         }
       }
     },
-    "Edit Message": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "编辑消息"
-          }
-        }
-      }
-    },
-    "Edit Task": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "编辑任务"
-          }
-        }
-      }
-    },
     "Editing this message will discard %lld later messages.": {
       "localizations": {
         "en": {
@@ -3658,52 +1918,12 @@
         }
       }
     },
-    "Empty output": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "输出为空"
-          }
-        }
-      }
-    },
     "Enable code line wrapping": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "启用代码自动换行"
-          }
-        }
-      }
-    },
-    "Enter a project name.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请输入项目名称。"
-          }
-        }
-      }
-    },
-    "Enter a response before submitting.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "提交前请先输入回复。"
-          }
-        }
-      }
-    },
-    "Enter a session title.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请输入会话标题。"
           }
         }
       }
@@ -3728,16 +1948,6 @@
         }
       }
     },
-    "Enter the server password.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请输入服务器密码。"
-          }
-        }
-      }
-    },
     "Error": {
       "localizations": {
         "zh-Hans": {
@@ -3758,72 +1968,12 @@
         }
       }
     },
-    "Estimated Cost": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "预估费用"
-          }
-        }
-      }
-    },
-    "Exact model ID": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "确切的模型 ID"
-          }
-        }
-      }
-    },
     "Exit code: %lld": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "退出码：%lld"
-          }
-        }
-      }
-    },
-    "Expand Thinking by Default": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "默认展开思考"
-          }
-        }
-      }
-    },
-    "Expand Tools by Default": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "默认展开工具"
-          }
-        }
-      }
-    },
-    "Expand active profile picker": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "展开当前配置文件选择器"
-          }
-        }
-      }
-    },
-    "Expand projects": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "展开项目"
           }
         }
       }
@@ -3848,62 +1998,12 @@
         }
       }
     },
-    "Export Failed": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "导出失败"
-          }
-        }
-      }
-    },
-    "Export as HTML": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "导出为 HTML"
-          }
-        }
-      }
-    },
-    "Export as JSON": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "导出为 JSON"
-          }
-        }
-      }
-    },
-    "Export file": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "导出文件"
-          }
-        }
-      }
-    },
     "FILE": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "文件"
-          }
-        }
-      }
-    },
-    "Fades words in as a response streams. Turn off to show text instantly.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "在回复流式传输时让文字淡入。关闭后即时显示文本。"
           }
         }
       }
@@ -3924,16 +2024,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "已失败"
-          }
-        }
-      }
-    },
-    "Favorites": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "收藏"
           }
         }
       }
@@ -3964,42 +2054,12 @@
         }
       }
     },
-    "File path is missing.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "文件路径缺失。"
-          }
-        }
-      }
-    },
     "Files": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "文件"
-          }
-        }
-      }
-    },
-    "Filters sessions to this project.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "将会话筛选到此项目。"
-          }
-        }
-      }
-    },
-    "Focus session search": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "聚焦会话搜索"
           }
         }
       }
@@ -4020,36 +2080,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "文件夹"
-          }
-        }
-      }
-    },
-    "Fork From Here": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "从此处分叉"
-          }
-        }
-      }
-    },
-    "Fork the conversation": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "分叉对话"
-          }
-        }
-      }
-    },
-    "Full Title": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "完整标题"
           }
         }
       }
@@ -4084,36 +2114,6 @@
         }
       }
     },
-    "Goal controls": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "目标控件"
-          }
-        }
-      }
-    },
-    "Goal request failed.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "目标请求失败。"
-          }
-        }
-      }
-    },
-    "Gold": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "金色"
-          }
-        }
-      }
-    },
     "Green": {
       "localizations": {
         "zh-Hans": {
@@ -4124,55 +2124,12 @@
         }
       }
     },
-    "HERMES NEST": {
-      "shouldTranslate": false
-    },
-    "Haptic Feedback": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "触感反馈"
-          }
-        }
-      }
-    },
     "Header Logo Color": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "标题徽标颜色"
-          }
-        }
-      }
-    },
-    "Header name": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请求头名称"
-          }
-        }
-      }
-    },
-    "Header value": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请求头值"
-          }
-        }
-      }
-    },
-    "Hermes File": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Hermes 文件"
           }
         }
       }
@@ -4270,26 +2227,6 @@
         }
       }
     },
-    "Hide Attachment Paths": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "隐藏附件路径"
-          }
-        }
-      }
-    },
-    "Hides the appended file-path line in your sent messages. Attachments still appear as previews, and the server still receives the paths.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "在你发送的消息中隐藏追加的文件路径行。附件仍会以预览形式显示，服务器仍会收到这些路径。"
-          }
-        }
-      }
-    },
     "High": {
       "localizations": {
         "zh-Hans": {
@@ -4330,16 +2267,6 @@
         }
       }
     },
-    "Image saved to Photos.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "图片已保存到“照片”。"
-          }
-        }
-      }
-    },
     "Images are uploaded as secure file attachments. Hermes will try Vision analysis; native inline image input is not advertised by Runs.": {
       "localizations": {
         "zh-Hans": {
@@ -4376,16 +2303,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "输入"
-          }
-        }
-      }
-    },
-    "Input Tokens": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "输入令牌"
           }
         }
       }
@@ -4440,16 +2357,6 @@
         }
       }
     },
-    "Interrupted the current response and queued your message to send next.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "已中断当前回复，并将你的消息排队，下一轮发送。"
-          }
-        }
-      }
-    },
     "Keep Tailscale connected while using Hermes Nest.": {
       "localizations": {
         "zh-Hans": {
@@ -4480,26 +2387,6 @@
         }
       }
     },
-    "Last 30 Days": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "最近 30 天"
-          }
-        }
-      }
-    },
-    "Last 7 Days": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "最近 7 天"
-          }
-        }
-      }
-    },
     "Latest": {
       "localizations": {
         "zh-Hans": {
@@ -4516,16 +2403,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "显示最新状态"
-          }
-        }
-      }
-    },
-    "Lays out messages and the composer right-to-left for Arabic, Hebrew, Persian, and Urdu. Code, math, tables, and tool output stay left-to-right. Other screens are unaffected.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "为阿拉伯语、希伯来语、波斯语和乌尔都语将消息和输入框从右到左排列。代码、数学公式、表格和工具输出保持从左到右。其他界面不受影响。"
           }
         }
       }
@@ -4570,72 +2447,12 @@
         }
       }
     },
-    "Linked Files": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "关联文件"
-          }
-        }
-      }
-    },
-    "Listen": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "朗读"
-          }
-        }
-      }
-    },
-    "Listening...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在聆听…"
-          }
-        }
-      }
-    },
     "Live": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "实时"
-          }
-        }
-      }
-    },
-    "Live Activity Excerpts": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "实时活动摘录"
-          }
-        }
-      }
-    },
-    "Load older messages": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "加载更早的消息"
-          }
-        }
-      }
-    },
-    "Load older messages before regenerating this response.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新生成此回复前，请先加载更早的消息。"
           }
         }
       }
@@ -4650,72 +2467,12 @@
         }
       }
     },
-    "Loading analytics...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载分析数据…"
-          }
-        }
-      }
-    },
-    "Loading archived sessions...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载归档会话…"
-          }
-        }
-      }
-    },
-    "Loading attachment...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载附件…"
-          }
-        }
-      }
-    },
-    "Loading file...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载文件…"
-          }
-        }
-      }
-    },
     "Loading files...": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "正在加载文件…"
-          }
-        }
-      }
-    },
-    "Loading media...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载媒体…"
-          }
-        }
-      }
-    },
-    "Loading memory...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载记忆…"
           }
         }
       }
@@ -4730,92 +2487,12 @@
         }
       }
     },
-    "Loading models...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载模型…"
-          }
-        }
-      }
-    },
-    "Loading older messages": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载更早的消息"
-          }
-        }
-      }
-    },
-    "Loading output...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载输出…"
-          }
-        }
-      }
-    },
-    "Loading profiles...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载配置文件…"
-          }
-        }
-      }
-    },
-    "Loading projects...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载项目…"
-          }
-        }
-      }
-    },
     "Loading sessions": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "正在加载会话"
-          }
-        }
-      }
-    },
-    "Loading skill...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载技能…"
-          }
-        }
-      }
-    },
-    "Loading skills...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载技能…"
-          }
-        }
-      }
-    },
-    "Loading tasks...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在加载任务…"
           }
         }
       }
@@ -4840,16 +2517,6 @@
         }
       }
     },
-    "Makes this the active server. Sessions, chats, and settings reload for it.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "将其设为当前服务器。会话、聊天和设置将随之重新加载。"
-          }
-        }
-      }
-    },
     "Manage Servers": {
       "localizations": {
         "zh-Hans": {
@@ -4866,26 +2533,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "远程管理会话、任务和文件"
-          }
-        }
-      }
-    },
-    "Mark Done": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "标记为完成"
-          }
-        }
-      }
-    },
-    "Matches device appearance": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "跟随设备外观"
           }
         }
       }
@@ -4950,52 +2597,12 @@
         }
       }
     },
-    "Message Action Failed": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "消息操作失败"
-          }
-        }
-      }
-    },
-    "Message Count": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "消息数量"
-          }
-        }
-      }
-    },
-    "Message Hermes Nest": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "向 Hermes Nest 发消息"
-          }
-        }
-      }
-    },
     "Messages": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "消息"
-          }
-        }
-      }
-    },
-    "Microphone access is disabled. Enable it in Settings to use voice input.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "麦克风访问权限已禁用。请在“设置”中开启，以使用语音输入。"
           }
         }
       }
@@ -5010,32 +2617,12 @@
         }
       }
     },
-    "Missing job identifier.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "缺少任务标识符。"
-          }
-        }
-      }
-    },
     "Model": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "模型"
-          }
-        }
-      }
-    },
-    "Model switching is unavailable.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法切换模型。"
           }
         }
       }
@@ -5060,42 +2647,12 @@
         }
       }
     },
-    "Move to Project": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "移动到项目"
-          }
-        }
-      }
-    },
-    "My Notes": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "我的笔记"
-          }
-        }
-      }
-    },
     "Name": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "名称"
-          }
-        }
-      }
-    },
-    "Needs Attention": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "需要关注"
           }
         }
       }
@@ -5140,66 +2697,6 @@
         }
       }
     },
-    "Open Hermes Nest Settings": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "打开 Hermes Nest 设置"
-          }
-        }
-      }
-    },
-    "Run Hermes Nest actions like New Chat from Siri, Spotlight, the Lock Screen, or the iPhone Action button. Open Hermes Nest Settings to manage its Siri & Search options. To assign an action to the Action button, open the iOS Settings app, choose Action Button, then Shortcut, and pick a Hermes Nest action.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "通过 Siri、Spotlight、锁定屏幕或 iPhone 的操作按钮运行 Hermes Nest 操作（如新建聊天）。若要使用操作按钮，请打开 iOS 设置，选择「操作按钮」,然后选择「快捷指令」,再选择一项 Hermes Nest 操作。"
-          }
-        }
-      }
-    },
-    "Siri & Shortcuts": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Siri 与快捷指令"
-          }
-        }
-      }
-    },
-    "New Project": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "新建项目"
-          }
-        }
-      }
-    },
-    "New Session": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "新建会话"
-          }
-        }
-      }
-    },
-    "New Task": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "新建任务"
-          }
-        }
-      }
-    },
     "Next": {
       "localizations": {
         "zh-Hans": {
@@ -5216,86 +2713,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "否"
-          }
-        }
-      }
-    },
-    "No Content": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无内容"
-          }
-        }
-      }
-    },
-    "No Data": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无数据"
-          }
-        }
-      }
-    },
-    "No Files": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无文件"
-          }
-        }
-      }
-    },
-    "No Matches": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无匹配项"
-          }
-        }
-      }
-    },
-    "No Matching Models": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无匹配的模型"
-          }
-        }
-      }
-    },
-    "No Matching Profiles": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无匹配的配置文件"
-          }
-        }
-      }
-    },
-    "No Preview": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无预览"
-          }
-        }
-      }
-    },
-    "No Recent Output": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无最近输出"
           }
         }
       }
@@ -5320,56 +2737,6 @@
         }
       }
     },
-    "No Tasks": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无任务"
-          }
-        }
-      }
-    },
-    "No Workspaces": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无工作区"
-          }
-        }
-      }
-    },
-    "No answer produced.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "未生成答案。"
-          }
-        }
-      }
-    },
-    "No archived sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无归档会话"
-          }
-        }
-      }
-    },
-    "No catalog models": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无目录模型"
-          }
-        }
-      }
-    },
     "No commands or skills match \"%@\"": {
       "localizations": {
         "zh-Hans": {
@@ -5390,112 +2757,12 @@
         }
       }
     },
-    "No matching sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无匹配的会话"
-          }
-        }
-      }
-    },
-    "No microphone input is available. Check the Simulator or device microphone settings.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "没有可用的麦克风输入。请检查模拟器或设备的麦克风设置。"
-          }
-        }
-      }
-    },
-    "No notes yet.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "暂无笔记。"
-          }
-        }
-      }
-    },
-    "No personalities are configured on the server.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器上未配置任何个性。"
-          }
-        }
-      }
-    },
-    "No profile yet.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "暂无配置文件。"
-          }
-        }
-      }
-    },
-    "No profiles": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无配置文件"
-          }
-        }
-      }
-    },
-    "No profiles available": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无可用的配置文件"
-          }
-        }
-      }
-    },
-    "No project": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无项目"
-          }
-        }
-      }
-    },
-    "No projects": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无项目"
-          }
-        }
-      }
-    },
     "No sessions yet": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "暂无会话"
-          }
-        }
-      }
-    },
-    "No skills are configured on the server.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器上未配置任何技能。"
           }
         }
       }
@@ -5520,26 +2787,6 @@
         }
       }
     },
-    "No soul defined yet.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "尚未定义灵魂。"
-          }
-        }
-      }
-    },
-    "No token usage available": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无可用的令牌用量"
-          }
-        }
-      }
-    },
     "No tools": {
       "localizations": {
         "zh-Hans": {
@@ -5556,36 +2803,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "无"
-          }
-        }
-      }
-    },
-    "Not available": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "不可用"
-          }
-        }
-      }
-    },
-    "Not set": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "未设置"
-          }
-        }
-      }
-    },
-    "Notifications unavailable.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "通知不可用。"
           }
         }
       }
@@ -5650,26 +2867,6 @@
         }
       }
     },
-    "Only assistant messages can be regenerated.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "仅可重新生成助手消息。"
-          }
-        }
-      }
-    },
-    "Only user messages can be edited.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "仅可编辑用户消息。"
-          }
-        }
-      }
-    },
     "Open %@": {
       "localizations": {
         "zh-Hans": {
@@ -5700,32 +2897,12 @@
         }
       }
     },
-    "Opens Settings. Long press to switch servers.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "打开“设置”。长按可切换服务器。"
-          }
-        }
-      }
-    },
     "Opens in the external browser": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "在外部浏览器中打开"
-          }
-        }
-      }
-    },
-    "Opens server details to switch, edit, or remove.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "打开服务器详情，以切换、编辑或移除。"
           }
         }
       }
@@ -5740,62 +2917,12 @@
         }
       }
     },
-    "Opens the custom request headers editor.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "打开自定义请求标头编辑器。"
-          }
-        }
-      }
-    },
-    "Opens the default model picker.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "打开默认模型选择器。"
-          }
-        }
-      }
-    },
-    "Opens the default profile picker.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "打开默认配置文件选择器。"
-          }
-        }
-      }
-    },
-    "Orange": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "橙色"
-          }
-        }
-      }
-    },
     "Output": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "输出"
-          }
-        }
-      }
-    },
-    "Output Tokens": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "输出令牌"
           }
         }
       }
@@ -5816,52 +2943,12 @@
         }
       }
     },
-    "Password": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "密码"
-          }
-        }
-      }
-    },
     "Password protected": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "受密码保护"
-          }
-        }
-      }
-    },
-    "Paste a copied file to attach it.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "粘贴已拷贝的文件以添加为附件。"
-          }
-        }
-      }
-    },
-    "Paste a copied image to attach it.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "粘贴已拷贝的图像以添加为附件。"
-          }
-        }
-      }
-    },
-    "Pattern keys": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "模式键"
           }
         }
       }
@@ -5886,52 +2973,12 @@
         }
       }
     },
-    "Peak Day": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "高峰日"
-          }
-        }
-      }
-    },
-    "Peak Hour": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "高峰时段"
-          }
-        }
-      }
-    },
     "Pending approvals: %lld": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "待批准：%lld"
-          }
-        }
-      }
-    },
-    "Permission not requested.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "尚未请求权限。"
-          }
-        }
-      }
-    },
-    "Personality cleared.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "已清除个性。"
           }
         }
       }
@@ -6006,66 +3053,6 @@
         }
       }
     },
-    "Preserved task list": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "已保留任务列表"
-          }
-        }
-      }
-    },
-    "Preview is not available for this attachment.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此附件没有可用的预览。"
-          }
-        }
-      }
-    },
-    "Preview is not available for this file type.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此文件类型没有可用的预览。"
-          }
-        }
-      }
-    },
-    "Preview is not available for this media type.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此媒体类型没有可用的预览。"
-          }
-        }
-      }
-    },
-    "Preview is not available for this media.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此媒体没有可用的预览。"
-          }
-        }
-      }
-    },
-    "Privacy Policy": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "隐私政策"
-          }
-        }
-      }
-    },
     "Processing result": {
       "localizations": {
         "zh-Hans": {
@@ -6096,42 +3083,12 @@
         }
       }
     },
-    "A workspace-local file is overriding the global project context.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "工作区本地文件正在覆盖全局项目上下文。"
-          }
-        }
-      }
-    },
-    "Project Context": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "项目上下文"
-          }
-        }
-      }
-    },
     "Project actions for %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "%@ 的项目操作"
-          }
-        }
-      }
-    },
-    "Project name": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "项目名称"
           }
         }
       }
@@ -6156,16 +3113,6 @@
         }
       }
     },
-    "Prompt is required.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "提示词为必填项。"
-          }
-        }
-      }
-    },
     "Provider": {
       "localizations": {
         "zh-Hans": {
@@ -6176,32 +3123,12 @@
         }
       }
     },
-    "Provider ID": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "提供商 ID"
-          }
-        }
-      }
-    },
     "Purple": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "紫色"
-          }
-        }
-      }
-    },
-    "Queue a message for the next turn": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "为下一轮排队一条消息"
           }
         }
       }
@@ -6256,16 +3183,6 @@
         }
       }
     },
-    "Reasoning changes are unavailable.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法更改推理。"
-          }
-        }
-      }
-    },
     "Recent": {
       "localizations": {
         "zh-Hans": {
@@ -6276,222 +3193,12 @@
         }
       }
     },
-    "Recent Daily Tokens": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "近期每日令牌"
-          }
-        }
-      }
-    },
-    "Recent Output": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "最近输出"
-          }
-        }
-      }
-    },
-    "Reconnect to send messages.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接以发送消息。"
-          }
-        }
-      }
-    },
     "Reconnect to the server to %@.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "重新连接服务器以%@。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to ask a side question.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以提出附加问题。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to change models.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以更改模型。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to change profiles.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以更改配置文件。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to change reasoning.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以更改推理。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to change workspace.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以更改工作区。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to compress context.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以压缩上下文。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to edit a message.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以编辑消息。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to export a session.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以导出会话。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to fork a conversation.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以分叉对话。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to manage goals.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以管理目标。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to regenerate a response.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以重新生成回复。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to rename a session.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以重命名会话。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to retry messages.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以重试消息。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to send a message.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以发送消息。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to start a background task.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以启动后台任务。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to start a new session.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以开始新会话。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to undo messages.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以撤销消息。"
-          }
-        }
-      }
-    },
-    "Reconnect to the server to upload attachments.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新连接服务器以上传附件。"
           }
         }
       }
@@ -6516,16 +3223,6 @@
         }
       }
     },
-    "Reference only": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "仅供参考"
-          }
-        }
-      }
-    },
     "Reference only · %@": {
       "localizations": {
         "zh-Hans": {
@@ -6542,26 +3239,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "刷新"
-          }
-        }
-      }
-    },
-    "Refresh Projects": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "刷新项目"
-          }
-        }
-      }
-    },
-    "Regenerate Response": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新生成回复"
           }
         }
       }
@@ -6610,62 +3287,12 @@
         }
       }
     },
-    "Remove Server": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "移除服务器"
-          }
-        }
-      }
-    },
     "Remove attachment %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "移除附件 %@"
-          }
-        }
-      }
-    },
-    "Remove custom model from favorites": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "从收藏中移除自定义模型"
-          }
-        }
-      }
-    },
-    "Remove header": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "移除标头"
-          }
-        }
-      }
-    },
-    "Remove this server?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "移除此服务器？"
-          }
-        }
-      }
-    },
-    "Removes this server and its saved settings on this device. Your active server is unaffected.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "在此设备上移除此服务器及其已存储的设置。当前服务器不受影响。"
           }
         }
       }
@@ -6680,16 +3307,6 @@
         }
       }
     },
-    "Rename Project": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重命名项目"
-          }
-        }
-      }
-    },
     "Rename Session": {
       "localizations": {
         "zh-Hans": {
@@ -6700,32 +3317,12 @@
         }
       }
     },
-    "Rename the current session": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重命名当前会话"
-          }
-        }
-      }
-    },
     "Reply": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "回复"
-          }
-        }
-      }
-    },
-    "Requesting voice permissions...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在请求语音权限…"
           }
         }
       }
@@ -6746,26 +3343,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "正在回复"
-          }
-        }
-      }
-    },
-    "Response Complete Alerts": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "回复完成提醒"
-          }
-        }
-      }
-    },
-    "Response Timestamps": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "回复时间戳"
           }
         }
       }
@@ -6830,46 +3407,6 @@
         }
       }
     },
-    "Retry is available for WebUI sessions only.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "仅 WebUI 会话支持重试。"
-          }
-        }
-      }
-    },
-    "Retry loading sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重试加载会话"
-          }
-        }
-      }
-    },
-    "Retry the last turn": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重试上一轮"
-          }
-        }
-      }
-    },
-    "Retry update": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重试更新"
-          }
-        }
-      }
-    },
     "Review approvals and clarifications inline": {
       "localizations": {
         "zh-Hans": {
@@ -6900,26 +3437,6 @@
         }
       }
     },
-    "Run Now": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "立即运行"
-          }
-        }
-      }
-    },
-    "Run a parallel task": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "运行并行任务"
-          }
-        }
-      }
-    },
     "Running": {
       "localizations": {
         "zh-Hans": {
@@ -6936,16 +3453,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "正在运行命令"
-          }
-        }
-      }
-    },
-    "Running now": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在运行"
           }
         }
       }
@@ -6970,52 +3477,12 @@
         }
       }
     },
-    "Save Custom Model": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "存储自定义模型"
-          }
-        }
-      }
-    },
-    "Save image to Photos": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "将图像存储到“照片”"
-          }
-        }
-      }
-    },
     "Saved": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "已存储"
-          }
-        }
-      }
-    },
-    "Saved Custom": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "已存储的自定义项"
-          }
-        }
-      }
-    },
-    "Saved Workspaces": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "已存储的工作区"
           }
         }
       }
@@ -7030,72 +3497,12 @@
         }
       }
     },
-    "Schedule is required.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "计划为必填项。"
-          }
-        }
-      }
-    },
-    "Scheduled Jobs": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "计划任务"
-          }
-        }
-      }
-    },
-    "Scheduled jobs from the Hermes server will appear here.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "来自 Hermes 服务器的计划任务将显示在此处。"
-          }
-        }
-      }
-    },
-    "Scroll to latest message": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "滚动到最新消息"
-          }
-        }
-      }
-    },
     "Search": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "搜索"
-          }
-        }
-      }
-    },
-    "Search available skills": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "搜索可用技能"
-          }
-        }
-      }
-    },
-    "Search files": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "搜索文件"
           }
         }
       }
@@ -7110,52 +3517,12 @@
         }
       }
     },
-    "Search profiles": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "搜索配置文件"
-          }
-        }
-      }
-    },
-    "Search sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "搜索会话"
-          }
-        }
-      }
-    },
-    "Search skills...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "搜索技能…"
-          }
-        }
-      }
-    },
     "Searching files": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "正在搜索文件"
-          }
-        }
-      }
-    },
-    "Searching sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在搜索会话"
           }
         }
       }
@@ -7170,52 +3537,12 @@
         }
       }
     },
-    "Select a file to attach it.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "选择一个文件以添加为附件。"
-          }
-        }
-      }
-    },
-    "Select model": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "选择模型"
-          }
-        }
-      }
-    },
-    "Select reasoning effort": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "选择推理强度"
-          }
-        }
-      }
-    },
     "Selected": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "已选择"
-          }
-        }
-      }
-    },
-    "Selected file": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "已选择的文件"
           }
         }
       }
@@ -7250,32 +3577,12 @@
         }
       }
     },
-    "Send While Responding": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "回复时发送"
-          }
-        }
-      }
-    },
     "Send `/%@ <message>` to use this skill.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "发送 `/%@ <message>` 以使用此技能。"
-          }
-        }
-      }
-    },
-    "Send a message to start the conversation.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "发送消息以开始对话。"
           }
         }
       }
@@ -7300,16 +3607,6 @@
         }
       }
     },
-    "Sent with every request to your server, including media and live streams. Use for a reverse proxy (e.g. Authentik) or token auth, such as an Authorization header.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "随发往服务器的每个请求一起发送，包括媒体和实时流。可用于反向代理（如 Authentik）或令牌验证，例如 Authorization 标头。"
-          }
-        }
-      }
-    },
     "Server": {
       "localizations": {
         "zh-Hans": {
@@ -7320,42 +3617,12 @@
         }
       }
     },
-    "Server Avatar": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器头像"
-          }
-        }
-      }
-    },
-    "Server Default": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器默认值"
-          }
-        }
-      }
-    },
     "Server URL": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "服务器 URL"
-          }
-        }
-      }
-    },
-    "Server password": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器密码"
           }
         }
       }
@@ -7396,26 +3663,6 @@
         }
       }
     },
-    "Session Action Failed": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "会话操作失败"
-          }
-        }
-      }
-    },
-    "Session ID is missing.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "缺少会话 ID。"
-          }
-        }
-      }
-    },
     "Session status:\n\n- Session ID: %@\n- Title: %@\n- Model: %@\n- Provider: %@\n- Profile: %@\n- Workspace: %@\n- Agent running: %@\n- Queued messages: %lld\n- Background tasks: %lld\n- Messages loaded: %lld\n- Tokens: %@": {
       "localizations": {
         "en": {
@@ -7432,52 +3679,12 @@
         }
       }
     },
-    "Session title": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "会话标题"
-          }
-        }
-      }
-    },
-    "Session usage data will appear here once you have conversations.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "进行对话后，会话用量数据将显示在此处。"
-          }
-        }
-      }
-    },
     "Sessions": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "会话"
-          }
-        }
-      }
-    },
-    "Sessions Avatar": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "会话头像"
-          }
-        }
-      }
-    },
-    "Sessions in this project will be moved to No project. The sessions themselves will not be deleted.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此项目中的会话将移至“无项目”。会话本身不会被删除。"
           }
         }
       }
@@ -7492,52 +3699,12 @@
         }
       }
     },
-    "Set Goal": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "设置目标"
-          }
-        }
-      }
-    },
     "Set Up": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "设置"
-          }
-        }
-      }
-    },
-    "Set or inspect a persistent goal": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "设置或查看持久目标"
-          }
-        }
-      }
-    },
-    "Set reasoning effort level": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "设置推理强度级别"
-          }
-        }
-      }
-    },
-    "Set the session personality": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "设置会话个性"
           }
         }
       }
@@ -7562,142 +3729,12 @@
         }
       }
     },
-    "Show all projects": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "显示所有项目"
-          }
-        }
-      }
-    },
-    "Show available slash commands": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "显示可用斜杠命令"
-          }
-        }
-      }
-    },
-    "Show session status": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "显示会话状态"
-          }
-        }
-      }
-    },
-    "Shows rename and delete actions for this project.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "显示此项目的重命名和删除操作。"
-          }
-        }
-      }
-    },
-    "Shows short response text on the Lock Screen and Dynamic Island.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "在锁定屏幕和灵动岛上显示简短的响应文本。"
-          }
-        }
-      }
-    },
-    "Shows the session search field.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "显示会话搜索栏。"
-          }
-        }
-      }
-    },
-    "Sign Out": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "退出登录"
-          }
-        }
-      }
-    },
-    "Sign Out of This Server": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "退出此服务器"
-          }
-        }
-      }
-    },
     "Sign in with the same account you used on your server.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "使用你在服务器上所用的同一账户登录。"
-          }
-        }
-      }
-    },
-    "Sign out of this server?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "退出此服务器？"
-          }
-        }
-      }
-    },
-    "Signs out and returns to onboarding.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "退出登录并返回引导流程。"
-          }
-        }
-      }
-    },
-    "Signs out and switches to another configured server.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "退出登录并切换到另一台已配置的服务器。"
-          }
-        }
-      }
-    },
-    "Signs out of the active server and returns to onboarding.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "退出当前服务器并返回引导流程。"
-          }
-        }
-      }
-    },
-    "Signs out of the active server and switches to another configured server.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "退出当前服务器并切换到另一台已配置的服务器。"
           }
         }
       }
@@ -7722,32 +3759,12 @@
         }
       }
     },
-    "Skills from the Hermes server will appear here.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "来自 Hermes 服务器的技能将显示在此处。"
-          }
-        }
-      }
-    },
     "Skills matching `%@`:": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "匹配 `%@` 的技能："
-          }
-        }
-      }
-    },
-    "Skip all this session": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "本次会话全部跳过"
           }
         }
       }
@@ -7762,42 +3779,12 @@
         }
       }
     },
-    "Sky": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "天蓝色"
-          }
-        }
-      }
-    },
-    "Source: local session metadata fallback.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "来源：本地会话元数据回退。"
-          }
-        }
-      }
-    },
     "Source: local session metadata fallback. Server insights failed: %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "来源：本地会话元数据回退。服务器分析失败：%@"
-          }
-        }
-      }
-    },
-    "Source: local session metadata.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "来源：本地会话元数据。"
           }
         }
       }
@@ -7812,16 +3799,6 @@
         }
       }
     },
-    "Speech recognition is disabled. Enable it in Settings to use voice input.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "语音识别已禁用。请在“设置”中启用以使用语音输入。"
-          }
-        }
-      }
-    },
     "Speech recognition is not available for the current locale.": {
       "localizations": {
         "zh-Hans": {
@@ -7832,72 +3809,12 @@
         }
       }
     },
-    "Speech recognition is not available right now.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "语音识别当前不可用。"
-          }
-        }
-      }
-    },
-    "Speech recognition is restricted on this device.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此设备上的语音识别受限。"
-          }
-        }
-      }
-    },
-    "Speech recognition permission was not granted.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "未授予语音识别权限。"
-          }
-        }
-      }
-    },
     "Start": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "开始"
-          }
-        }
-      }
-    },
-    "Start New Session": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "开始新会话"
-          }
-        }
-      }
-    },
-    "Start New Session?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "开始新会话？"
-          }
-        }
-      }
-    },
-    "Start a new session": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "开始新会话"
           }
         }
       }
@@ -7918,16 +3835,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "正在开始响应"
-          }
-        }
-      }
-    },
-    "Starting update…": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在开始更新…"
           }
         }
       }
@@ -7962,62 +3869,12 @@
         }
       }
     },
-    "Steer the active response": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "引导当前响应"
-          }
-        }
-      }
-    },
-    "Steer was unavailable, so the message was queued and the current response was stopped.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "引导功能不可用，因此消息已排队，当前响应已停止。"
-          }
-        }
-      }
-    },
-    "Steering hint delivered.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "引导提示已送达。"
-          }
-        }
-      }
-    },
-    "Steering hint was not consumed before the response ended, so it was queued for the next turn.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "引导提示在响应结束前未被采用，因此已排队至下一轮。"
-          }
-        }
-      }
-    },
     "Stop": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "停止"
-          }
-        }
-      }
-    },
-    "Stop Listening": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "停止朗读"
           }
         }
       }
@@ -8042,62 +3899,12 @@
         }
       }
     },
-    "Stop the current response": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "停止当前响应"
-          }
-        }
-      }
-    },
-    "Stop the response and send a new message": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "停止响应并发送新消息"
-          }
-        }
-      }
-    },
-    "Stop voice input": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "停止语音输入"
-          }
-        }
-      }
-    },
     "Stopping response": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "正在停止响应"
-          }
-        }
-      }
-    },
-    "Stopping response...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在停止响应…"
-          }
-        }
-      }
-    },
-    "Stored on this device only.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "仅存储于此设备。"
           }
         }
       }
@@ -8112,32 +3919,12 @@
         }
       }
     },
-    "Streamed Text Animation": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "流式文本动画"
-          }
-        }
-      }
-    },
     "Streaming": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "流式传输"
-          }
-        }
-      }
-    },
-    "Submit clarification": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "提交澄清"
           }
         }
       }
@@ -8152,42 +3939,12 @@
         }
       }
     },
-    "Suggestions are limited to trusted workspace roots from the server.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "建议仅限于服务器提供的受信任工作区根目录。"
-          }
-        }
-      }
-    },
     "Support": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "支持"
-          }
-        }
-      }
-    },
-    "Switch the active model": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "切换当前模型"
-          }
-        }
-      }
-    },
-    "Switch the active workspace": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "切换当前工作区"
           }
         }
       }
@@ -8212,26 +3969,6 @@
         }
       }
     },
-    "Switch to This Server": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "切换到此服务器"
-          }
-        }
-      }
-    },
-    "Switching profiles starts a separate session so this transcript is not retagged.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "切换配置文件会开始一个单独的会话，因此此对话记录不会被重新标记。"
-          }
-        }
-      }
-    },
     "System": {
       "localizations": {
         "zh-Hans": {
@@ -8252,16 +3989,6 @@
         }
       }
     },
-    "Tap Chat to start.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "轻点“聊天”开始。"
-          }
-        }
-      }
-    },
     "Task": {
       "localizations": {
         "zh-Hans": {
@@ -8272,32 +3999,12 @@
         }
       }
     },
-    "Task Actions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "任务操作"
-          }
-        }
-      }
-    },
     "Tasks": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "任务"
-          }
-        }
-      }
-    },
-    "Terminal is not available in the mobile app.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "终端在移动应用中不可用。"
           }
         }
       }
@@ -8352,16 +4059,6 @@
         }
       }
     },
-    "The edited message cannot be empty.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "编辑后的消息不能为空。"
-          }
-        }
-      }
-    },
     "The password was rejected. Check the server password and try again.": {
       "localizations": {
         "zh-Hans": {
@@ -8382,66 +4079,6 @@
         }
       }
     },
-    "The server could not stop the current response.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器无法停止当前响应。"
-          }
-        }
-      }
-    },
-    "The server did not confirm the change.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未确认此更改。"
-          }
-        }
-      }
-    },
-    "The server did not provide a profile name.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未提供配置文件名称。"
-          }
-        }
-      }
-    },
-    "The server did not provide a project ID.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未提供项目 ID。"
-          }
-        }
-      }
-    },
-    "The server could not unarchive this session.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器无法取消归档此会话。"
-          }
-        }
-      }
-    },
-    "The server did not provide a session ID.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未提供会话 ID。"
-          }
-        }
-      }
-    },
     "The server did not respond in time. Check that the Mac is awake, hermes-webui is running, and the tunnel is connected.": {
       "localizations": {
         "zh-Hans": {
@@ -8452,242 +4089,12 @@
         }
       }
     },
-    "The server did not return a /btw stream.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回 /btw 流。"
-          }
-        }
-      }
-    },
-    "The server did not return a background task.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回后台任务。"
-          }
-        }
-      }
-    },
-    "The server did not return a message to retry.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回可重试的消息。"
-          }
-        }
-      }
-    },
-    "The server did not return a stream ID after editing.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器在编辑后未返回流 ID。"
-          }
-        }
-      }
-    },
-    "The server did not return a stream ID after regenerating.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器在重新生成后未返回流 ID。"
-          }
-        }
-      }
-    },
-    "The server did not return a stream ID after retrying.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器在重试后未返回流 ID。"
-          }
-        }
-      }
-    },
-    "The server did not return a stream ID.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回流 ID。"
-          }
-        }
-      }
-    },
-    "The server did not return the compressed session.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回压缩后的会话。"
-          }
-        }
-      }
-    },
-    "The server did not return the duplicated session ID.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回复制的会话 ID。"
-          }
-        }
-      }
-    },
-    "The server did not return the duplicated session.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回复制的会话。"
-          }
-        }
-      }
-    },
-    "The server did not return the forked session ID.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回分叉的会话 ID。"
-          }
-        }
-      }
-    },
-    "The server did not return the forked session.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回分叉的会话。"
-          }
-        }
-      }
-    },
-    "The server did not return the linked session.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回关联的会话。"
-          }
-        }
-      }
-    },
-    "The server did not return the new profile session.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回新的配置文件会话。"
-          }
-        }
-      }
-    },
-    "The server did not return the new project ID.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回新的项目 ID。"
-          }
-        }
-      }
-    },
-    "The server did not return the new project.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回新的项目。"
-          }
-        }
-      }
-    },
-    "The server did not return the new session ID.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回新的会话 ID。"
-          }
-        }
-      }
-    },
-    "The server did not return the new session.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回新的会话。"
-          }
-        }
-      }
-    },
-    "The server did not return the renamed project ID.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回重命名后的项目 ID。"
-          }
-        }
-      }
-    },
-    "The server did not return the renamed project.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回重命名后的项目。"
-          }
-        }
-      }
-    },
-    "The server did not return the uploaded file path.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器未返回上传文件的路径。"
-          }
-        }
-      }
-    },
-    "The server didn't come back after the update. Check the server, then retry.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器在更新后未恢复。请检查服务器，然后重试。"
-          }
-        }
-      }
-    },
     "The server endpoint was not found. Check that the URL points to a Hermes Web UI server.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "未找到服务器端点。请检查 URL 是否指向 Hermes Web UI 服务器。"
-          }
-        }
-      }
-    },
-    "The server is busy with active work. Wait for it to finish, then retry.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "服务器正忙于处理任务。请等待其完成后重试。"
           }
         }
       }
@@ -8772,72 +4179,12 @@
         }
       }
     },
-    "The stream returned a malformed error event.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "流返回了格式错误的错误事件。"
-          }
-        }
-      }
-    },
-    "The stream returned an error.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "流返回了错误。"
-          }
-        }
-      }
-    },
-    "The update could not be applied.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法应用此更新。"
-          }
-        }
-      }
-    },
-    "The update is taking longer than expected to finish. Try again in a moment.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "更新完成所需时间比预期更长。请稍后重试。"
-          }
-        }
-      }
-    },
     "Theme": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "主题"
-          }
-        }
-      }
-    },
-    "Theme switching is not available from mobile slash commands.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法通过移动端斜杠命令切换主题。"
-          }
-        }
-      }
-    },
-    "There is no assistant text to listen to.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "没有可朗读的助手文本。"
           }
         }
       }
@@ -8862,52 +4209,12 @@
         }
       }
     },
-    "Thinking and Tool Cards": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "思考与工具卡片"
-          }
-        }
-      }
-    },
-    "Thinking and Tool cards start expanded instead of collapsed. Tapping a card still toggles it.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "思考卡片和工具卡片默认展开而非折叠。轻点卡片仍可切换。"
-          }
-        }
-      }
-    },
     "Thinking, %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "思考中，%@"
-          }
-        }
-      }
-    },
-    "This attachment does not have a server file path.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此附件没有服务器文件路径。"
-          }
-        }
-      }
-    },
-    "This command is not available in the mobile app.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此命令在移动应用中不可用。"
           }
         }
       }
@@ -8922,132 +4229,12 @@
         }
       }
     },
-    "This file appears to be empty.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此文件似乎为空。"
-          }
-        }
-      }
-    },
     "This file is not an image that can be saved to Photos.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "此文件不是可保存到“照片”的图片。"
-          }
-        }
-      }
-    },
-    "This pulls the latest Hermes server version and restarts it. Active chats may be interrupted briefly; the app reconnects when the server is back.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "这会拉取最新的 Hermes 服务器版本并将其重启。进行中的聊天可能会短暂中断；服务器恢复后应用会重新连接。"
-          }
-        }
-      }
-    },
-    "This removes the scheduled task from the Hermes server.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "这会从 Hermes 服务器移除该计划任务。"
-          }
-        }
-      }
-    },
-    "This removes the server and its saved settings on this device. Your active server is unaffected.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "这会移除此设备上的该服务器及其已保存的设置。你的当前服务器不受影响。"
-          }
-        }
-      }
-    },
-    "This removes the session from the Hermes server. Use this only on a session you no longer need.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "这会从 Hermes 服务器移除该会话。请仅对你不再需要的会话执行此操作。"
-          }
-        }
-      }
-    },
-    "This server is already configured.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此服务器已配置。"
-          }
-        }
-      }
-    },
-    "This server requires a password.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此服务器需要密码。"
-          }
-        }
-      }
-    },
-    "This server signs in with passkeys, which Hermes Nest doesn't support yet.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此服务器使用通行密钥登录，Hermes Nest 暂不支持。"
-          }
-        }
-      }
-    },
-    "This server's cached sessions and messages will be deleted. Other servers and online server data are not affected.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此服务器的缓存会话和消息将被删除。其他服务器及在线服务器数据不受影响。"
-          }
-        }
-      }
-    },
-    "This server's offline cache was cleared.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此服务器的离线缓存已清除。"
-          }
-        }
-      }
-    },
-    "This skill has no content.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此技能没有内容。"
-          }
-        }
-      }
-    },
-    "This task has not produced any output yet.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此任务尚未产生任何输出。"
           }
         }
       }
@@ -9062,32 +4249,12 @@
         }
       }
     },
-    "Timeframe": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "时间范围"
-          }
-        }
-      }
-    },
     "Timeout %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "超时 %@"
-          }
-        }
-      }
-    },
-    "Tint New Chat & Send": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "为“新聊天”和“发送”着色"
           }
         }
       }
@@ -9102,62 +4269,12 @@
         }
       }
     },
-    "Toast Notifications": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "提示通知"
-          }
-        }
-      }
-    },
-    "Toasts": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "提示"
-          }
-        }
-      }
-    },
-    "Today": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "今天"
-          }
-        }
-      }
-    },
     "Tool": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "工具"
-          }
-        }
-      }
-    },
-    "Top Sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "热门会话"
-          }
-        }
-      }
-    },
-    "Total Tokens": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "令牌总数"
           }
         }
       }
@@ -9172,92 +4289,12 @@
         }
       }
     },
-    "Try a different file name or path.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请尝试其他文件名或路径。"
-          }
-        }
-      }
-    },
-    "Try a different model name or ID.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请尝试其他模型名称或 ID。"
-          }
-        }
-      }
-    },
-    "Try a different profile name.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请尝试其他配置文件名称。"
-          }
-        }
-      }
-    },
-    "Try another search or project filter.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请尝试其他搜索或项目筛选条件。"
-          }
-        }
-      }
-    },
-    "Try typing a path under your home folder or an existing workspace root.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请尝试输入主目录下或现有工作区根目录下的路径。"
-          }
-        }
-      }
-    },
-    "Type a model ID exactly as the server expects it.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请完全按照服务器要求的格式输入模型 ID。"
-          }
-        }
-      }
-    },
-    "Type a response": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "输入回复"
-          }
-        }
-      }
-    },
     "URL": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "URL"
-          }
-        }
-      }
-    },
-    "Unarchive": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "取消归档"
           }
         }
       }
@@ -9272,62 +4309,12 @@
         }
       }
     },
-    "Uncategorized": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "未分类"
-          }
-        }
-      }
-    },
-    "Undo is available for WebUI sessions only.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "撤销仅适用于 WebUI 会话。"
-          }
-        }
-      }
-    },
-    "Undo the last exchange": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "撤销上一轮对话"
-          }
-        }
-      }
-    },
     "Unknown": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "未知"
-          }
-        }
-      }
-    },
-    "Unknown Date": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "未知日期"
-          }
-        }
-      }
-    },
-    "Unknown Model": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "未知模型"
           }
         }
       }
@@ -9342,42 +4329,12 @@
         }
       }
     },
-    "Unnamed Skill": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "未命名技能"
-          }
-        }
-      }
-    },
-    "Unpin": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "取消固定"
-          }
-        }
-      }
-    },
     "Untitled": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "无标题"
-          }
-        }
-      }
-    },
-    "Untitled Project": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无标题项目"
           }
         }
       }
@@ -9392,32 +4349,12 @@
         }
       }
     },
-    "Untitled Task": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无标题任务"
-          }
-        }
-      }
-    },
     "Up": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "向上"
-          }
-        }
-      }
-    },
-    "Up to date": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "已是最新"
           }
         }
       }
@@ -9438,186 +4375,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "有可用更新 · 落后 %lld 个版本"
-          }
-        }
-      }
-    },
-    "Update server?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "更新服务器？"
-          }
-        }
-      }
-    },
-    "Updates the Sessions header logo color.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "更新会话标题徽标颜色。"
-          }
-        }
-      }
-    },
-    "Updating & restarting…": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在更新并重启…"
-          }
-        }
-      }
-    },
-    "Updating app icon": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在更新应用图标"
-          }
-        }
-      }
-    },
-    "Updating composer settings...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在更新编辑器设置…"
-          }
-        }
-      }
-    },
-    "Updating task...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在更新任务…"
-          }
-        }
-      }
-    },
-    "Uploading attachment...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在上传附件…"
-          }
-        }
-      }
-    },
-    "Usage Analytics": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "用量分析"
-          }
-        }
-      }
-    },
-    "Usage: /background <prompt>": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "用法：/background <prompt>"
-          }
-        }
-      }
-    },
-    "Usage: /btw <question>": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "用法：/btw <question>"
-          }
-        }
-      }
-    },
-    "Usage: /interrupt <message>": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "用法：/interrupt <message>"
-          }
-        }
-      }
-    },
-    "Usage: /model <id>": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "用法：/model <id>"
-          }
-        }
-      }
-    },
-    "Usage: /queue <message>": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "用法：/queue <message>"
-          }
-        }
-      }
-    },
-    "Usage: /reasoning show|hide|none|minimal|low|medium|high|xhigh": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "用法：/reasoning show|hide|none|minimal|low|medium|high|xhigh"
-          }
-        }
-      }
-    },
-    "Usage: /steer <message>": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "用法：/steer <message>"
-          }
-        }
-      }
-    },
-    "Usage: /workspace <path>": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "用法：/workspace <path>"
-          }
-        }
-      }
-    },
-    "Use Custom": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "使用自定义"
-          }
-        }
-      }
-    },
-    "Use `/skills [query]` to search skills.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "使用 `/skills [query]` 搜索技能。"
           }
         }
       }
@@ -9672,26 +4429,6 @@
         }
       }
     },
-    "Violet": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "紫罗兰色"
-          }
-        }
-      }
-    },
-    "Voice commands are not available in the mobile app.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "语音命令在移动应用中不可用。"
-          }
-        }
-      }
-    },
     "Voice input": {
       "localizations": {
         "zh-Hans": {
@@ -9708,196 +4445,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "语音输入和适合移动端的编辑器控件"
-          }
-        }
-      }
-    },
-    "Voice input can start only while Hermes Nest is active.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "仅当 Hermes Nest 处于活动状态时才能启动语音输入。"
-          }
-        }
-      }
-    },
-    "Voice input is already preparing the microphone. Try again in a moment.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "语音输入正在准备麦克风。请稍后重试。"
-          }
-        }
-      }
-    },
-    "Voice input is not available because the microphone input format is invalid.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "由于麦克风输入格式无效，语音输入不可用。"
-          }
-        }
-      }
-    },
-    "Wait for the current /btw answer to finish first.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请先等待当前 /btw 回答完成。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before changing goals.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再更改目标。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before changing models.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再切换模型。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before changing personality.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再更改个性。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before changing profiles.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再切换配置文件。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before changing reasoning.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再更改推理。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before changing workspace.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再切换工作区。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before compressing context.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再压缩上下文。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before editing.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再编辑。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before forking.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再分叉。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before regenerating.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再重新生成。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before renaming the session.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再重命名会话。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before retrying messages.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再重试消息。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before starting a new session.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再开始新会话。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before undoing messages.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再撤销消息。"
-          }
-        }
-      }
-    },
-    "Wait for the current response to finish before using /btw.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请等待当前响应完成后再使用 /btw。"
           }
         }
       }
@@ -9952,46 +4499,6 @@
         }
       }
     },
-    "Workspace path": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "工作区路径"
-          }
-        }
-      }
-    },
-    "Workspace switching is unavailable.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "工作区切换不可用。"
-          }
-        }
-      }
-    },
-    "Wrap Code Block Lines": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "代码块换行"
-          }
-        }
-      }
-    },
-    "Wraps long lines in code blocks to fit the screen instead of scrolling sideways. You can also tap the wrap button in any code block.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "将代码块中的长行换行以适应屏幕，而非横向滚动。你也可以轻点任意代码块中的换行按钮。"
-          }
-        }
-      }
-    },
     "Writing response": {
       "localizations": {
         "zh-Hans": {
@@ -10012,62 +4519,12 @@
         }
       }
     },
-    "YOLO mode is not available in the mobile app.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "YOLO 模式在移动应用中不可用。"
-          }
-        }
-      }
-    },
     "Yellow": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "黄色"
-          }
-        }
-      }
-    },
-    "Yes": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "是"
-          }
-        }
-      }
-    },
-    "Yesterday": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "昨天"
-          }
-        }
-      }
-    },
-    "You'll return to onboarding and need the server URL and password to sign back in.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "你将返回引导流程，并需要服务器 URL 和密码才能重新登录。"
-          }
-        }
-      }
-    },
-    "You'll switch to another configured server. Sign in again to use this one.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "你将切换到另一台已配置的服务器。要使用此服务器，请重新登录。"
           }
         }
       }
@@ -10092,92 +4549,12 @@
         }
       }
     },
-    "Your session expired. Sign in again.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "你的会话已过期。请重新登录。"
-          }
-        }
-      }
-    },
-    "change models": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "切换模型"
-          }
-        }
-      }
-    },
-    "change reasoning": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "更改推理"
-          }
-        }
-      }
-    },
-    "change workspace": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "切换工作区"
-          }
-        }
-      }
-    },
-    "focus topic": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "聚焦主题"
-          }
-        }
-      }
-    },
     "iOS blocked this insecure HTTP connection. Use HTTPS, or use a Tailscale IP in the 100.64.0.0/10 range.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "iOS 阻止了此不安全的 HTTP 连接。请使用 HTTPS，或使用 100.64.0.0/10 范围内的 Tailscale IP。"
-          }
-        }
-      }
-    },
-    "iOS notifications allowed.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "已允许 iOS 通知。"
-          }
-        }
-      }
-    },
-    "iOS notifications disabled.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "已禁用 iOS 通知。"
-          }
-        }
-      }
-    },
-    "iOS permission not requested.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "尚未请求 iOS 权限。"
           }
         }
       }
@@ -10208,16 +4585,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "消息"
-          }
-        }
-      }
-    },
-    "model_name": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "model_name"
           }
         }
       }
@@ -10292,16 +4659,6 @@
         }
       }
     },
-    "Modified": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "已修改"
-          }
-        }
-      }
-    },
     "Added": {
       "localizations": {
         "zh-Hans": {
@@ -10332,16 +4689,6 @@
         }
       }
     },
-    "Untracked": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "未跟踪"
-          }
-        }
-      }
-    },
     "Conflict": {
       "localizations": {
         "zh-Hans": {
@@ -10362,42 +4709,12 @@
         }
       }
     },
-    "Not a Git Repository": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "不是 Git 仓库"
-          }
-        }
-      }
-    },
     "This chat's workspace isn't a git repository.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "此聊天的工作区不是 Git 仓库。"
-          }
-        }
-      }
-    },
-    "Could Not Load Changes": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "无法加载更改"
-          }
-        }
-      }
-    },
-    "No Changes": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "没有更改"
           }
         }
       }
@@ -10502,26 +4819,6 @@
         }
       }
     },
-    "Expand section": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "展开部分"
-          }
-        }
-      }
-    },
-    "Collapse section": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "折叠部分"
-          }
-        }
-      }
-    },
     "%lld files changed": {
       "localizations": {
         "en": {
@@ -10576,26 +4873,6 @@
         }
       }
     },
-    "Create the branch from the current HEAD and switch to it.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "从当前 HEAD 创建分支并切换到它。"
-          }
-        }
-      }
-    },
-    "Current Git branch": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "当前的 Git 分支"
-          }
-        }
-      }
-    },
     "Fetch": {
       "localizations": {
         "zh-Hans": {
@@ -10606,65 +4883,12 @@
         }
       }
     },
-    "Fetch complete": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "获取完成"
-          }
-        }
-      }
-    },
-    "Fetching...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在获取..."
-          }
-        }
-      }
-    },
-    "Git Action Failed": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Git 操作失败"
-          }
-        }
-      }
-    },
-    "hermes-nest/my-feature": {
-      "shouldTranslate": false
-    },
     "Local": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "本地"
-          }
-        }
-      }
-    },
-    "New Branch": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "新分行"
-          }
-        }
-      }
-    },
-    "New branch...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "新分行..."
           }
         }
       }
@@ -10679,112 +4903,12 @@
         }
       }
     },
-    "Pull complete": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "拉取完成"
-          }
-        }
-      }
-    },
-    "Pull Remote Changes?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "拉取远程更改？"
-          }
-        }
-      }
-    },
-    "Pull uses fast-forward only and will not create a merge commit.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Pull 仅使用快进，不会创建合并提交。"
-          }
-        }
-      }
-    },
-    "Pulling...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "拉..."
-          }
-        }
-      }
-    },
     "Push": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
             "value": "推"
-          }
-        }
-      }
-    },
-    "Push complete": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "推送完成"
-          }
-        }
-      }
-    },
-    "Push Local Commits?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "推送本地提交？"
-          }
-        }
-      }
-    },
-    "Push the current branch to its configured upstream remote?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "将当前分支推送到其配置的上游远程？"
-          }
-        }
-      }
-    },
-    "Pushing...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "推..."
-          }
-        }
-      }
-    },
-    "Refreshing...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "清爽..."
-          }
-        }
-      }
-    },
-    "Reload branch list": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新加载分支列表"
           }
         }
       }
@@ -10799,108 +4923,8 @@
         }
       }
     },
-    "Search branches": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "搜寻分行"
-          }
-        }
-      }
-    },
-    "Stash & Switch": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "储藏室和开关"
-          }
-        }
-      }
-    },
-    "Switching...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "切换..."
-          }
-        }
-      }
-    },
-    "The branch changed, but the saved changes could not be restored.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "分支已更改，但无法恢复已保存的更改。"
-          }
-        }
-      }
-    },
-    "This workspace has uncommitted changes. Save them temporarily, switch branches, then restore any saved changes for the destination branch.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "此工作区有未提交的更改。暂时保存它们，切换分支，然后恢复目标分支的所有已保存更改。"
-          }
-        }
-      }
-    },
-    "Uncommitted Changes": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "未提交的更改"
-          }
-        }
-      }
-    },
-    "Wait for the active response to finish before changing this repository.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "在更改此存储库之前，请等待主动响应完成。"
-          }
-        }
-      }
-    },
-    "Writes disabled on server. Enable HERMES_WEBUI_WORKSPACE_GIT_DESTRUCTIVE=1 on the server to use this.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "在服务器上禁用写入。在服务器上启用 HERMES_WEBUI_WORKSPACE_GIT_DESTRUCTIVE=1 以使用此功能。"
-          }
-        }
-      }
-    },
     "Git": {
       "shouldTranslate": false
-    },
-    "Cache Hit Rate": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "缓存命中率"
-          }
-        }
-      }
-    },
-    "Cache Read Tokens": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "缓存读取令牌"
-          }
-        }
-      }
     },
     "%@ cache": {
       "localizations": {
@@ -10908,86 +4932,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "缓存 %@"
-          }
-        }
-      }
-    },
-    "New Profile": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "新建配置文件"
-          }
-        }
-      }
-    },
-    "Profile name": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "配置文件名称"
-          }
-        }
-      }
-    },
-    "Lowercase letters, numbers, hyphens, and underscores; must start with a letter or number.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "仅限小写字母、数字、连字符和下划线；必须以字母或数字开头。"
-          }
-        }
-      }
-    },
-    "Opens the new profile form.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "打开新建配置文件表单。"
-          }
-        }
-      }
-    },
-    "Clone config from active profile": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "从活动配置文件克隆配置"
-          }
-        }
-      }
-    },
-    "Use active profile default": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "使用活动配置文件默认值"
-          }
-        }
-      }
-    },
-    "Choose from configured providers and models for this new profile.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "从已配置的提供商和模型中为此新配置文件选择。"
-          }
-        }
-      }
-    },
-    "Base URL": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "基础 URL"
           }
         }
       }
@@ -11002,82 +4946,12 @@
         }
       }
     },
-    "Base URL must start with http:// or https://.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "基础 URL 必须以 http:// 或 https:// 开头。"
-          }
-        }
-      }
-    },
-    "Optional. Base URL example: http://localhost:11434": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "可选。基础 URL 示例：http://localhost:11434"
-          }
-        }
-      }
-    },
     "Manage": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "管理"
-          }
-        }
-      }
-    },
-    "Manage Workspaces": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "管理工作区"
-          }
-        }
-      }
-    },
-    "Add Workspace": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "添加工作区"
-          }
-        }
-      }
-    },
-    "Rename Workspace": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重命名工作区"
-          }
-        }
-      }
-    },
-    "Workspace name": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "工作区名称"
-          }
-        }
-      }
-    },
-    "Remove Workspace?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "移除工作区？"
           }
         }
       }
@@ -11092,162 +4966,12 @@
         }
       }
     },
-    "Removing a workspace only unregisters its path from the server's list. No files are deleted.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "移除工作区仅会将其路径从服务器列表中注销，不会删除任何文件。"
-          }
-        }
-      }
-    },
-    "Workspace management isn't available on this server.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "此服务器不支持工作区管理。"
-          }
-        }
-      }
-    },
-    "Name (optional)": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "名称（可选）"
-          }
-        }
-      }
-    },
-    "Create the folder if it doesn't exist": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "如文件夹不存在则创建"
-          }
-        }
-      }
-    },
-    "Add a workspace to make it available when starting sessions.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "添加工作区，以便在开始会话时使用。"
-          }
-        }
-      }
-    },
-    "Collapse scheduled sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "收起计划会话"
-          }
-        }
-      }
-    },
-    "Expand scheduled sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "展开计划会话"
-          }
-        }
-      }
-    },
-    "Scheduled sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "计划会话"
-          }
-        }
-      }
-    },
-    "Card ID": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "卡片 ID"
-          }
-        }
-      }
-    },
-    "Checking Result": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Checking Result"
-          }
-        }
-      }
-    },
-    "Check Result": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "检查结果"
-          }
-        }
-      }
-    },
-    "Claim Expires": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Claim Expires"
-          }
-        }
-      }
-    },
-    "Claim ID": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Claim ID"
-          }
-        }
-      }
-    },
     "Comment": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "评论"
-          }
-        }
-      }
-    },
-    "Comment cannot be blank.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Comment cannot be blank."
-          }
-        }
-      }
-    },
-    "Comments cannot be edited or deleted after sending.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Comments cannot be edited or deleted after sending."
           }
         }
       }
@@ -11282,42 +5006,12 @@
         }
       }
     },
-    "Dispatch Runs": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "调度运行"
-          }
-        }
-      }
-    },
     "Events": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "事件"
-          }
-        }
-      }
-    },
-    "Load Worker Log": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Load Worker Log"
-          }
-        }
-      }
-    },
-    "Maximum Runtime": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Maximum Runtime"
           }
         }
       }
@@ -11332,62 +5026,12 @@
         }
       }
     },
-    "Only the last part of this log is shown.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Only the last part of this log is shown."
-          }
-        }
-      }
-    },
-    "Operational History": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "操作历史"
-          }
-        }
-      }
-    },
-    "Operational Metadata": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Operational Metadata"
-          }
-        }
-      }
-    },
-    "Outcome Uncertain": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Outcome Uncertain"
-          }
-        }
-      }
-    },
     "Priority": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "优先级"
-          }
-        }
-      }
-    },
-    "Refresh to check the Card before trying again.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Refresh to check the Card before trying again."
           }
         }
       }
@@ -11412,92 +5056,12 @@
         }
       }
     },
-    "Worker ID": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Worker ID"
-          }
-        }
-      }
-    },
-    "Worker Log": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "工作进程日志"
-          }
-        }
-      }
-    },
-    "This Board no longer exists. Return to Kanban to choose another Board.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This Board no longer exists. Return to Kanban to choose another Board."
-          }
-        }
-      }
-    },
-    "Browse Board": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "浏览看板"
-          }
-        }
-      }
-    },
     "Browse Board: %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "浏览看板：%@"
-          }
-        }
-      }
-    },
-    "Choose Board": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择看板"
-          }
-        }
-      }
-    },
-    "This Board no longer exists. Choose another Board.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "此看板已不存在。请选择另一个看板。"
-          }
-        }
-      }
-    },
-    "This Card no longer exists on this Board. The Board has been refreshed.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This Card no longer exists on this Board. The Board has been refreshed."
-          }
-        }
-      }
-    },
-    "A whole number from -100 through 100.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "从 -100 到 100 的整数。"
           }
         }
       }
@@ -11522,56 +5086,6 @@
         }
       }
     },
-    "Choose Prerequisite": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择先决条件"
-          }
-        }
-      }
-    },
-    "Choose Tenant": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择租户"
-          }
-        }
-      }
-    },
-    "Choose a supported Status.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择支持的状态。"
-          }
-        }
-      }
-    },
-    "Choose a valid Prerequisite.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择有效的先决条件。"
-          }
-        }
-      }
-    },
-    "Create Ready, Unassigned Card?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "创建准备好的未分配卡？"
-          }
-        }
-      }
-    },
     "Current Status: %@. Choose a permitted Status only if you want to move the Card.": {
       "localizations": {
         "zh-Hans": {
@@ -11592,52 +5106,12 @@
         }
       }
     },
-    "Edit Card": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "编辑卡"
-          }
-        }
-      }
-    },
     "Execution": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "执行"
-          }
-        }
-      }
-    },
-    "Maximum Runtime must be a whole number of seconds greater than 0.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最大运行时间必须是大于 0 的整数秒。"
-          }
-        }
-      }
-    },
-    "New Card": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "新卡"
-          }
-        }
-      }
-    },
-    "Optional number of seconds.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "可选的秒数。"
           }
         }
       }
@@ -11652,52 +5126,12 @@
         }
       }
     },
-    "Priority must be a whole number from -100 through 100.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "优先级必须是 -100 到 100 之间的整数。"
-          }
-        }
-      }
-    },
-    "Refresh the Board before trying again.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重试之前刷新面板。"
-          }
-        }
-      }
-    },
     "Reload": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "重新加载"
-          }
-        }
-      }
-    },
-    "Reload Server Version": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重新加载服务器版本"
-          }
-        }
-      }
-    },
-    "Reload Server Version?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重新加载服务器版本？"
           }
         }
       }
@@ -11712,82 +5146,12 @@
         }
       }
     },
-    "Review and Overwrite": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "检查并覆盖"
-          }
-        }
-      }
-    },
     "Saving": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "保存"
-          }
-        }
-      }
-    },
-    "Scratch": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "划痕"
-          }
-        }
-      }
-    },
-    "Separate skill names with commas.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "技能名称之间用逗号分隔。"
-          }
-        }
-      }
-    },
-    "Server Status": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "服务器状态"
-          }
-        }
-      }
-    },
-    "Server Title": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "服务器名称"
-          }
-        }
-      }
-    },
-    "The Dispatcher skips Ready Cards without an Assigned Profile.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "调度员会跳过没有分配配置文件的就绪卡。"
-          }
-        }
-      }
-    },
-    "This Card changed on the server after the editor opened. Your draft has been preserved.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "编辑器打开后，这张卡在服务器上发生了变化。您的草稿已保存。"
           }
         }
       }
@@ -11802,122 +5166,12 @@
         }
       }
     },
-    "Title is required.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "标题为必填项。"
-          }
-        }
-      }
-    },
-    "Workspace path is required for this workspace kind.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "此工作空间类型需要工作空间路径。"
-          }
-        }
-      }
-    },
-    "Workspace, Skills, Maximum Runtime, and Prerequisite are set when the Card is created and cannot be edited here.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "工作空间、技能、最长运行时间和先决条件是在创建卡片时设置的，无法在此处编辑。"
-          }
-        }
-      }
-    },
-    "Worktree": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "工作树"
-          }
-        }
-      }
-    },
-    "Your local draft will be discarded.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "您的本地草稿将被丢弃。"
-          }
-        }
-      }
-    },
-    "View all": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "查看全部"
-          }
-        }
-      }
-    },
-    "Add Prerequisite": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "添加先决条件"
-          }
-        }
-      }
-    },
     "Block": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "阻止"
-          }
-        }
-      }
-    },
-    "Card Actions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "卡片操作"
-          }
-        }
-      }
-    },
-    "Choose Card": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择卡片"
-          }
-        }
-      }
-    },
-    "Leave Running?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "离开“运行中”？"
-          }
-        }
-      }
-    },
-    "Leaving Running may clear the Card's claim and worker state.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "离开“运行中”可能会清除卡片的认领和工作进程状态。"
           }
         }
       }
@@ -11932,32 +5186,12 @@
         }
       }
     },
-    "Refresh the Card to check the server result before trying again.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重试前，请刷新卡片以检查服务器结果。"
-          }
-        }
-      }
-    },
     "Remove %@ as Prerequisite": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "移除 %@ 作为先决条件"
-          }
-        }
-      }
-    },
-    "The server refused or did not apply this update.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "服务器拒绝或未应用此更新。"
           }
         }
       }
@@ -11982,42 +5216,12 @@
         }
       }
     },
-    "Undo Archive": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "撤销归档"
-          }
-        }
-      }
-    },
     "Browsing": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "正在浏览"
-          }
-        }
-      }
-    },
-    "Browsing a Board stays local to Hermes Nest. Making a Board active changes shared server state.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "浏览看板只会影响 Hermes Nest。将看板设为当前会更改共享服务器状态。"
-          }
-        }
-      }
-    },
-    "Creating a Board does not make it active.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "创建看板不会将其设为当前看板。"
           }
         }
       }
@@ -12042,62 +5246,12 @@
         }
       }
     },
-    "Make Active Board": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "将看板设为当前"
-          }
-        }
-      }
-    },
-    "Making this Board active changes shared server state for other Hermes clients.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "将此看板设为当前会更改其他 Hermes 客户端共享的服务器状态。"
-          }
-        }
-      }
-    },
     "Slug": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "标识符"
-          }
-        }
-      }
-    },
-    "The slug cannot be changed after the Board is created.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "创建看板后无法更改标识符。"
-          }
-        }
-      }
-    },
-    "Updating Board...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在更新看板…"
-          }
-        }
-      }
-    },
-    "Update failed": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "更新失败"
           }
         }
       }

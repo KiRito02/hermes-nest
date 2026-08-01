@@ -129,11 +129,4 @@ final class AppIntentNewChatTests: XCTestCase {
         XCTAssertTrue(NewChatVoiceIntent.openAppWhenRun)
     }
 
-    func testNewChatRequestDefaultsToVoiceOff() {
-        XCTAssertFalse(NewChatRequest().autoStartsVoiceInput)
-    }
-
-    func testNewChatRequestCarriesVoiceFlag() {
-        XCTAssertTrue(NewChatRequest(autoStartsVoiceInput: true).autoStartsVoiceInput)
-    }
 }

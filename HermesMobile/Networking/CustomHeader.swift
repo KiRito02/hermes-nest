@@ -1,5 +1,4 @@
 import Foundation
-import os
 
 /// A single user-supplied HTTP request header attached to every outgoing request.
 ///
@@ -124,30 +123,5 @@ extension Array where Element == CustomHeader {
             return []
         }
         return headers
-    }
-}
-
-/// Process-wide, thread-safe snapshot of the user's custom headers.
-///
-/// The app has no dependency-injection container — `APIClient`/`SSEClient` are
-/// built ad hoc in ~20 places — so each reads the current headers from here when
-/// building a request (at request time, so even long-lived clients pick up an
-/// edit immediately). `AuthManager` owns all writes: it loads from the Keychain
-/// on launch and replaces the snapshot whenever the user edits headers.
-final class CustomHeaderStore: Sendable {
-    static let shared = CustomHeaderStore()
-
-    private let storage: OSAllocatedUnfairLock<[CustomHeader]>
-
-    init(headers: [CustomHeader] = []) {
-        storage = OSAllocatedUnfairLock(initialState: headers)
-    }
-
-    func snapshot() -> [CustomHeader] {
-        storage.withLock { $0 }
-    }
-
-    func replace(with headers: [CustomHeader]) {
-        storage.withLock { $0 = headers }
     }
 }
