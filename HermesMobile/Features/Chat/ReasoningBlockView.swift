@@ -2,11 +2,17 @@ import SwiftUI
 
 struct ReasoningBlockView: View {
     let text: String
+    let isActive: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage(ChatTranscriptDisplaySettings.thinkingCardsStartExpandedKey) private var startsExpanded = false
     @State private var userToggledExpansion: Bool?
+
+    init(text: String, isActive: Bool = false) {
+        self.text = text
+        self.isActive = isActive
+    }
 
     private var isExpanded: Bool {
         ChatTranscriptDisplaySettings.isCardExpanded(
@@ -84,10 +90,37 @@ struct ReasoningBlockView: View {
     }
 
     private var titleText: some View {
-        Text("Thinking")
-            .font(AppFont.caption(weight: .semibold))
-            .foregroundStyle(.primary)
-            .lineLimit(1)
+        HStack(spacing: 5) {
+            Text("Thinking")
+                .lineLimit(1)
+
+            if isActive {
+                TimelineView(
+                    .animation(
+                        minimumInterval: 0.18,
+                        paused: reduceMotion
+                    )
+                ) { context in
+                    HStack(spacing: 3) {
+                        ForEach(0..<3, id: \.self) { index in
+                            Circle()
+                                .fill(Color.secondary)
+                                .frame(width: 4, height: 4)
+                                .opacity(
+                                    dotOpacity(
+                                        index: index,
+                                        date: context.date
+                                    )
+                                )
+                        }
+                    }
+                }
+                .frame(width: 18, height: 8)
+                .accessibilityHidden(true)
+            }
+        }
+        .font(AppFont.caption(weight: .semibold))
+        .foregroundStyle(.primary)
     }
 
     private func summaryText(_ value: String, lineLimit: Int) -> some View {
@@ -103,14 +136,29 @@ struct ReasoningBlockView: View {
     }
 
     private func summary(for value: String) -> String {
-        let oneLine = value
-            .replacingOccurrences(of: "\n", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let latestLine = value
+            .split(whereSeparator: \.isNewline)
+            .reversed()
+            .compactMap { line -> String? in
+                let cleaned = String(line)
+                    .replacingOccurrences(of: "**", with: "")
+                    .replacingOccurrences(of: "__", with: "")
+                    .replacingOccurrences(of: "`", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return cleaned.isEmpty ? nil : cleaned
+            }
+            .first ?? String(localized: "Thinking")
 
-        if oneLine.count <= 80 {
-            return oneLine
+        if latestLine.count <= 80 {
+            return latestLine
         }
 
-        return "\(oneLine.prefix(80))..."
+        return "\(latestLine.prefix(80))..."
+    }
+
+    private func dotOpacity(index: Int, date: Date) -> Double {
+        guard !reduceMotion else { return 0.65 }
+        let step = Int(date.timeIntervalSinceReferenceDate / 0.18) % 3
+        return step == index ? 1 : 0.28
     }
 }

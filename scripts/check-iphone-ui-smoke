@@ -167,6 +167,12 @@ if "Menu {" in attachment_entry or ".disabled(true)" in attachment_entry:
     )
 
 for snippet, description in [
+    (
+        "preferredCompactColumn: $preferredCompactColumn",
+        "native compact-column navigation state",
+    ),
+    ("List(selection: sessionSelection)", "native session selection"),
+    ("NavigationLink(value: session.id)", "native session navigation link"),
     ("ChatActionButtonPalette.resolve", "explicit send-button palette"),
     ("CompanionSendButtonStyle()", "custom high-contrast send style"),
     (
@@ -247,6 +253,10 @@ for snippet, description in [
         "consolidated model, reasoning, and usage menu",
     ),
     (
+        "viewModel.liveReasoningPresentationText",
+        "single live thinking presentation",
+    ),
+    (
         "dynamicTypeSize.isAccessibilitySize",
         "accessibility-size composer fallback",
     ),
@@ -310,6 +320,26 @@ for snippet, description in [
     ),
 ]:
     require(SESSION_SURFACE, snippet, description)
+
+live_transcript = SESSION_VIEW.split(
+    "private var liveRunTranscriptContent", maxsplit=1
+)[1].split("private var companionComposer", maxsplit=1)[0]
+if "ForEach(viewModel.liveReasoningGroups)" in live_transcript:
+    raise SystemExit(
+        "The active run must update one thinking block instead of stacking "
+        "one card per reasoning checkpoint."
+    )
+for snippet, description in [
+    (
+        "activeRunID ?? terminalPresentationRunID",
+        "stable live-to-terminal presentation identity",
+    ),
+    (
+        "maximumCharacters: 48",
+        "visible progressive assistant output",
+    ),
+]:
+    require(SESSION_VIEW_MODEL, snippet, description)
 
 shell_source = SESSION_VIEW.split(
     "struct CompanionSessionHistoryView: View", maxsplit=1

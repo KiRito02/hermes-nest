@@ -93,6 +93,8 @@ struct CompanionSessionListView: View {
     @State private var isConfirmingForget = false
     @State private var selectedSessionID: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var preferredCompactColumn:
+        NavigationSplitViewColumn = .sidebar
     @State private var detailNavigationPath:
         [CompanionShellDestination] = []
     @State private var showsConnectionDetails = false
@@ -141,8 +143,11 @@ struct CompanionSessionListView: View {
     var body: some View {
         let displayedSessions = viewModel.matchingSessions(searchText: searchText)
 
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            List {
+        NavigationSplitView(
+            columnVisibility: $columnVisibility,
+            preferredCompactColumn: $preferredCompactColumn
+        ) {
+            List(selection: sessionSelection) {
                 if viewModel.isViewingCachedData {
                     CompanionOfflineCacheBanner()
                         .listRowSeparator(.hidden)
@@ -166,9 +171,7 @@ struct CompanionSessionListView: View {
 
                 Section("Recent") {
                     ForEach(displayedSessions) { session in
-                        Button {
-                            selectSession(session)
-                        } label: {
+                        NavigationLink(value: session.id) {
                             SessionRowView(
                                 session: session,
                                 showsMessageCount: true,
@@ -187,7 +190,7 @@ struct CompanionSessionListView: View {
                                 )
                             )
                         }
-                        .buttonStyle(.plain)
+                        .tag(session.id)
                         .accessibilityAddTraits(
                             isSelected(session) ? .isSelected : []
                         )
@@ -405,16 +408,20 @@ struct CompanionSessionListView: View {
         viewModel.sessionForNavigation(id: selectedSessionID)
     }
 
-    private func isSelected(_ session: SessionSummary) -> Bool {
-        detailNavigationPath.isEmpty && selectedSessionID == session.id
+    private var sessionSelection: Binding<String?> {
+        Binding(
+            get: { selectedSessionID },
+            set: { sessionID in
+                selectedSessionID = sessionID
+                guard sessionID != nil else { return }
+                detailNavigationPath.removeAll()
+                showDetailColumn()
+            }
+        )
     }
 
-    private func selectSession(_ session: SessionSummary) {
-        selectedSessionID = session.id
-        detailNavigationPath.removeAll()
-        if horizontalSizeClass != .regular {
-            columnVisibility = .detailOnly
-        }
+    private func isSelected(_ session: SessionSummary) -> Bool {
+        detailNavigationPath.isEmpty && selectedSessionID == session.id
     }
 
     @ViewBuilder
@@ -445,9 +452,13 @@ struct CompanionSessionListView: View {
         _ destination: CompanionShellDestination
     ) {
         detailNavigationPath = [destination]
-        if horizontalSizeClass != .regular {
-            columnVisibility = .detailOnly
-        }
+        showDetailColumn()
+    }
+
+    private func showDetailColumn() {
+        guard horizontalSizeClass != .regular else { return }
+        preferredCompactColumn = .detail
+        columnVisibility = .detailOnly
     }
 
     @ViewBuilder
@@ -528,9 +539,7 @@ struct CompanionSessionListView: View {
             if let created = await viewModel.createSession() {
                 selectedSessionID = created.id
                 detailNavigationPath.removeAll()
-                if horizontalSizeClass != .regular {
-                    columnVisibility = .detailOnly
-                }
+                showDetailColumn()
             }
         }
     }
@@ -1238,8 +1247,14 @@ struct CompanionSessionHistoryView: View {
                 alignment: .leading,
                 spacing: 2
             ) {
-                ForEach(viewModel.liveReasoningGroups) { group in
-                    ReasoningBlockView(text: group.text)
+                if let reasoning =
+                    viewModel.liveReasoningPresentationText {
+                    ReasoningBlockView(
+                        text: reasoning,
+                        isActive:
+                            viewModel.isLiveThinkingPresentationActive
+                    )
+                        .id("companion-live-thinking")
                         .accessibilityIdentifier(
                             "companion.run.reasoning"
                         )
@@ -1309,25 +1324,6 @@ struct CompanionSessionHistoryView: View {
                 || viewModel.isUploadingAttachment
                 || viewModel.isPreparingDroppedAttachments {
                 attachmentStrip
-            }
-
-            if let error = viewModel.modelSelectionErrorMessage {
-                HStack(spacing: 8) {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .lineLimit(2)
-                    Spacer(minLength: 8)
-                    if viewModel.modelGroups.isEmpty {
-                        Button("Retry") {
-                            Task {
-                                await viewModel.loadModelOptions(refresh: true)
-                            }
-                        }
-                        .font(HermesNestDesign.Typography.control)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             composerInputLayout {
@@ -1540,6 +1536,16 @@ struct CompanionSessionHistoryView: View {
 
     private var compactComposerContextMenu: some View {
         Menu {
+            if viewModel.modelSelectionErrorMessage != nil {
+                Button {
+                    Task {
+                        await viewModel.loadModelOptions(refresh: true)
+                    }
+                } label: {
+                    Label("Retry", systemImage: "arrow.clockwise")
+                }
+            }
+
             if !viewModel.modelGroups.isEmpty
                 || viewModel.isLoadingModelOptions {
                 Button {

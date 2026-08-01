@@ -621,7 +621,7 @@ final class CompanionSessionHistoryViewModel {
 
     private(set) var session: SessionSummary
     private(set) var allMessages: [ChatMessage] = []
-    private(set) var isLoading = false
+    private(set) var isLoading = true
     private(set) var isViewingCachedData = false
     private(set) var errorMessage: String?
     private(set) var mutationErrorMessage: String?
@@ -811,12 +811,31 @@ final class CompanionSessionHistoryViewModel {
         }
         groups.append(
             ReasoningGroup(
-                id: "live-reasoning-\(activeRunID ?? "pending")",
+                id: "live-reasoning-\(presentationRunID ?? "pending")",
                 anchorMessageID: nil,
                 text: liveText
             )
         )
         return groups
+    }
+
+    /// Presents the current turn as one continuously updating thinking block,
+    /// even when Hermes persists several reasoning checkpoints.
+    var liveReasoningPresentationText: String? {
+        var checkpoints: [String] = []
+        for group in liveReasoningGroups {
+            guard let text = group.text.trimmedNonEmptyValue else { continue }
+            if let last = checkpoints.last,
+               text.hasPrefix(last) || last.hasPrefix(text) {
+                if text.count > last.count {
+                    checkpoints[checkpoints.count - 1] = text
+                }
+            } else if !checkpoints.contains(text) {
+                checkpoints.append(text)
+            }
+        }
+        guard !checkpoints.isEmpty else { return nil }
+        return checkpoints.joined(separator: "\n\n")
     }
 
     var liveToolActivityGroup: ToolCallGroup? {
@@ -828,7 +847,7 @@ final class CompanionSessionHistoryViewModel {
         }
         let anchorMessageID = persistedGroups.first?.anchorMessageID
         let persisted = ToolCallGroup(
-            id: "live-tools-\(activeRunID ?? "pending")",
+            id: "live-tools-\(presentationRunID ?? "pending")",
             anchorMessageID: anchorMessageID,
             toolCalls: persistedGroups.flatMap(\.toolCalls)
         )
@@ -842,7 +861,7 @@ final class CompanionSessionHistoryViewModel {
             ]
         )
         return ToolCallGroup(
-            id: "live-tools-\(activeRunID ?? "pending")",
+            id: "live-tools-\(presentationRunID ?? "pending")",
             anchorMessageID: anchorMessageID,
             toolCalls: merged.flatMap(\.toolCalls)
         )
@@ -854,6 +873,10 @@ final class CompanionSessionHistoryViewModel {
 
     var isRunActive: Bool {
         activeRunID != nil || runState == .starting
+    }
+
+    var isLiveThinkingPresentationActive: Bool {
+        isRunActive || isTerminalRefreshPending
     }
 
     var hasLiveTranscriptContent: Bool {
@@ -879,8 +902,13 @@ final class CompanionSessionHistoryViewModel {
     }
 
     private func isLiveRunAnchor(_ anchorMessageID: String?) -> Bool {
-        guard isRunActive, let anchorMessageID else { return false }
+        guard isLiveThinkingPresentationActive,
+              let anchorMessageID else { return false }
         return liveRunAnchorMessageIDs.contains(anchorMessageID)
+    }
+
+    private var presentationRunID: String? {
+        activeRunID ?? terminalPresentationRunID
     }
 
     private var activeRunKey: CompanionActiveRunKey? {
@@ -1266,7 +1294,7 @@ final class CompanionSessionHistoryViewModel {
             role: "assistant",
             content: streamedAssistantText,
             timestamp: nil,
-            messageId: activeRunID.map { "stream-\($0)" }
+            messageId: presentationRunID.map { "stream-\($0)" }
         )
     }
 
@@ -2024,7 +2052,7 @@ final class CompanionSessionHistoryViewModel {
 
     private func scheduleDeltaFlush() {
         deltaFlushTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 33_000_000)
+            try? await Task.sleep(nanoseconds: 50_000_000)
             guard !Task.isCancelled else { return }
             self?.flushPendingDelta()
         }
@@ -2034,7 +2062,7 @@ final class CompanionSessionHistoryViewModel {
         deltaFlushTask?.cancel()
         deltaFlushTask = nil
         let drained = deltaBuffer.drain(
-            maximumCharacters: 192
+            maximumCharacters: 48
         )
         guard !drained.isEmpty else { return }
         streamedAssistantText += drained
