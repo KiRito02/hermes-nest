@@ -74,6 +74,7 @@
 		C09300000000000000000001 /* HapticButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09300000000000000000002 /* HapticButton.swift */; };
 		C09300000000000000000003 /* HapticButtonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09300000000000000000004 /* HapticButtonTests.swift */; };
 		C09500000000000000000001 /* AdaptiveGlassModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09500000000000000000002 /* AdaptiveGlassModifier.swift */; };
+		C03900000000000000000001 /* CompanionShellComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03900000000000000000002 /* CompanionShellComponents.swift */; };
 		031031031031031031031001 /* MarkdownMathSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 031031031031031031031002 /* MarkdownMathSegmenter.swift */; };
 		031031031031031031031005 /* MarkdownMathFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 031031031031031031031006 /* MarkdownMathFormatter.swift */; };
 		031031031031031031031007 /* MarkdownMathFormatter+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = 031031031031031031031008 /* MarkdownMathFormatter+Support.swift */; };
@@ -209,6 +210,7 @@
 		C09300000000000000000002 /* HapticButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticButton.swift; sourceTree = "<group>"; };
 		C09300000000000000000004 /* HapticButtonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticButtonTests.swift; sourceTree = "<group>"; };
 		C09500000000000000000002 /* AdaptiveGlassModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaptiveGlassModifier.swift; sourceTree = "<group>"; };
+		C03900000000000000000002 /* CompanionShellComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionShellComponents.swift; sourceTree = "<group>"; };
 		C09500000000000000000004 /* AdaptiveGlassTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaptiveGlassTests.swift; sourceTree = "<group>"; };
 		031031031031031031031002 /* MarkdownMathSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownMathSegmenter.swift; sourceTree = "<group>"; };
 		031031031031031031031006 /* MarkdownMathFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownMathFormatter.swift; sourceTree = "<group>"; };
@@ -445,6 +447,7 @@
 			children = (
 				C09300000000000000000002 /* HapticButton.swift */,
 				C09500000000000000000002 /* AdaptiveGlassModifier.swift */,
+				C03900000000000000000002 /* CompanionShellComponents.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -737,6 +740,7 @@
 				C02700000000000000000001 /* ActiveStreamRecoveryState.swift in Sources */,
 				C12800000000000000000003 /* ChatTimelineAccessorySurface.swift in Sources */,
 				C09500000000000000000001 /* AdaptiveGlassModifier.swift in Sources */,
+				C03900000000000000000001 /* CompanionShellComponents.swift in Sources */,
 				031031031031031031031009 /* DisplayMathView.swift in Sources */,
 				031031031031031031031001 /* MarkdownMathSegmenter.swift in Sources */,
 				031031031031031031031005 /* MarkdownMathFormatter.swift in Sources */,

@@ -63,6 +63,13 @@ enum HermesNestDesign {
         static let metadata = Font.caption
     }
 
+    enum Shell {
+        static let minimumControlSize: CGFloat = 44
+        static let sidebarIconWidth: CGFloat = 24
+        static let sidebarRowCornerRadius: CGFloat = 10
+        static let connectionRowCornerRadius: CGFloat = 14
+    }
+
     static let transcriptMaximumWidth: CGFloat = 760
     static let sidebarIdealWidth: CGFloat = 320
     static let compactCornerRadius: CGFloat = 12
@@ -79,6 +86,10 @@ enum HermesNestDesign {
 
     static var raisedSurface: Color {
         Color(uiColor: .tertiarySystemBackground)
+    }
+
+    static var selectedSurface: Color {
+        Color(uiColor: .quaternarySystemFill)
     }
 
     static var subtleBorder: Color {

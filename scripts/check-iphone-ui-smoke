@@ -26,6 +26,11 @@ SESSION_VIEW = (
     ROOT
     / "HermesMobile/Features/SessionList/CompanionSessionListView.swift"
 ).read_text(encoding="utf-8")
+SHELL_COMPONENTS = (
+    ROOT
+    / "HermesMobile/Features/Shared/CompanionShellComponents.swift"
+).read_text(encoding="utf-8")
+SESSION_SURFACE = SESSION_VIEW + "\n" + SHELL_COMPONENTS
 SESSION_VIEW_MODEL = (
     ROOT
     / "HermesMobile/Features/SessionList/CompanionSessionListViewModel.swift"
@@ -66,6 +71,10 @@ for snippet, description in [
         '"--core-chat-compact-lab"',
         "compact Stage Manager-width Debug launch hook",
     ),
+    (
+        '"--companion-shell-lab"',
+        "production App-shell Debug launch hook",
+    ),
 ]:
     require(APP, snippet, description)
 
@@ -79,9 +88,20 @@ require(
     "CompanionAttachmentStagerTests.swift in Sources",
     "attachment stager test target membership",
 )
+require(
+    PROJECT,
+    "CompanionShellComponents.swift in Sources",
+    "shared App-shell component target membership",
+)
 require(FIXTURE, "CoreChatLabRunService", "local run service")
 require(FIXTURE, "runService: runService", "local run service injection")
 require(FIXTURE, "AdaptiveCoreChatLabView", "adaptive iPad chat fixture")
+require(FIXTURE, "CompanionShellLabView", "production App-shell fixture")
+require(
+    FIXTURE,
+    "CompanionSessionListView(",
+    "real production App shell in the fixture",
+)
 require(
     FIXTURE,
     "requestGeometryUpdate",
@@ -231,8 +251,49 @@ for snippet, description in [
         "CompanionTokenPresentation.exactCount",
         "exact Companion token presentation",
     ),
+    (
+        "enum CompanionShellDestination: CaseIterable, Hashable",
+        "typed adaptive App-shell destination routing",
+    ),
+    (
+        "@State private var detailNavigationPath:",
+        "state-preserving detail navigation path",
+    ),
+    (
+        ".navigationDestination(for: CompanionShellDestination.self)",
+        "native App-shell detail navigation",
+    ),
+    (
+        "CompanionShellDestinationRow(",
+        "readable sidebar destination rows",
+    ),
+    (
+        "CompanionConnectionRow(",
+        "bottom Companion connection row",
+    ),
+    (
+        ".sheet(isPresented: $showsConnectionDetails)",
+        "progressively disclosed Companion connection details",
+    ),
 ]:
-    require(SESSION_VIEW, snippet, description)
+    require(SESSION_SURFACE, snippet, description)
+
+shell_source = SESSION_VIEW.split(
+    "struct CompanionSessionHistoryView: View", maxsplit=1
+)[0]
+toolbar_source = shell_source.split(".toolbar {", maxsplit=1)[1].split(
+    "        } detail:", maxsplit=1
+)[0]
+for forbidden in [
+    "CompanionDiscoveryView(",
+    "CompanionWorkspaceView(",
+    "CompanionMemoryView(",
+]:
+    if forbidden in toolbar_source:
+        raise SystemExit(
+            "Production destinations belong in the sidebar hierarchy, not "
+            f"the crowded shell toolbar: {forbidden}"
+        )
 require(
     SESSION_VIEW_MODEL,
     "final class CompanionSessionHistoryViewModelRegistry",
@@ -344,6 +405,23 @@ if unexpected_languages:
         "Only English and Simplified Chinese are supported; found: "
         + ", ".join(sorted(unexpected_languages))
     )
+for key in [
+    "Connection",
+    "Gateway status",
+    "No matching chats",
+    "Opens this destination",
+    "Shows Companion connection details",
+    "Skills and Toolsets",
+    "Unavailable with this Gateway or Companion",
+]:
+    localization = LOCALIZATIONS["strings"].get(key, {}).get(
+        "localizations", {}
+    ).get("zh-Hans", {})
+    value = localization.get("stringUnit", {}).get("value", "")
+    if not value.strip():
+        raise SystemExit(
+            f"Missing Simplified-Chinese App-shell localization: {key}"
+        )
 require(
     LOCALIZATIONS["strings"]["Copied Message"]["localizations"]["zh-Hans"][
         "stringUnit"
@@ -372,8 +450,17 @@ for snippet, description in [
     ("if: inputs.capture_screenshots", "optional screenshot steps"),
     ("--core-chat-lab core-chat-en.png", "English core chat capture"),
     ("--core-chat-lab core-chat-zh-Hans.png", "Simplified Chinese capture"),
+    (
+        "--companion-shell-lab companion-shell-en.png",
+        "English production App-shell capture",
+    ),
+    (
+        "--companion-shell-lab companion-shell-zh-Hans.png",
+        "Simplified-Chinese production App-shell capture",
+    ),
     ("--long-chat-lab long-chat.png", "long chat capture"),
     ("core-chat-dark.png", "dark-mode core chat capture"),
+    ("companion-shell-dark.png", "dark-mode production App-shell capture"),
     ("name: iphone-ui-smoke", "uploaded screenshot artifact"),
     ("run_ipad:", "adaptive iPad input"),
     ("Signed 13-inch iPad Pro Launch", "manual iPad acceptance job"),

@@ -5895,6 +5895,76 @@
           }
         }
       }
+    },
+    "Skills and Toolsets": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "技能与工具集"
+          }
+        }
+      }
+    },
+    "Opens this destination": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开此功能页面"
+          }
+        }
+      }
+    },
+    "Unavailable with this Gateway or Companion": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前 Gateway 或 Companion 不支持此功能"
+          }
+        }
+      }
+    },
+    "Shows Companion connection details": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示 Companion 连接详情"
+          }
+        }
+      }
+    },
+    "Gateway status": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gateway 状态"
+          }
+        }
+      }
+    },
+    "Connection": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接"
+          }
+        }
+      }
+    },
+    "No matching chats": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有匹配的聊天"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

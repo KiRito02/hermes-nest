@@ -48,6 +48,51 @@ struct CoreChatLabView: View {
 
 }
 
+/// Deterministic host for the production adaptive shell. It deliberately uses
+/// the real session list, sidebar destinations, and detail navigation while
+/// keeping every repository response local to the process.
+struct CompanionShellLabView: View {
+    @State private var connectionManager = CompanionConnectionManager()
+
+    private let session: SessionSummary
+    private let repository: any SessionRepository
+    private let connection: CompanionConnection
+    private let runService: any ConversationRunServing
+    private let modelService: any CompanionModelServing
+
+    init() {
+        let usesSimplifiedChinese =
+            Locale.preferredLanguages.first?.hasPrefix("zh-Hans") == true
+                || Locale.preferredLanguages.first?.hasPrefix("zh-CN") == true
+        let session = CoreChatLabFixture.session(
+            usesSimplifiedChinese: usesSimplifiedChinese
+        )
+        self.session = session
+        repository = CoreChatLabRepository(
+            session: session,
+            messages: CoreChatLabFixture.messages(
+                usesSimplifiedChinese: usesSimplifiedChinese
+            )
+        )
+        connection = CoreChatLabFixture.connection()
+        runService = CoreChatLabRunService(
+            usesSimplifiedChinese: usesSimplifiedChinese
+        )
+        modelService = CoreChatLabModelService()
+    }
+
+    var body: some View {
+        CompanionSessionListView(
+            connectionManager: connectionManager,
+            connection: connection,
+            repository: repository,
+            initialSelectedSessionID: session.id,
+            runService: runService,
+            modelService: modelService
+        )
+    }
+}
+
 /// Signed simulator acceptance host for the regular iPad split view and a
 /// deterministic narrow Stage Manager-width content proposal. The compact
 /// fixture does not pretend to resize Simulator itself; manual acceptance
@@ -61,37 +106,15 @@ struct AdaptiveCoreChatLabView: View {
     let layout: Layout
     let requestsLandscape: Bool
 
-    @State private var columnVisibility:
-        NavigationSplitViewVisibility = .all
-
     var body: some View {
         Group {
             switch layout {
             case .regular:
-                NavigationSplitView(
-                    columnVisibility: $columnVisibility
-                ) {
-                    List {
-                        Label(
-                            "Hermes Nest UI Review",
-                            systemImage: "bubble.left.and.bubble.right"
-                        )
-                    }
-                    .navigationTitle("Chats")
-                    .navigationSplitViewColumnWidth(
-                        min: 280,
-                        ideal: HermesNestDesign.sidebarIdealWidth,
-                        max: 390
-                    )
-                } detail: {
-                    CoreChatLabView()
-                }
-                .navigationSplitViewStyle(.balanced)
+                CompanionShellLabView()
 
             case .compact:
-                NavigationStack {
-                    CoreChatLabView()
-                }
+                CompanionShellLabView()
+                .environment(\.horizontalSizeClass, .compact)
                 .frame(maxWidth: 620)
                 .frame(maxWidth: .infinity)
                 .background(HermesNestDesign.raisedSurface)
@@ -124,6 +147,71 @@ struct AdaptiveCoreChatLabView: View {
 }
 
 private enum CoreChatLabFixture {
+    static func connection() -> CompanionConnection {
+        let skillsEndpoint = CompanionEndpointCapability(
+            method: "GET",
+            path: "/v1/skills"
+        )
+        let toolsetsEndpoint = CompanionEndpointCapability(
+            method: "GET",
+            path: "/v1/toolsets"
+        )
+        let endpoints = [
+            "file_roots": CompanionEndpointCapability(
+                method: "GET",
+                path: "/companion/v1/files/roots"
+            ),
+            "memory": CompanionEndpointCapability(
+                method: "GET",
+                path: "/companion/v1/memory/{target}"
+            ),
+            "memory_operations": CompanionEndpointCapability(
+                method: "POST",
+                path: "/companion/v1/memory/{target}/operations"
+            ),
+            "memory_reset": CompanionEndpointCapability(
+                method: "POST",
+                path: "/companion/v1/memory/{target}/reset"
+            ),
+            "skills": skillsEndpoint,
+            "toolsets": toolsetsEndpoint,
+        ]
+        let companion = CompanionCapabilityBlock(
+            version: "ui-smoke",
+            features: [
+                "files": .bool(true),
+                "memory": .bool(true),
+                "skills_proxy": .bool(true),
+                "toolsets_proxy": .bool(true),
+            ],
+            endpoints: endpoints
+        )
+        let gatewayCapabilities = CompanionGatewayCapabilities(
+            object: "capabilities",
+            platform: "api_server",
+            auth: nil,
+            runtime: nil,
+            features: ["skills_api": .bool(true)],
+            endpoints: [
+                "skills": skillsEndpoint,
+                "toolsets": toolsetsEndpoint,
+            ]
+        )
+        return CompanionConnection(
+            companionURL: URL(string: "https://ui-smoke.invalid")!,
+            deviceID: "ui-smoke-device",
+            capabilities: CompanionCapabilities(
+                object: "capabilities",
+                contractVersion: "1",
+                companion: companion,
+                gateway: CompanionGatewayCapabilityBlock(
+                    status: "ok",
+                    capabilities: gatewayCapabilities
+                )
+            )
+        )
+    }
+
     static func session(
         usesSimplifiedChinese: Bool
     ) -> SessionSummary {

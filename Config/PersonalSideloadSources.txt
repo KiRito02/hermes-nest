@@ -22,6 +22,7 @@ CompanionPresentationSupport.swift
 CompanionSessionPool.swift
 CompanionSessionListView.swift
 CompanionSessionListViewModel.swift
+CompanionShellComponents.swift
 CompanionWorkspaceModels.swift
 CompanionWorkspaceService.swift
 CompanionWorkspaceView.swift

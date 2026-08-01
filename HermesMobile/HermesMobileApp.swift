@@ -72,6 +72,10 @@ struct HermesMobileApp: App {
                     layout: .compact,
                     requestsLandscape: false
                 )
+            } else if ProcessInfo.processInfo.arguments.contains(
+                "--companion-shell-lab"
+            ) {
+                CompanionShellLabView()
             } else if ProcessInfo.processInfo.arguments.contains("--core-chat-lab") {
                 NavigationStack {
                     CoreChatLabView()
