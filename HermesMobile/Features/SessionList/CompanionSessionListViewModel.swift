@@ -678,6 +678,7 @@ final class CompanionSessionHistoryViewModel {
     private var runStartAdmission: (() -> Bool)?
     @ObservationIgnored private var deltaBuffer =
         ConversationRunDeltaBuffer()
+    private var deltaPresentationTickCount = 0
     private var liveRunAnchorMessageIDs: Set<String> = []
     private var isStopRequestInFlight = false
     private var stopRecoveryState: CompanionStopRecoveryState = .notRequested
@@ -2174,6 +2175,9 @@ final class CompanionSessionHistoryViewModel {
     }
 
     private func enqueue(_ delta: String) {
+        if deltaBuffer.isEmpty {
+            deltaPresentationTickCount = 0
+        }
         deltaBuffer.append(delta)
         ensureDeltaFlushScheduled()
     }
@@ -2198,6 +2202,19 @@ final class CompanionSessionHistoryViewModel {
         deltaFlushTask = nil
         let pendingText = deltaBuffer.pendingText
         let backlogUnits = StreamingWordDrain.unitCount(in: pendingText)
+        let maximumTicks = max(
+            1,
+            Int(
+                Self.maximumPresentationLagNanoseconds
+                    / Self.deltaFlushCadenceNanoseconds
+            )
+        )
+        let remainingTicks = max(
+            1,
+            maximumTicks - deltaPresentationTickCount
+        )
+        let remainingLagNanoseconds =
+            Self.deltaFlushCadenceNanoseconds * UInt64(remainingTicks)
         let maximumCharacters: Int
         if backlogUnits <= 1 {
             maximumCharacters = max(
@@ -2205,8 +2222,7 @@ final class CompanionSessionHistoryViewModel {
                 Int(
                     ceil(
                         Double(pendingText.count)
-                            * Double(Self.deltaFlushCadenceNanoseconds)
-                            / Double(Self.maximumPresentationLagNanoseconds)
+                            / Double(remainingTicks)
                     )
                 )
             )
@@ -2214,7 +2230,7 @@ final class CompanionSessionHistoryViewModel {
             let quota = StreamingWordDrain.drainQuota(
                 backlogUnitCount: backlogUnits,
                 cadenceNanoseconds: Self.deltaFlushCadenceNanoseconds,
-                maxLagNanoseconds: Self.maximumPresentationLagNanoseconds
+                maxLagNanoseconds: remainingLagNanoseconds
             )
             maximumCharacters = StreamingWordDrain.splitAtUnitBoundary(
                 pendingText,
@@ -2225,6 +2241,10 @@ final class CompanionSessionHistoryViewModel {
             maximumCharacters: maximumCharacters
         )
         guard !drained.isEmpty else { return }
+        deltaPresentationTickCount += 1
+        if deltaBuffer.isEmpty {
+            deltaPresentationTickCount = 0
+        }
         streamedAssistantText += drained
         markStreamingTranscriptChanged()
         ensureDeltaFlushScheduled()
