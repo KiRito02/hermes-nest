@@ -93,17 +93,31 @@ struct CompanionSessionListView: View {
     @State private var isConfirmingForget = false
     @State private var selectedSessionID: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var preferredCompactColumn:
+        NavigationSplitViewColumn = .sidebar
+    @State private var detailNavigationPath:
+        [CompanionShellDestination] = []
+    @State private var showsConnectionDetails = false
     @State private var sessionPendingDelete: SessionSummary?
     @State private var isCreatingSession = false
     @State private var historyViewModelRegistry =
         CompanionSessionHistoryViewModelRegistry()
     @FocusState private var isSearchFocused: Bool
     private let repository: any SessionRepository
+    private let runService: (any ConversationRunServing)?
+    private let modelService: (any CompanionModelServing)?
+    private let workspaceService: (any CompanionWorkspaceServing)?
+    private let discoveryService: (any CompanionDiscoveryServing)?
 
     init(
         connectionManager: CompanionConnectionManager,
         connection: CompanionConnection,
-        repository: (any SessionRepository)? = nil
+        repository: (any SessionRepository)? = nil,
+        initialSelectedSessionID: String? = nil,
+        runService: (any ConversationRunServing)? = nil,
+        modelService: (any CompanionModelServing)? = nil,
+        workspaceService: (any CompanionWorkspaceServing)? = nil,
+        discoveryService: (any CompanionDiscoveryServing)? = nil
     ) {
         self.connectionManager = connectionManager
         self.connection = connection
@@ -111,135 +125,151 @@ struct CompanionSessionListView: View {
             companionURL: connection.companionURL
         )
         self.repository = resolvedRepository
+        self.runService = runService
+        self.modelService = modelService
+        self.workspaceService = workspaceService
+        self.discoveryService = discoveryService
         _viewModel = State(
             initialValue: CompanionSessionListViewModel(
                 repository: resolvedRepository,
                 companionURL: connection.companionURL
             )
         )
+        _selectedSessionID = State(
+            initialValue: initialSelectedSessionID
+        )
     }
 
     var body: some View {
         let displayedSessions = viewModel.matchingSessions(searchText: searchText)
 
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            List(selection: $selectedSessionID) {
+        NavigationSplitView(
+            columnVisibility: $columnVisibility,
+            preferredCompactColumn: $preferredCompactColumn
+        ) {
+            List(selection: sessionSelection) {
                 if viewModel.isViewingCachedData {
                     CompanionOfflineCacheBanner()
                         .listRowSeparator(.hidden)
                 }
 
-                ForEach(displayedSessions) { session in
-                    NavigationLink(value: session.id) {
-                        SessionRowView(
-                            session: session,
-                            showsMessageCount: true,
-                            showsWorkspace: false,
-                            isViewingCachedData: viewModel.isViewingCachedData
-                        )
+                Section {
+                    if connection.capabilities.supportsFiles {
+                        destinationRow(.files)
                     }
-                    .tag(session.id)
-                    .listRowInsets(
-                        EdgeInsets(
-                            top: 4,
-                            leading: 10,
-                            bottom: 4,
-                            trailing: 10
-                        )
+
+                    if connection.capabilities.supportsBuiltInMemory {
+                        destinationRow(.memory)
+                    }
+
+                    destinationRow(
+                        .skillsAndToolsets,
+                        isEnabled: connection.capabilities
+                            .supportsSkillsAndToolsetsDiscovery
                     )
-                    .listRowBackground(Color.clear)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            sessionPendingDelete = session
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
-                    .onAppear {
-                        guard session.id == displayedSessions.last?.id else { return }
-                        Task {
-                            await viewModel.loadNextPageIfNeeded(
-                                modelContext: modelContext
-                            )
-                        }
-                    }
                 }
 
-                if viewModel.isLoadingNextPage {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
+                Section("Recent") {
+                    ForEach(displayedSessions) { session in
+                        NavigationLink(value: session.id) {
+                            SessionRowView(
+                                session: session,
+                                showsMessageCount: true,
+                                showsWorkspace: false,
+                                isViewingCachedData:
+                                    viewModel.isViewingCachedData
+                            )
+                            .background(
+                                isSelected(session)
+                                    ? HermesNestDesign.selectedSurface
+                                    : Color.clear,
+                                in: RoundedRectangle(
+                                    cornerRadius: HermesNestDesign.Shell
+                                        .sidebarRowCornerRadius,
+                                    style: .continuous
+                                )
+                            )
+                        }
+                        .tag(session.id)
+                        .accessibilityAddTraits(
+                            isSelected(session) ? .isSelected : []
+                        )
+                        .listRowInsets(
+                            EdgeInsets(
+                                top: 2,
+                                leading: 8,
+                                bottom: 2,
+                                trailing: 8
+                            )
+                        )
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .swipeActions(
+                            edge: .trailing,
+                            allowsFullSwipe: false
+                        ) {
+                            Button(role: .destructive) {
+                                sessionPendingDelete = session
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                        .onAppear {
+                            guard session.id == displayedSessions.last?.id else {
+                                return
+                            }
+                            Task {
+                                await viewModel.loadNextPageIfNeeded(
+                                    modelContext: modelContext
+                                )
+                            }
+                        }
                     }
-                    .listRowSeparator(.hidden)
+
+                    if displayedSessions.isEmpty {
+                        sessionListStateRow
+                    }
+
+                    if viewModel.isLoadingNextPage {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                        .listRowSeparator(.hidden)
+                    }
                 }
             }
-            .listStyle(.plain)
+            .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
             .background(HermesNestDesign.sidebar)
-            .navigationTitle("Chats")
+            .navigationTitle("Hermes Nest")
             .searchable(text: $searchText, prompt: "Search chats")
             .searchFocused($isSearchFocused)
             .refreshable {
                 await viewModel.loadInitial(modelContext: modelContext)
-            }
-            .overlay {
-                listOverlay
             }
             .navigationSplitViewColumnWidth(
                 min: 280,
                 ideal: HermesNestDesign.sidebarIdealWidth,
                 max: 390
             )
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    Divider()
+
+                    CompanionConnectionRow(
+                        companionURL: connection.companionURL,
+                        isWorking: connectionManager.isWorking
+                    ) {
+                        showsConnectionDetails = true
+                    }
+                    .padding(.horizontal, HermesNestDesign.Spacing.small)
+                    .padding(.vertical, HermesNestDesign.Spacing.xSmall)
+                }
+                .background(HermesNestDesign.sidebar)
+            }
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        CompanionDiscoveryView(
-                            companionURL: connection.companionURL,
-                            capabilities: connection.capabilities
-                        )
-                    } label: {
-                        Image(systemName: "books.vertical")
-                    }
-                    .disabled(
-                        !connection.capabilities
-                            .supportsSkillsAndToolsetsDiscovery
-                    )
-                    .accessibilityLabel("Skills and Toolsets")
-                    .accessibilityHint(Text(
-                        connection.capabilities
-                            .supportsSkillsAndToolsetsDiscovery
-                            ? "Browses read-only Hermes capabilities"
-                            : "Unavailable with this Gateway or Companion"
-                    ))
-                }
-
-                if connection.capabilities.supportsFiles {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        NavigationLink {
-                            CompanionWorkspaceView(
-                                companionURL: connection.companionURL
-                            )
-                        } label: {
-                            Image(systemName: "folder")
-                        }
-                        .accessibilityLabel("Files")
-                    }
-                }
-
-                if connection.capabilities.supportsBuiltInMemory {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        NavigationLink {
-                            CompanionMemoryView(
-                                companionURL: connection.companionURL
-                            )
-                        } label: {
-                            Image(systemName: "brain")
-                        }
-                        .accessibilityLabel("Memory")
-                    }
-                }
-
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         createSession()
@@ -254,38 +284,24 @@ struct CompanionSessionListView: View {
                     .help("New Chat")
                     .accessibilityLabel("New chat")
                 }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button {
-                            Task {
-                                await viewModel.loadInitial(modelContext: modelContext)
-                            }
-                        } label: {
-                            Label("Refresh sessions", systemImage: "arrow.clockwise")
-                        }
-
-                        Button(role: .destructive) {
-                            isConfirmingForget = true
-                        } label: {
-                            Label("Forget Companion", systemImage: "rectangle.portrait.and.arrow.right")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .font(.title3)
-                    }
-                    .accessibilityLabel("Connection actions")
-                }
             }
         } detail: {
-            if let selectedSession {
-                historyView(for: selectedSession)
-            } else {
-                CompanionChatWelcomeView(
-                    isCreatingSession: isCreatingSession,
-                    canCreateSession: !viewModel.isViewingCachedData,
-                    onCreateSession: createSession
-                )
+            NavigationStack(path: $detailNavigationPath) {
+                Group {
+                    if let selectedSession {
+                        historyView(for: selectedSession)
+                    } else {
+                        CompanionChatWelcomeView(
+                            isCreatingSession: isCreatingSession,
+                            canCreateSession: !viewModel.isViewingCachedData,
+                            onCreateSession: createSession
+                        )
+                    }
+                }
+                .navigationDestination(for: CompanionShellDestination.self) {
+                    destination in
+                    destinationView(destination)
+                }
             }
         }
         .navigationSplitViewStyle(.balanced)
@@ -306,6 +322,29 @@ struct CompanionSessionListView: View {
             if viewModel.sessions.isEmpty {
                 await viewModel.loadInitial(modelContext: modelContext)
             }
+        }
+        .sheet(isPresented: $showsConnectionDetails) {
+            CompanionConnectionDetailsView(
+                companionURL: connection.companionURL,
+                gatewayStatus:
+                    connection.capabilities.gateway?.status,
+                isWorking: connectionManager.isWorking,
+                onRefresh: {
+                    Task {
+                        await connectionManager.resume()
+                        await viewModel.loadInitial(modelContext: modelContext)
+                    }
+                },
+                onForget: {
+                    showsConnectionDetails = false
+                    Task { @MainActor in
+                        await Task.yield()
+                        isConfirmingForget = true
+                    }
+                }
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
         }
         .alert("Forget this Companion?", isPresented: $isConfirmingForget) {
             Button("Cancel", role: .cancel) {}
@@ -369,6 +408,129 @@ struct CompanionSessionListView: View {
         viewModel.sessionForNavigation(id: selectedSessionID)
     }
 
+    private var sessionSelection: Binding<String?> {
+        Binding(
+            get: { selectedSessionID },
+            set: { sessionID in
+                selectedSessionID = sessionID
+                guard sessionID != nil else { return }
+                detailNavigationPath.removeAll()
+                showDetailColumn()
+            }
+        )
+    }
+
+    private func isSelected(_ session: SessionSummary) -> Bool {
+        detailNavigationPath.isEmpty && selectedSessionID == session.id
+    }
+
+    @ViewBuilder
+    private func destinationRow(
+        _ destination: CompanionShellDestination,
+        isEnabled: Bool = true
+    ) -> some View {
+        CompanionShellDestinationRow(
+            destination: destination,
+            isSelected: detailNavigationPath.last == destination,
+            isEnabled: isEnabled
+        ) {
+            openDestination(destination)
+        }
+        .listRowInsets(
+            EdgeInsets(
+                top: 2,
+                leading: 8,
+                bottom: 2,
+                trailing: 8
+            )
+        )
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+    }
+
+    private func openDestination(
+        _ destination: CompanionShellDestination
+    ) {
+        detailNavigationPath = [destination]
+        showDetailColumn()
+    }
+
+    private func showDetailColumn() {
+        guard horizontalSizeClass != .regular else { return }
+        preferredCompactColumn = .detail
+        columnVisibility = .detailOnly
+    }
+
+    @ViewBuilder
+    private func destinationView(
+        _ destination: CompanionShellDestination
+    ) -> some View {
+        switch destination {
+        case .files:
+            CompanionWorkspaceView(
+                companionURL: connection.companionURL,
+                service: workspaceService
+            )
+        case .memory:
+            CompanionMemoryView(
+                companionURL: connection.companionURL,
+                service: workspaceService
+            )
+        case .skillsAndToolsets:
+            CompanionDiscoveryView(
+                companionURL: connection.companionURL,
+                capabilities: connection.capabilities,
+                service: discoveryService
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var sessionListStateRow: some View {
+        if viewModel.isLoading && viewModel.sessions.isEmpty {
+            HStack(spacing: HermesNestDesign.Spacing.small) {
+                ProgressView()
+                Text("Loading sessions...")
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .listRowSeparator(.hidden)
+        } else if let errorMessage = viewModel.errorMessage,
+                  viewModel.sessions.isEmpty {
+            VStack(alignment: .leading, spacing: HermesNestDesign.Spacing.small) {
+                Label(
+                    "Sessions unavailable",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.subheadline.weight(.semibold))
+
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Button("Retry") {
+                    Task {
+                        await connectionManager.resume()
+                        await viewModel.loadInitial(modelContext: modelContext)
+                    }
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(.vertical, HermesNestDesign.Spacing.small)
+            .listRowSeparator(.hidden)
+        } else {
+            Text(
+                searchText.isEmpty
+                    ? String(localized: "No sessions yet")
+                    : String(localized: "No matching chats")
+            )
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .padding(.vertical, HermesNestDesign.Spacing.small)
+            .listRowSeparator(.hidden)
+        }
+    }
+
     private func createSession() {
         guard !isCreatingSession else { return }
         isCreatingSession = true
@@ -376,9 +538,8 @@ struct CompanionSessionListView: View {
             defer { isCreatingSession = false }
             if let created = await viewModel.createSession() {
                 selectedSessionID = created.id
-                if horizontalSizeClass != .regular {
-                    columnVisibility = .detailOnly
-                }
+                detailNavigationPath.removeAll()
+                showDetailColumn()
             }
         }
     }
@@ -397,6 +558,9 @@ struct CompanionSessionListView: View {
             supportsUploads: connection.capabilities.supportsUploads,
             supportsServerFileAttachments:
                 connection.capabilities.supportsServerFileAttachments,
+            runService: runService,
+            modelService: modelService,
+            workspaceService: workspaceService,
             historyViewModelRegistry: historyViewModelRegistry,
             onUpdated: { session in
                 selectedSessionID = session.id
@@ -426,33 +590,6 @@ struct CompanionSessionListView: View {
         .id(session.sessionId)
     }
 
-    @ViewBuilder
-    private var listOverlay: some View {
-        if viewModel.isLoading && viewModel.sessions.isEmpty {
-            ProgressView("Loading sessions...")
-        } else if let errorMessage = viewModel.errorMessage,
-                  viewModel.sessions.isEmpty {
-            ContentUnavailableView {
-                Label("Sessions unavailable", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(errorMessage)
-            } actions: {
-                Button("Retry") {
-                    Task {
-                        await connectionManager.resume()
-                        await viewModel.loadInitial(modelContext: modelContext)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-            }
-        } else if viewModel.sessions.isEmpty {
-            ContentUnavailableView(
-                "No sessions yet",
-                systemImage: "bubble.left.and.bubble.right",
-                description: Text("Existing Hermes sessions will appear here.")
-            )
-        }
-    }
 }
 
 @MainActor
@@ -501,6 +638,7 @@ struct CompanionSessionHistoryView: View {
     let onUpdated: (SessionSummary) -> Void
     let onForked: () -> Void
     let onDeleted: (String) -> Void
+    private let registrySessionID: String
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -570,6 +708,7 @@ struct CompanionSessionHistoryView: View {
         self.onUpdated = onUpdated
         self.onForked = onForked
         self.onDeleted = onDeleted
+        registrySessionID = session.id
         let makeViewModel = {
             CompanionSessionHistoryViewModel(
                 session: session,
@@ -721,7 +860,10 @@ struct CompanionSessionHistoryView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            companionComposer
+            VStack(spacing: 0) {
+                companionComposer
+            }
+            .background(HermesNestDesign.canvas.ignoresSafeArea())
         }
         .overlay {
             if viewModel.isLoading && viewModel.allMessages.isEmpty {
@@ -821,7 +963,7 @@ struct CompanionSessionHistoryView: View {
         .onAppear {
             historyViewModelRegistry?.adopt(
                 viewModel,
-                sessionID: viewModel.session.id
+                sessionID: registrySessionID
             )
         }
         .task(id: didCompleteInitialAppearance) {
@@ -835,9 +977,9 @@ struct CompanionSessionHistoryView: View {
             await viewModel.resumeRunObservation(
                 modelContext: modelContext
             )
-            if !viewModel.hasLoadedAuthoritativeHistory {
-                await viewModel.load(modelContext: modelContext)
-            }
+            await viewModel.refreshHistoryOnAppearance(
+                modelContext: modelContext
+            )
             await viewModel.loadModelOptions()
             if supportsUploads {
                 await viewModel.restorePendingUploads()
@@ -1110,8 +1252,14 @@ struct CompanionSessionHistoryView: View {
                 alignment: .leading,
                 spacing: 2
             ) {
-                ForEach(viewModel.liveReasoningGroups) { group in
-                    ReasoningBlockView(text: group.text)
+                if let reasoning =
+                    viewModel.liveReasoningPresentationText {
+                    ReasoningBlockView(
+                        text: reasoning,
+                        isActive:
+                            viewModel.isLiveThinkingPresentationActive
+                    )
+                        .id("companion-live-thinking")
                         .accessibilityIdentifier(
                             "companion.run.reasoning"
                         )
@@ -1183,25 +1331,6 @@ struct CompanionSessionHistoryView: View {
                 attachmentStrip
             }
 
-            if let error = viewModel.modelSelectionErrorMessage {
-                HStack(spacing: 8) {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .lineLimit(2)
-                    Spacer(minLength: 8)
-                    if viewModel.modelGroups.isEmpty {
-                        Button("Retry") {
-                            Task {
-                                await viewModel.loadModelOptions(refresh: true)
-                            }
-                        }
-                        .font(HermesNestDesign.Typography.control)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
             composerInputLayout {
                 Button {
                     if supportsUploads {
@@ -1249,13 +1378,12 @@ struct CompanionSessionHistoryView: View {
                 .focused($composerIsFocused)
                 .lineLimit(1...6)
                 .textFieldStyle(.plain)
-                .disabled(
-                    !viewModel.canSend
-                        || viewModel.isPreparingDroppedAttachments
-                )
+                .disabled(!viewModel.canEditDraft)
                 .submitLabel(.send)
                 .onSubmit {
-                    sendDraft()
+                    if viewModel.canSend {
+                        sendDraft()
+                    }
                 }
 
                 if viewModel.isRunActive {
@@ -1412,6 +1540,16 @@ struct CompanionSessionHistoryView: View {
 
     private var compactComposerContextMenu: some View {
         Menu {
+            if viewModel.modelSelectionErrorMessage != nil {
+                Button {
+                    Task {
+                        await viewModel.loadModelOptions(refresh: true)
+                    }
+                } label: {
+                    Label("Retry", systemImage: "arrow.clockwise")
+                }
+            }
+
             if !viewModel.modelGroups.isEmpty
                 || viewModel.isLoadingModelOptions {
                 Button {

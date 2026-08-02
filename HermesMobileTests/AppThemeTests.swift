@@ -86,6 +86,25 @@ final class AppThemeTests: XCTestCase {
         XCTAssertEqual(SessionIdentitySettings.normalizedInitials(" u-z!9 "), "UZ9")
         XCTAssertEqual(SessionIdentitySettings.normalizedInitials("abcd"), "ABC")
     }
+
+    func testAppShellControlTargetsMeetThePlatformMinimum() {
+        XCTAssertGreaterThanOrEqual(
+            HermesNestDesign.Shell.minimumControlSize,
+            44
+        )
+    }
+
+    func testAppShellDestinationsHaveDistinctLabelsAndSymbols() {
+        let destinations = CompanionShellDestination.allCases
+
+        XCTAssertEqual(Set(destinations.map(\.title)).count, destinations.count)
+        XCTAssertEqual(
+            Set(destinations.map(\.systemImage)).count,
+            destinations.count
+        )
+        XCTAssertTrue(destinations.allSatisfy { !$0.title.isEmpty })
+        XCTAssertTrue(destinations.allSatisfy { !$0.systemImage.isEmpty })
+    }
 }
 
 final class PrimaryActionTintSettingsTests: XCTestCase {

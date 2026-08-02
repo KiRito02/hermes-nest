@@ -612,14 +612,14 @@ final class SessionRepositoryTests: CompanionHTTPTestCase {
         XCTAssertTrue(loaded)
         XCTAssertEqual(4, viewModel.allMessages.count)
         XCTAssertEqual(
-            ["user", "assistant", "assistant"],
+            ["user", "assistant"],
             viewModel.visibleMessages.compactMap(\.role)
         )
         XCTAssertFalse(viewModel.visibleMessages.contains {
             $0.content?.contains("<untrusted_tool_result") == true
         })
         let activity = viewModel.durableToolActivity(
-            anchoredTo: toolRequest
+            anchoredTo: try XCTUnwrap(viewModel.visibleMessages.last)
         )
         let toolCalls = activity.flatMap(\.toolCalls)
         XCTAssertEqual(["web_search"], toolCalls.map(\.name))
@@ -743,6 +743,48 @@ final class SessionRepositoryTests: CompanionHTTPTestCase {
         XCTAssertEqual("tip-session", viewModel.session.sessionId)
         XCTAssertEqual(["tip-session"], recordedDetailIDs)
         XCTAssertEqual(["tip-session"], recordedUpdateIDs)
+    }
+
+    @MainActor
+    func testResolvedHistoryRemainsUsableWhenDetailRefreshFails() async throws {
+        let parent = SessionSummary(
+            sessionId: "parent-session",
+            title: "Compressed parent"
+        )
+        let repository = ResolvedHistoryStubSessionRepository(
+            detail: SessionSummary(sessionId: "tip-session"),
+            history: SessionHistory(
+                sessionID: "tip-session",
+                messages: [
+                    ChatMessage(
+                        role: "assistant",
+                        content: "Resolved transcript",
+                        timestamp: 1,
+                        messageId: "tip-session:message:1"
+                    )
+                ]
+            ),
+            failsDetailRefresh: true
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: parent,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            )
+        )
+
+        let loaded = await viewModel.load()
+
+        XCTAssertTrue(loaded)
+        XCTAssertEqual("tip-session", viewModel.session.sessionId)
+        XCTAssertEqual("Compressed parent", viewModel.session.title)
+        XCTAssertEqual(
+            "Resolved transcript",
+            viewModel.allMessages.last?.content
+        )
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertTrue(viewModel.canSend)
     }
 
     private func makeSession(
@@ -944,12 +986,18 @@ private actor MutationStubSessionRepository: SessionRepository {
 private actor ResolvedHistoryStubSessionRepository: SessionRepository {
     let detail: SessionSummary
     let history: SessionHistory
+    let failsDetailRefresh: Bool
     private(set) var recordedDetailIDs: [String] = []
     private(set) var recordedUpdateIDs: [String] = []
 
-    init(detail: SessionSummary, history: SessionHistory) {
+    init(
+        detail: SessionSummary,
+        history: SessionHistory,
+        failsDetailRefresh: Bool = false
+    ) {
         self.detail = detail
         self.history = history
+        self.failsDetailRefresh = failsDetailRefresh
     }
 
     func listSessions(_ query: SessionListQuery) async throws -> SessionPage {
@@ -962,6 +1010,9 @@ private actor ResolvedHistoryStubSessionRepository: SessionRepository {
 
     func session(id: String) async throws -> SessionSummary {
         recordedDetailIDs.append(id)
+        if failsDetailRefresh {
+            throw SessionRepositoryError.companionUnreachable
+        }
         return detail
     }
 

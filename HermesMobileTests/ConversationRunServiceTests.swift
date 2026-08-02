@@ -3252,20 +3252,68 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         )
         XCTAssertEqual("Finish", viewModel.allMessages.last?.content)
         XCTAssertFalse(viewModel.canSend)
+        XCTAssertTrue(viewModel.canEditDraft)
         XCTAssertTrue(viewModel.needsTerminalHistoryRetry)
         XCTAssertNil(viewModel.errorMessage)
         XCTAssertFalse(viewModel.terminalHistoryRetryMessage.isEmpty)
 
-        let didRetry = await viewModel.retryTerminalHistory(
+        await viewModel.refreshHistoryOnAppearance(
             modelContext: modelContext
         )
-        XCTAssertTrue(didRetry)
         XCTAssertEqual(
             "Authoritative final answer",
             viewModel.allMessages.last?.content
         )
         XCTAssertEqual("", viewModel.streamedAssistantText)
         XCTAssertFalse(viewModel.needsTerminalHistoryRetry)
+        XCTAssertTrue(viewModel.canSend)
+    }
+
+    @MainActor
+    func testReenteringLoadedSessionRetriesTransientRefreshWithoutBlockingDraft() async throws {
+        let session = try makeSessionSummary()
+        let history = [
+            ChatMessage(
+                role: "user",
+                content: "Existing question",
+                timestamp: 1,
+                messageId: "user-1"
+            ),
+            ChatMessage(
+                role: "assistant",
+                content: "Existing answer",
+                timestamp: 2,
+                messageId: "assistant-1"
+            ),
+        ]
+        let repository = RunHistoryRepositoryStub(
+            session: session,
+            failHistoryCalls: [2],
+            historyMessagesByCall: [1: history, 3: history]
+        )
+        let viewModel = CompanionSessionHistoryViewModel(
+            session: session,
+            repository: repository,
+            companionURL: try XCTUnwrap(
+                URL(string: "https://companion.example.test")
+            )
+        )
+
+        let initialLoad = await viewModel.load()
+        let transientRefresh = await viewModel.load()
+        XCTAssertTrue(initialLoad)
+        XCTAssertFalse(transientRefresh)
+        XCTAssertTrue(viewModel.hasLoadedAuthoritativeHistory)
+        XCTAssertTrue(viewModel.shouldRefreshHistoryOnAppearance)
+        XCTAssertTrue(viewModel.canEditDraft)
+        XCTAssertTrue(viewModel.canSend)
+
+        await viewModel.refreshHistoryOnAppearance()
+
+        let historyCallCount = await repository.historyCallCount
+        XCTAssertEqual(3, historyCallCount)
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertFalse(viewModel.shouldRefreshHistoryOnAppearance)
         XCTAssertTrue(viewModel.canSend)
     }
 
@@ -3832,6 +3880,13 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
             ),
             ChatMessage(
                 role: "assistant",
+                content: nil,
+                timestamp: 3.5,
+                messageId: "assistant-reasoning",
+                reasoning: "I should summarize the verified result."
+            ),
+            ChatMessage(
+                role: "assistant",
                 content: "The file contains project documentation.",
                 timestamp: 4,
                 messageId: "assistant-answer"
@@ -3856,7 +3911,10 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         XCTAssertTrue(didLoad)
 
         XCTAssertEqual(
-            ["I should inspect the requested file first."],
+            [
+                "I should inspect the requested file first.",
+                "I should summarize the verified result."
+            ],
             viewModel.durableReasoningGroups.map(\.text)
         )
         XCTAssertEqual(1, viewModel.durableToolCallGroups.count)
@@ -3867,6 +3925,25 @@ final class ConversationRunServiceTests: CompanionHTTPTestCase {
         XCTAssertEqual(
             "Project documentation",
             viewModel.durableToolCallGroups.first?.toolCalls.first?.preview
+        )
+        XCTAssertEqual(
+            ["user-1", "assistant-answer"],
+            viewModel.visibleMessages.map(\.id)
+        )
+        XCTAssertEqual(
+            [
+                "I should inspect the requested file first.\n\n"
+                    + "I should summarize the verified result."
+            ],
+            viewModel.durableReasoning(
+                anchoredTo: messages[4]
+            ).map(\.text)
+        )
+        XCTAssertEqual(
+            ["read_file"],
+            viewModel.durableToolActivity(
+                anchoredTo: messages[4]
+            ).flatMap(\.toolCalls).compactMap(\.name)
         )
     }
 

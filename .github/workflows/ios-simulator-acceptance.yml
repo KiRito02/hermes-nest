@@ -164,8 +164,11 @@ jobs:
 
           capture_ui en en_US --core-chat-lab core-chat-en.png
           capture_ui zh-Hans zh_CN --core-chat-lab core-chat-zh-Hans.png
+          capture_ui en en_US --companion-shell-lab companion-shell-en.png
+          capture_ui zh-Hans zh_CN --companion-shell-lab companion-shell-zh-Hans.png
           xcrun simctl ui "${SIMULATOR_UDID}" appearance dark
           capture_ui en en_US --core-chat-lab core-chat-dark.png
+          capture_ui en en_US --companion-shell-lab companion-shell-dark.png
           xcrun simctl ui "${SIMULATOR_UDID}" appearance light
           capture_ui en en_US --long-chat-lab long-chat.png
 

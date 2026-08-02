@@ -48,6 +48,65 @@ struct CoreChatLabView: View {
 
 }
 
+/// Deterministic host for the production adaptive shell. It deliberately uses
+/// the real session list, sidebar destinations, and detail navigation while
+/// keeping every repository response local to the process.
+struct CompanionShellLabView: View {
+    @State private var connectionManager: CompanionConnectionManager
+
+    private let session: SessionSummary
+    private let repository: any SessionRepository
+    private let connection: CompanionConnection
+    private let runService: any ConversationRunServing
+    private let modelService: any CompanionModelServing
+    private let workspaceService: any CompanionWorkspaceServing
+    private let discoveryService: any CompanionDiscoveryServing
+
+    init() {
+        let usesSimplifiedChinese =
+            Locale.preferredLanguages.first?.hasPrefix("zh-Hans") == true
+                || Locale.preferredLanguages.first?.hasPrefix("zh-CN") == true
+        let session = CoreChatLabFixture.session(
+            usesSimplifiedChinese: usesSimplifiedChinese
+        )
+        self.session = session
+        repository = CoreChatLabRepository(
+            session: session,
+            messages: CoreChatLabFixture.messages(
+                usesSimplifiedChinese: usesSimplifiedChinese
+            )
+        )
+        let connection = CoreChatLabFixture.connection()
+        self.connection = connection
+        _connectionManager = State(
+            initialValue: CompanionConnectionManager(
+                service: CoreChatLabConnectionService(
+                    connection: connection
+                )
+            )
+        )
+        runService = CoreChatLabRunService(
+            usesSimplifiedChinese: usesSimplifiedChinese
+        )
+        modelService = CoreChatLabModelService()
+        workspaceService = CoreChatLabWorkspaceService()
+        discoveryService = CoreChatLabDiscoveryService()
+    }
+
+    var body: some View {
+        CompanionSessionListView(
+            connectionManager: connectionManager,
+            connection: connection,
+            repository: repository,
+            initialSelectedSessionID: session.id,
+            runService: runService,
+            modelService: modelService,
+            workspaceService: workspaceService,
+            discoveryService: discoveryService
+        )
+    }
+}
+
 /// Signed simulator acceptance host for the regular iPad split view and a
 /// deterministic narrow Stage Manager-width content proposal. The compact
 /// fixture does not pretend to resize Simulator itself; manual acceptance
@@ -61,37 +120,15 @@ struct AdaptiveCoreChatLabView: View {
     let layout: Layout
     let requestsLandscape: Bool
 
-    @State private var columnVisibility:
-        NavigationSplitViewVisibility = .all
-
     var body: some View {
         Group {
             switch layout {
             case .regular:
-                NavigationSplitView(
-                    columnVisibility: $columnVisibility
-                ) {
-                    List {
-                        Label(
-                            "Hermes Nest UI Review",
-                            systemImage: "bubble.left.and.bubble.right"
-                        )
-                    }
-                    .navigationTitle("Chats")
-                    .navigationSplitViewColumnWidth(
-                        min: 280,
-                        ideal: HermesNestDesign.sidebarIdealWidth,
-                        max: 390
-                    )
-                } detail: {
-                    CoreChatLabView()
-                }
-                .navigationSplitViewStyle(.balanced)
+                CompanionShellLabView()
 
             case .compact:
-                NavigationStack {
-                    CoreChatLabView()
-                }
+                CompanionShellLabView()
+                .environment(\.horizontalSizeClass, .compact)
                 .frame(maxWidth: 620)
                 .frame(maxWidth: .infinity)
                 .background(HermesNestDesign.raisedSurface)
@@ -124,6 +161,71 @@ struct AdaptiveCoreChatLabView: View {
 }
 
 private enum CoreChatLabFixture {
+    static func connection() -> CompanionConnection {
+        let skillsEndpoint = CompanionEndpointCapability(
+            method: "GET",
+            path: "/v1/skills"
+        )
+        let toolsetsEndpoint = CompanionEndpointCapability(
+            method: "GET",
+            path: "/v1/toolsets"
+        )
+        let endpoints = [
+            "file_roots": CompanionEndpointCapability(
+                method: "GET",
+                path: "/companion/v1/files/roots"
+            ),
+            "memory": CompanionEndpointCapability(
+                method: "GET",
+                path: "/companion/v1/memory/{target}"
+            ),
+            "memory_operations": CompanionEndpointCapability(
+                method: "POST",
+                path: "/companion/v1/memory/{target}/operations"
+            ),
+            "memory_reset": CompanionEndpointCapability(
+                method: "POST",
+                path: "/companion/v1/memory/{target}/reset"
+            ),
+            "skills": skillsEndpoint,
+            "toolsets": toolsetsEndpoint,
+        ]
+        let companion = CompanionCapabilityBlock(
+            version: "ui-smoke",
+            features: [
+                "files": .bool(true),
+                "memory": .bool(true),
+                "skills_proxy": .bool(true),
+                "toolsets_proxy": .bool(true),
+            ],
+            endpoints: endpoints
+        )
+        let gatewayCapabilities = CompanionGatewayCapabilities(
+            object: "capabilities",
+            platform: "api_server",
+            auth: nil,
+            runtime: nil,
+            features: ["skills_api": .bool(true)],
+            endpoints: [
+                "skills": skillsEndpoint,
+                "toolsets": toolsetsEndpoint,
+            ]
+        )
+        return CompanionConnection(
+            companionURL: URL(string: "https://ui-smoke.invalid")!,
+            deviceID: "ui-smoke-device",
+            capabilities: CompanionCapabilities(
+                object: "capabilities",
+                contractVersion: "1",
+                companion: companion,
+                gateway: CompanionGatewayCapabilityBlock(
+                    status: "ok",
+                    capabilities: gatewayCapabilities
+                )
+            )
+        )
+    }
+
     static func session(
         usesSimplifiedChinese: Bool
     ) -> SessionSummary {
@@ -448,5 +550,155 @@ private actor CoreChatLabModelService: CompanionModelServing {
             )
         )
     }
+}
+
+private actor CoreChatLabWorkspaceService: CompanionWorkspaceServing {
+    func roots() async throws -> [CompanionWorkspaceRoot] {
+        [
+            CompanionWorkspaceRoot(
+                id: "workspace",
+                name: "Hermes Workspace",
+                writable: true,
+                attachable: true
+            )
+        ]
+    }
+
+    func entries(
+        rootID: String,
+        path: String,
+        cursor: String?
+    ) async throws -> CompanionWorkspacePage {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func preview(
+        rootID: String,
+        path: String
+    ) async throws -> CompanionWorkspacePreview {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func download(rootID: String, path: String) async throws -> Data {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func downloadAttachment(path: String) async throws -> Data {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func upload(
+        sessionID: String,
+        destination: CompanionUploadDestination,
+        filename: String,
+        contentType: String,
+        fileURL: URL,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws -> CompanionUpload {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func stageServerFile(
+        sessionID: String,
+        sourceRootID: String,
+        sourcePath: String,
+        destination: CompanionUploadDestination
+    ) async throws -> CompanionUpload {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func uploads(sessionID: String) async throws -> [CompanionUpload] {
+        []
+    }
+
+    func deleteUpload(id: String) async throws {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func memory(target: String) async throws -> CompanionMemorySnapshot {
+        CompanionMemorySnapshot(
+            target: target,
+            entries: ["Prefer concise, evidence-backed answers."],
+            revision: "ui-smoke",
+            charCount: 39,
+            charLimit: 12_000
+        )
+    }
+
+    func mutateMemory(
+        target: String,
+        revision: String,
+        operations: [CompanionMemoryOperation]
+    ) async throws -> CompanionMemorySnapshot {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+
+    func resetMemory(
+        target: String,
+        revision: String,
+        confirmation: String
+    ) async throws -> CompanionMemorySnapshot {
+        throw CompanionWorkspaceServiceError.notConfigured
+    }
+}
+
+private actor CoreChatLabDiscoveryService: CompanionDiscoveryServing {
+    func fetch() async throws -> CompanionDiscoveryCatalog {
+        CompanionDiscoveryCatalog(
+            skills: [
+                CompanionSkill(
+                    name: "ui-review",
+                    description: "Local UI acceptance fixture",
+                    category: "System"
+                )
+            ],
+            toolsets: [
+                CompanionToolset(
+                    name: "workspace",
+                    label: "Workspace",
+                    description: "Local UI acceptance fixture",
+                    enabled: true,
+                    configured: true,
+                    tools: ["read_file"]
+                )
+            ]
+        )
+    }
+}
+
+private actor CoreChatLabConnectionService: CompanionConnectionServing {
+    private let connection: CompanionConnection
+
+    init(connection: CompanionConnection) {
+        self.connection = connection
+    }
+
+    func checkLiveness(
+        companionURLString: String
+    ) async throws -> CompanionHealth {
+        throw CompanionConnectionError.invalidRequest
+    }
+
+    func pair(
+        companionURLString: String,
+        secret: String,
+        deviceName: String
+    ) async throws -> CompanionConnection {
+        throw CompanionConnectionError.invalidRequest
+    }
+
+    func savedCompanionURL() async -> URL? {
+        connection.companionURL
+    }
+
+    func hasStoredDeviceCredential() async -> Bool {
+        false
+    }
+
+    func resume() async throws -> CompanionConnection? {
+        connection
+    }
+
+    func forget() async {}
 }
 #endif

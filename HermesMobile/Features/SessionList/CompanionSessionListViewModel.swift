@@ -678,6 +678,7 @@ final class CompanionSessionHistoryViewModel {
     private var runStartAdmission: (() -> Bool)?
     @ObservationIgnored private var deltaBuffer =
         ConversationRunDeltaBuffer()
+    private var deltaPresentationTickCount = 0
     private var liveRunAnchorMessageIDs: Set<String> = []
     private var isStopRequestInFlight = false
     private var stopRecoveryState: CompanionStopRecoveryState = .notRequested
@@ -734,14 +735,23 @@ final class CompanionSessionHistoryViewModel {
         return allMessages[visibleStartIndex...].filter { message in
             message.role != "tool"
                 && !TranscriptTurnClassifier.isToolResultOnlyMessage(message)
-                && !isLivePlaceholderMessage(message)
+                && !isHiddenAssistantPlaceholder(message)
         }
     }
 
-    private func isLivePlaceholderMessage(_ message: ChatMessage) -> Bool {
-        message.role == "assistant"
-            && message.content?.trimmedNonEmptyValue == nil
-            && isLiveRunAnchor(message.id)
+    private func isHiddenAssistantPlaceholder(
+        _ message: ChatMessage
+    ) -> Bool {
+        guard message.role == "assistant",
+              message.content?.trimmedNonEmptyValue == nil,
+              message.attachments?.isEmpty != false,
+              let anchorID = transcriptAnchorID(for: message) else {
+            return false
+        }
+        if isLiveRunAnchor(anchorID) {
+            return true
+        }
+        return durablePresentationAnchorIDsByAnchorID[anchorID] != anchorID
     }
 
     /// Primes cache-backed rows before a navigation transition completes. The
@@ -775,19 +785,51 @@ final class CompanionSessionHistoryViewModel {
     func durableReasoning(
         anchoredTo message: ChatMessage
     ) -> [ReasoningGroup] {
-        durableReasoningGroups.filter {
-            $0.anchorMessageID == message.id
-                && !isLiveRunAnchor($0.anchorMessageID)
+        guard let messageAnchorID = transcriptAnchorID(for: message) else {
+            return []
         }
+        let groups = durableReasoningGroups.filter { group in
+            guard let anchorID = group.anchorMessageID else { return false }
+            return !isLiveRunAnchor(anchorID)
+                && durablePresentationAnchorIDsByAnchorID[anchorID]
+                    == messageAnchorID
+        }
+        guard let text = consolidatedReasoningText(from: groups) else {
+            return []
+        }
+        return [
+            ReasoningGroup(
+                id: "turn-reasoning-\(messageAnchorID)",
+                anchorMessageID: messageAnchorID,
+                text: text
+            )
+        ]
     }
 
     func durableToolActivity(
         anchoredTo message: ChatMessage
     ) -> [ToolCallGroup] {
-        durableToolCallGroups.filter {
-            $0.anchorMessageID == message.id
-                && !isLiveRunAnchor($0.anchorMessageID)
+        guard let messageAnchorID = transcriptAnchorID(for: message) else {
+            return []
         }
+        let groups = durableToolCallGroups.filter { group in
+            guard let anchorID = group.anchorMessageID else { return false }
+            return !isLiveRunAnchor(anchorID)
+                && durablePresentationAnchorIDsByAnchorID[anchorID]
+                    == messageAnchorID
+        }
+        guard !groups.isEmpty else { return [] }
+        let toolCalls = ToolCallGroup.coalescingByAssistantTurn(
+            groups,
+            messages: allMessages
+        ).flatMap(\.toolCalls)
+        return [
+            ToolCallGroup(
+                id: "turn-tools-\(messageAnchorID)",
+                anchorMessageID: messageAnchorID,
+                toolCalls: toolCalls
+            )
+        ]
     }
 
     var liveReasoningGroups: [ReasoningGroup] {
@@ -811,12 +853,37 @@ final class CompanionSessionHistoryViewModel {
         }
         groups.append(
             ReasoningGroup(
-                id: "live-reasoning-\(activeRunID ?? "pending")",
+                id: "live-reasoning-\(presentationRunID ?? "pending")",
                 anchorMessageID: nil,
                 text: liveText
             )
         )
         return groups
+    }
+
+    /// Presents the current turn as one continuously updating thinking block,
+    /// even when Hermes persists several reasoning checkpoints.
+    var liveReasoningPresentationText: String? {
+        consolidatedReasoningText(from: liveReasoningGroups)
+    }
+
+    private func consolidatedReasoningText(
+        from groups: [ReasoningGroup]
+    ) -> String? {
+        var checkpoints: [String] = []
+        for group in groups {
+            guard let text = group.text.trimmedNonEmptyValue else { continue }
+            if let last = checkpoints.last,
+               text.hasPrefix(last) || last.hasPrefix(text) {
+                if text.count > last.count {
+                    checkpoints[checkpoints.count - 1] = text
+                }
+            } else if !checkpoints.contains(text) {
+                checkpoints.append(text)
+            }
+        }
+        guard !checkpoints.isEmpty else { return nil }
+        return checkpoints.joined(separator: "\n\n")
     }
 
     var liveToolActivityGroup: ToolCallGroup? {
@@ -828,7 +895,7 @@ final class CompanionSessionHistoryViewModel {
         }
         let anchorMessageID = persistedGroups.first?.anchorMessageID
         let persisted = ToolCallGroup(
-            id: "live-tools-\(activeRunID ?? "pending")",
+            id: "live-tools-\(presentationRunID ?? "pending")",
             anchorMessageID: anchorMessageID,
             toolCalls: persistedGroups.flatMap(\.toolCalls)
         )
@@ -842,7 +909,7 @@ final class CompanionSessionHistoryViewModel {
             ]
         )
         return ToolCallGroup(
-            id: "live-tools-\(activeRunID ?? "pending")",
+            id: "live-tools-\(presentationRunID ?? "pending")",
             anchorMessageID: anchorMessageID,
             toolCalls: merged.flatMap(\.toolCalls)
         )
@@ -856,6 +923,10 @@ final class CompanionSessionHistoryViewModel {
         activeRunID != nil || runState == .starting
     }
 
+    var isLiveThinkingPresentationActive: Bool {
+        isRunActive || isTerminalRefreshPending
+    }
+
     var hasLiveTranscriptContent: Bool {
         !liveReasoningGroups.isEmpty
             || liveToolActivityGroup != nil
@@ -866,7 +937,10 @@ final class CompanionSessionHistoryViewModel {
     }
 
     var showsThinkingIndicator: Bool {
-        guard isRunActive, isWaitingForVisibleRunProgress else {
+        guard isRunActive,
+              isWaitingForVisibleRunProgress,
+              liveReasoningPresentationText == nil,
+              liveToolActivityGroup == nil else {
             return false
         }
         switch runState {
@@ -879,8 +953,57 @@ final class CompanionSessionHistoryViewModel {
     }
 
     private func isLiveRunAnchor(_ anchorMessageID: String?) -> Bool {
-        guard isRunActive, let anchorMessageID else { return false }
+        guard isLiveThinkingPresentationActive,
+              let anchorMessageID else { return false }
         return liveRunAnchorMessageIDs.contains(anchorMessageID)
+    }
+
+    private var presentationRunID: String? {
+        activeRunID ?? terminalPresentationRunID
+    }
+
+    private var durablePresentationAnchorIDsByAnchorID: [String: String] {
+        let turnKeys = TranscriptTurnClassifier
+            .assistantTurnKeysByAnchorID(allMessages)
+        var anchorsByTurnKey: [String: [String]] = [:]
+        var visibleAnchorByTurnKey: [String: String] = [:]
+
+        for (index, message) in allMessages.enumerated()
+        where message.role == "assistant" {
+            let anchorID = TranscriptTurnClassifier.anchorID(
+                for: message,
+                at: index
+            )
+            let turnKey = turnKeys[anchorID] ?? "message:\(anchorID)"
+            anchorsByTurnKey[turnKey, default: []].append(anchorID)
+            if message.content?.trimmedNonEmptyValue != nil
+                || message.attachments?.isEmpty == false {
+                visibleAnchorByTurnKey[turnKey] = anchorID
+            }
+        }
+
+        return anchorsByTurnKey.reduce(into: [:]) { result, entry in
+            guard let fallbackAnchor = entry.value.last else { return }
+            let presentationAnchor =
+                visibleAnchorByTurnKey[entry.key] ?? fallbackAnchor
+            for anchorID in entry.value {
+                result[anchorID] = presentationAnchor
+            }
+        }
+    }
+
+    private func transcriptAnchorID(
+        for message: ChatMessage
+    ) -> String? {
+        guard let index = allMessages.firstIndex(where: {
+            $0.id == message.id
+        }) else {
+            return message.messageId
+        }
+        return TranscriptTurnClassifier.anchorID(
+            for: message,
+            at: index
+        )
     }
 
     private var activeRunKey: CompanionActiveRunKey? {
@@ -901,7 +1024,24 @@ final class CompanionSessionHistoryViewModel {
             && !isTerminalRefreshPending
             && !needsTerminalHistoryRetry
             && !isApplyingModelSelection
-            && errorMessage == nil
+            && (errorMessage == nil || hasLoadedAuthoritativeHistory)
+    }
+
+    /// Drafting is local UI state. A history refresh or transient transport
+    /// failure may delay Send, but must never make the text field inert.
+    var canEditDraft: Bool {
+        !isPreparingDroppedAttachments
+    }
+
+    /// Retained view models keep live runs and drafts across compact
+    /// navigation. They must not also retain a transient refresh failure
+    /// forever merely because one earlier authoritative load succeeded.
+    var shouldRefreshHistoryOnAppearance: Bool {
+        !isRunActive
+            && (!hasLoadedAuthoritativeHistory
+                || isViewingCachedData
+                || errorMessage != nil
+                || needsTerminalHistoryRetry)
     }
 
     func prepareDroppedAttachments(
@@ -1266,7 +1406,7 @@ final class CompanionSessionHistoryViewModel {
             role: "assistant",
             content: streamedAssistantText,
             timestamp: nil,
-            messageId: activeRunID.map { "stream-\($0)" }
+            messageId: presentationRunID.map { "stream-\($0)" }
         )
     }
 
@@ -1294,9 +1434,14 @@ final class CompanionSessionHistoryViewModel {
 
         do {
             let history = try await repository.messageHistory(id: sessionID)
-            let resolvedSession = try await repository.session(
-                id: history.sessionID
-            )
+            let resolvedSession: SessionSummary
+            if history.sessionID == sessionID {
+                resolvedSession = session
+            } else {
+                resolvedSession = (try? await repository.session(
+                    id: history.sessionID
+                )) ?? session.replacingSessionID(with: history.sessionID)
+            }
             session = resolvedSession
             let preservedTerminalPresentation: Bool
             if let activeRunID, !runState.isTerminalPresentation {
@@ -1327,6 +1472,16 @@ final class CompanionSessionHistoryViewModel {
                 sessionID: history.sessionID,
                 in: modelContext
             )
+            if history.sessionID != sessionID {
+                // The sidebar continues to address the lineage root. Keep a
+                // root-keyed snapshot too so the next launch can paint before
+                // Gateway resolves the compression tip again.
+                cache(
+                    history.messages,
+                    sessionID: sessionID,
+                    in: modelContext
+                )
+            }
             cacheSession(resolvedSession, in: modelContext)
             if needsTerminalHistoryRetry,
                !preservedTerminalPresentation {
@@ -1353,6 +1508,13 @@ final class CompanionSessionHistoryViewModel {
             }
             return false
         }
+    }
+
+    func refreshHistoryOnAppearance(
+        modelContext: ModelContext? = nil
+    ) async {
+        guard shouldRefreshHistoryOnAppearance else { return }
+        _ = await load(modelContext: modelContext)
     }
 
     func resumeRunObservation(
@@ -2013,6 +2175,9 @@ final class CompanionSessionHistoryViewModel {
     }
 
     private func enqueue(_ delta: String) {
+        if deltaBuffer.isEmpty {
+            deltaPresentationTickCount = 0
+        }
         deltaBuffer.append(delta)
         ensureDeltaFlushScheduled()
     }
@@ -2024,7 +2189,9 @@ final class CompanionSessionHistoryViewModel {
 
     private func scheduleDeltaFlush() {
         deltaFlushTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 33_000_000)
+            try? await Task.sleep(
+                nanoseconds: Self.deltaFlushCadenceNanoseconds
+            )
             guard !Task.isCancelled else { return }
             self?.flushPendingDelta()
         }
@@ -2033,14 +2200,59 @@ final class CompanionSessionHistoryViewModel {
     private func flushPendingDelta() {
         deltaFlushTask?.cancel()
         deltaFlushTask = nil
+        let pendingText = deltaBuffer.pendingText
+        let backlogUnits = StreamingWordDrain.unitCount(in: pendingText)
+        let maximumTicks = max(
+            1,
+            Int(
+                Self.maximumPresentationLagNanoseconds
+                    / Self.deltaFlushCadenceNanoseconds
+            )
+        )
+        let remainingTicks = max(
+            1,
+            maximumTicks - deltaPresentationTickCount
+        )
+        let remainingLagNanoseconds =
+            Self.deltaFlushCadenceNanoseconds * UInt64(remainingTicks)
+        let maximumCharacters: Int
+        if backlogUnits <= 1 {
+            maximumCharacters = max(
+                3,
+                Int(
+                    ceil(
+                        Double(pendingText.count)
+                            / Double(remainingTicks)
+                    )
+                )
+            )
+        } else {
+            let quota = StreamingWordDrain.drainQuota(
+                backlogUnitCount: backlogUnits,
+                cadenceNanoseconds: Self.deltaFlushCadenceNanoseconds,
+                maxLagNanoseconds: remainingLagNanoseconds
+            )
+            maximumCharacters = StreamingWordDrain.splitAtUnitBoundary(
+                pendingText,
+                unitCount: quota
+            ).head.count
+        }
         let drained = deltaBuffer.drain(
-            maximumCharacters: 192
+            maximumCharacters: maximumCharacters
         )
         guard !drained.isEmpty else { return }
+        deltaPresentationTickCount += 1
+        if deltaBuffer.isEmpty {
+            deltaPresentationTickCount = 0
+        }
         streamedAssistantText += drained
         markStreamingTranscriptChanged()
         ensureDeltaFlushScheduled()
     }
+
+    private static let deltaFlushCadenceNanoseconds: UInt64 = 60_000_000
+    private static let maximumPresentationLagNanoseconds: UInt64 =
+        2_000_000_000
 
     private func beginReconciliation(
         runID: String,
