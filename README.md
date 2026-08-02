@@ -16,14 +16,15 @@
 
 ## Status
 
-Hermes Nest now uses the approved App → self-hosted Companion → loopback
-Hermes Gateway architecture. The personal product builds only the native
-iPhone/iPad App; inherited WebUI login/control routes and extension targets are
-not part of its runtime.
+Hermes Nest v0.1.0 is the first formal personal-sideload release. It uses the
+approved App → self-hosted Companion → loopback Hermes Gateway architecture.
+The personal product builds only the native iPhone/iPad App; inherited WebUI
+login/control routes and extension targets are not part of its runtime.
 
 - Distribution target: personal sideload, not App Store/TestFlight.
-- Current development branch changes remain local until explicitly approved
-  for push.
+- Download the unsigned IPA from the
+  [latest GitHub Release](https://github.com/KiRito02/hermes-nest/releases/latest),
+  then sign and install it with AltStore or SideStore.
 
 ## Goal
 
